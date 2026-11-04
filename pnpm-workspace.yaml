@@ -1,0 +1,4 @@
+packages:
+  - ui
+  - e2e/ui
+  - docs

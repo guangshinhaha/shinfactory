@@ -1,0 +1,42 @@
+[routing.defaults]
+provider = "claude"
+model = "claude-opus-4-6"
+
+# Tag-specific routing overrides. Example:
+# [routing.tags.urgent]
+# provider = "claude"
+# model = "claude-opus-4-6"
+
+[skills]
+paths = [".agents/skills"]
+
+[agents.claude]
+path = "~/.claude"
+args = ["--dangerously-skip-permissions", "--verbose"]
+
+[agents.codex]
+path = "~/.codex"
+
+[adapters.backlog]
+skill = "todo"
+
+[adapters.backlog.scripts]
+sync = "go run adapters/main.go backlog-sync"
+add = "go run adapters/main.go backlog-add"
+done = "go run adapters/main.go backlog-done"
+edit = "go run adapters/main.go backlog-edit"
+
+[runtime]
+# "process" | "sprites"
+default = "process"
+
+[runtime.sprites]
+# token_env = "SPRITES_TOKEN"
+# base_url = ""
+sprite_name = "noodle-dev"
+# git_token_env = "GITHUB_TOKEN"
+
+# [runtime.cursor]
+# api_key_env = "CURSOR_API_KEY"
+# base_url = ""
+# repository = ""
