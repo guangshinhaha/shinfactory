@@ -5,11 +5,11 @@ tmp_dir = "/tmp/air-noodle"
 
 [build]
 # Rebuild the noodle CLI into ./bin on source changes.
-cmd = "go build -o ./bin/noodle ."
-bin = "./bin/noodle"
+cmd = "go build -o ./bin/shinfactory ."
+bin = "./bin/shinfactory"
 
 # Run noodle start so the Go API server is live for Vite's proxy.
-entrypoint = ["./bin/noodle", "start"]
+entrypoint = ["./bin/shinfactory", "start"]
 
 include_ext = ["go", "mod", "sum"]
 exclude_dir = [".git", ".worktrees", "node_modules", "dist", "target", "tmp"]

@@ -2,7 +2,7 @@ version: 2
 
 builds:
   - main: .
-    binary: noodle
+    binary: shinfactory
     env:
       - CGO_ENABLED=0
     goos:

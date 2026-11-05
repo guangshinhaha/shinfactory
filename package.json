@@ -8,7 +8,7 @@
   ],
   "scripts": {
     "setup": "pnpm install",
-    "build": "pnpm --filter noodle-ui build && go build -o ./bin/noodle .",
+    "build": "pnpm --filter noodle-ui build && go build -o ./bin/shinfactory .",
     "generate": "go generate ./generate/...",
     "release": "node ./scripts/release.mjs",
     "test": "go test ./...",
@@ -22,7 +22,7 @@
     "status": "go run . status",
     "skills": "go run . skills list",
     "dev": "mkdir -p ui/dist/client && concurrently -k -n vite,api -c blue,green \"pnpm --filter noodle-ui dev\" \"NOODLE_BROWSER_URL=http://localhost:5173 NOODLE_DEV=1 go tool air -c .air.toml\"",
-    "dev:ui": "go build -o ./bin/noodle . && concurrently -k -n vite,noodle -c blue,green \"pnpm --filter noodle-ui dev\" \"NOODLE_NO_BROWSER=1 ./bin/noodle start\"",
+    "dev:ui": "go build -o ./bin/shinfactory . && concurrently -k -n vite,noodle -c blue,green \"pnpm --filter noodle-ui dev\" \"NOODLE_NO_BROWSER=1 ./bin/shinfactory start\"",
     "dev:backend": "pnpm --filter noodle-ui build && NOODLE_DEV=1 go tool air -c .air.toml",
     "dev:verbose": "mkdir -p ui/dist/client && concurrently -k -n vite,api -c blue,green \"pnpm --filter noodle-ui dev\" \"NOODLE_BROWSER_URL=http://localhost:5173 NOODLE_DEV=1 go tool air -d -c .air.verbose.toml\"",
     "fixtures:loop": "NOODLE_LOOP_FIXTURE_MODE=check go test ./loop -run TestLoopDirectoryFixtures -count=1 && go run ./scripts/fixturehash check --root loop/testdata",
@@ -32,7 +32,7 @@
     "bugs": "sh scripts/bugs.sh",
     "docs:dev": "pnpm --filter noodle-docs dev",
     "docs:build": "pnpm --filter noodle-docs build",
-    "clean": "rm -f ./bin/noodle && rm -rf ui/dist/client/assets ui/dist/client/index.html",
+    "clean": "rm -f ./bin/shinfactory && rm -rf ui/dist/client/assets ui/dist/client/index.html",
     "mark-done": "sh scripts/mark-done.sh",
     "sandbox": "sh scripts/sandbox.sh",
     "test:smoke": "go test -tags e2e -timeout 600s -count=1 ./e2e/"

@@ -24,7 +24,7 @@ func NewRootCmd() *cobra.Command {
 	var showVersion bool
 
 	root := &cobra.Command{
-		Use:           "noodle",
+		Use:           "shinfactory",
 		Short:         "Open-source AI coding framework",
 		SilenceUsage:  true,
 		SilenceErrors: true,

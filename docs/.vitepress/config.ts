@@ -14,7 +14,7 @@ export default defineConfig({
     },
   },
   base: "/noodle/",
-  title: "Noodle",
+  title: "shinfactory",
   description:
     "Noodle is an open-source AI coding framework that orchestrates agents using skills — reusable, self-scheduling units of work. Built with Go, it uses LLM-powered scheduling and a kitchen brigade model to automate code review, testing, planning, and more.",
 
