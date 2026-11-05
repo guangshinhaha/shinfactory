@@ -28,7 +28,7 @@ For directories without a dedicated index file yet (`brain/codebase/`, `brain/au
 brain/
 ├── index.md              ← root entry point, links to everything
 ├── principles.md         ← pointer: principles live in shinstack
-├── todos.md              ← product backlog
+├── todos.md              ← backlog, only with the todos.md backend (else GitHub issues)
 ├── vision.md             ← elevator pitch + link to architecture
 ├── architecture.md       ← full technical reference
 ├── codebase/             ← project-specific knowledge and gotchas
@@ -43,7 +43,7 @@ brain/
 - If you introduce a new top-level category, add an index-style entrypoint for it (links only, no inlined content).
 - `brain/index.md` is the root. Every brain file must be reachable from it.
 - File names: lowercase, hyphenated. `worktree-gotchas.md`.
-- Plan directories: prefixed with the todo ID from `brain/todos.md`. `02-arrow-bindings/` with `overview.md` and `phase-N-*.md` inside.
+- Plan directories: prefixed with the backlog item ID (issue number on a GitHub backlog). `02-arrow-bindings/` with `overview.md` and `phase-N-*.md` inside.
 
 ## Wikilinks
 

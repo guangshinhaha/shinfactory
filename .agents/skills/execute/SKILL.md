@@ -19,7 +19,7 @@ Implementation methodology. Loads alongside the domain skill (e.g., "noodle") â€
 Establish what needs doing:
 
 - **Plan phase**: Read the assigned phase from `brain/plans/`. Read the overview for scope boundaries. Invoke Skill(backlog) for project-specific context. Load domain skills listed in "Applicable skills."
-- **Backlog item**: Read the todo from `brain/todos.md`. If a linked plan exists, read it. Otherwise, scope from the description.
+- **Backlog item**: Read the item with the `todo` skill (a GitHub issue or a `brain/todos.md` line). If a linked plan exists, read it. Otherwise, scope from the description.
 - **Ad-hoc request**: The user prompt is the scope. Identify affected files and packages before starting.
 
 Output: a clear, bounded description of what changes and what doesn't.

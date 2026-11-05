@@ -86,6 +86,6 @@ Create the plan structure directly using file tools:
 2. Write `brain/plans/NN-slug-name/overview.md` with YAML frontmatter (`id`, `created`, `status: active`)
 3. Write each phase file: `brain/plans/NN-slug-name/phase-01-name.md`, `phase-02-name.md`, etc.
 4. Append `- [[plans/NN-slug-name/overview]]` to `brain/plans/index.md`
-5. Add the plan wikilink `[[plans/NN-slug-name/overview]]` to the todo item in `brain/todos.md`
+5. Link the plan to its backlog item with the `todo` skill (Link a plan)
 
 Fill in the overview and phase file content using Edit tools.

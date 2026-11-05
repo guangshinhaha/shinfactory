@@ -8,7 +8,7 @@ You are running inside a Noodle cook session — an autonomous coding agent mana
 
 Your working directory is a git worktree (an isolated checkout). It contains committed project files:
 
-- ` + "`" + `todos.md` + "`" + ` — Project backlog items
+- The project backlog: GitHub issues or ` + "`" + `todos.md` + "`" + `, depending on the backlog adapter in ` + "`" + `.noodle.toml` + "`" + `. Read and update it with the ` + "`" + `todo` + "`" + ` skill.
 
 The ` + "`" + `.noodle/` + "`" + ` directory (mise.json, orders.json, tickets.json) is in the main checkout, not in your worktree. Your task context is provided in the prompt — do not try to read .noodle state files.
 
