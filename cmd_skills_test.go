@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/poteto/noodle/config"
+	"github.com/guangshinhaha/shinfactory/config"
 )
 
 func TestSkillsListRespectsPrecedence(t *testing.T) {

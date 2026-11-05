@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/poteto/noodle/internal/mode"
-	"github.com/poteto/noodle/internal/orderx"
-	"github.com/poteto/noodle/internal/projection"
-	"github.com/poteto/noodle/internal/reducer"
-	"github.com/poteto/noodle/internal/state"
+	"github.com/guangshinhaha/shinfactory/internal/mode"
+	"github.com/guangshinhaha/shinfactory/internal/orderx"
+	"github.com/guangshinhaha/shinfactory/internal/projection"
+	"github.com/guangshinhaha/shinfactory/internal/reducer"
+	"github.com/guangshinhaha/shinfactory/internal/state"
 )
 
 func (l *Loop) loadOrdersState() error {

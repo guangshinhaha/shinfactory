@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/poteto/noodle/internal/filex"
+	"github.com/guangshinhaha/shinfactory/internal/filex"
 )
 
 type ticketState struct {

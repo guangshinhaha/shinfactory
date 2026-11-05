@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/poteto/noodle/loop"
+	"github.com/guangshinhaha/shinfactory/loop"
 )
 
 // TraceFilter categorizes event lines for filtering.

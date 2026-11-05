@@ -3,8 +3,8 @@ package dispatcher
 import (
 	"context"
 
-	"github.com/poteto/noodle/event"
-	"github.com/poteto/noodle/parse"
+	"github.com/guangshinhaha/shinfactory/event"
+	"github.com/guangshinhaha/shinfactory/parse"
 )
 
 // processSession implements Session backed by a direct child process.

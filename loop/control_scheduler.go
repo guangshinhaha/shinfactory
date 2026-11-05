@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/poteto/noodle/internal/ingest"
+	"github.com/guangshinhaha/shinfactory/internal/ingest"
 )
 
 // controlAdvance force-completes the active stage of an order.

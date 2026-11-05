@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/poteto/noodle/internal/stringx"
+	"github.com/guangshinhaha/shinfactory/internal/stringx"
 )
 
 // Ingester is the single ingestion arbiter for external inputs.

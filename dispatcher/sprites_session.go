@@ -8,7 +8,7 @@ import (
 
 	sprites "github.com/superfly/sprites-go"
 
-	"github.com/poteto/noodle/event"
+	"github.com/guangshinhaha/shinfactory/event"
 )
 
 type spritesSessionConfig struct {

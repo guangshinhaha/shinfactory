@@ -3,7 +3,7 @@ package shellx
 import (
 	"strings"
 
-	"github.com/poteto/noodle/internal/stringx"
+	"github.com/guangshinhaha/shinfactory/internal/stringx"
 )
 
 // Quote wraps a shell token in single quotes and escapes embedded single quotes.

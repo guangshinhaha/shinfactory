@@ -1,8 +1,8 @@
 package taskreg
 
 import (
-	"github.com/poteto/noodle/internal/stringx"
-	"github.com/poteto/noodle/skill"
+	"github.com/guangshinhaha/shinfactory/internal/stringx"
+	"github.com/guangshinhaha/shinfactory/skill"
 )
 
 // TaskType is one schedulable task kind, discovered from skill frontmatter.

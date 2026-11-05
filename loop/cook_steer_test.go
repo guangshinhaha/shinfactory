@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/poteto/noodle/config"
-	"github.com/poteto/noodle/event"
-	loopruntime "github.com/poteto/noodle/runtime"
+	"github.com/guangshinhaha/shinfactory/config"
+	"github.com/guangshinhaha/shinfactory/event"
+	loopruntime "github.com/guangshinhaha/shinfactory/runtime"
 )
 
 type testSessionEventSink struct {

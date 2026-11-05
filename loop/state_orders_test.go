@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/poteto/noodle/internal/statever"
+	"github.com/guangshinhaha/shinfactory/internal/statever"
 )
 
 func TestMutateOrdersStateSkipsWriteWhenUnchanged(t *testing.T) {

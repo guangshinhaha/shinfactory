@@ -1,7 +1,7 @@
 package mise
 
 import (
-	"github.com/poteto/noodle/internal/jsonx"
+	"github.com/guangshinhaha/shinfactory/internal/jsonx"
 )
 
 func writeBriefAtomic(path string, brief Brief) error {

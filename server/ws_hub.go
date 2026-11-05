@@ -15,8 +15,8 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/gorilla/websocket"
-	"github.com/poteto/noodle/internal/snapshot"
-	"github.com/poteto/noodle/loop"
+	"github.com/guangshinhaha/shinfactory/internal/snapshot"
+	"github.com/guangshinhaha/shinfactory/loop"
 )
 
 // wsClient is a connected WebSocket consumer. Implements Subscriber.

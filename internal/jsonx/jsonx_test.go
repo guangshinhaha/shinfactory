@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/poteto/noodle/internal/jsonx"
+	"github.com/guangshinhaha/shinfactory/internal/jsonx"
 )
 
 type sample struct {

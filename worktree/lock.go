@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/poteto/noodle/internal/procx"
+	"github.com/guangshinhaha/shinfactory/internal/procx"
 )
 
 func (a *App) mergeLockPath() string {

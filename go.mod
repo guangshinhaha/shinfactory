@@ -1,4 +1,4 @@
-module github.com/poteto/noodle
+module github.com/guangshinhaha/shinfactory
 
 go 1.25.0
 

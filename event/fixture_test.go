@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/poteto/noodle/internal/testutil/fixturedir"
+	"github.com/guangshinhaha/shinfactory/internal/testutil/fixturedir"
 )
 
 func TestTicketMaterializerDirectoryFixtures(t *testing.T) {

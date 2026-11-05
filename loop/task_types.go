@@ -1,8 +1,8 @@
 package loop
 
 import (
-	"github.com/poteto/noodle/internal/taskreg"
-	"github.com/poteto/noodle/mise"
+	"github.com/guangshinhaha/shinfactory/internal/taskreg"
+	"github.com/guangshinhaha/shinfactory/mise"
 )
 
 // TaskType is the canonical registry entry for a Noodle task/session type.

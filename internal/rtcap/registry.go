@@ -3,7 +3,7 @@ package rtcap
 import (
 	"sync"
 
-	"github.com/poteto/noodle/internal/stringx"
+	"github.com/guangshinhaha/shinfactory/internal/stringx"
 )
 
 // Default capability profiles for known runtimes.

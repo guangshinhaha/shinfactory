@@ -7,8 +7,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/poteto/noodle/dispatcher"
-	"github.com/poteto/noodle/internal/procx"
+	"github.com/guangshinhaha/shinfactory/dispatcher"
+	"github.com/guangshinhaha/shinfactory/internal/procx"
 )
 
 // processRuntime adds PID-based session recovery to the base DispatcherRuntime.

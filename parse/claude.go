@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/poteto/noodle/internal/stringx"
+	"github.com/guangshinhaha/shinfactory/internal/stringx"
 )
 
 type ClaudeAdapter struct{}

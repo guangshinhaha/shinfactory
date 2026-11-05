@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/poteto/noodle/config"
-	"github.com/poteto/noodle/mise"
-	loopruntime "github.com/poteto/noodle/runtime"
+	"github.com/guangshinhaha/shinfactory/config"
+	"github.com/guangshinhaha/shinfactory/mise"
+	loopruntime "github.com/guangshinhaha/shinfactory/runtime"
 )
 
 func TestParkPendingReviewWritesFile(t *testing.T) {

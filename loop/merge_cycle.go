@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/poteto/noodle/internal/ingest"
+	"github.com/guangshinhaha/shinfactory/internal/ingest"
 )
 
 func (l *Loop) drainMergeResults(ctx context.Context) error {

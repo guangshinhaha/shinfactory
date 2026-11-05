@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/poteto/noodle/internal/jsonx"
+	"github.com/guangshinhaha/shinfactory/internal/jsonx"
 )
 
 func listSessionIDs(runtimeDir string) ([]string, error) {

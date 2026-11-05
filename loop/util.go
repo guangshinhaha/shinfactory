@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/poteto/noodle/internal/shellx"
-	"github.com/poteto/noodle/internal/stringx"
-	"github.com/poteto/noodle/mise"
+	"github.com/guangshinhaha/shinfactory/internal/shellx"
+	"github.com/guangshinhaha/shinfactory/internal/stringx"
+	"github.com/guangshinhaha/shinfactory/mise"
 )
 
 func buildCookPrompt(orderID string, stage Stage, plan []string, title string, rationale string, resumePrompt string) string {

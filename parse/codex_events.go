@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/poteto/noodle/internal/stringx"
+	"github.com/guangshinhaha/shinfactory/internal/stringx"
 )
 
 func parseCodexTurnContext(payload json.RawMessage, ts time.Time) ([]CanonicalEvent, error) {

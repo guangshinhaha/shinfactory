@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/poteto/noodle/internal/filex"
-	"github.com/poteto/noodle/internal/stringx"
+	"github.com/guangshinhaha/shinfactory/internal/filex"
+	"github.com/guangshinhaha/shinfactory/internal/stringx"
 )
 
 func (l *Loop) controlPaths() (controlPath string, ackPath string, lockPath string) {

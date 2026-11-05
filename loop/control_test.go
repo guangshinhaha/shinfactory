@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/poteto/noodle/config"
-	"github.com/poteto/noodle/internal/failure"
-	loopruntime "github.com/poteto/noodle/runtime"
+	"github.com/guangshinhaha/shinfactory/config"
+	"github.com/guangshinhaha/shinfactory/internal/failure"
+	loopruntime "github.com/guangshinhaha/shinfactory/runtime"
 )
 
 func newControlTestLoop(t *testing.T, wt *fakeWorktree, rt *mockRuntime) *Loop {

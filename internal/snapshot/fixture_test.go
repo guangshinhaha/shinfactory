@@ -10,11 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/poteto/noodle/internal/orderx"
-	"github.com/poteto/noodle/internal/projection"
-	"github.com/poteto/noodle/internal/testutil/fixturedir"
-	"github.com/poteto/noodle/loop"
-	"github.com/poteto/noodle/mise"
+	"github.com/guangshinhaha/shinfactory/internal/orderx"
+	"github.com/guangshinhaha/shinfactory/internal/projection"
+	"github.com/guangshinhaha/shinfactory/internal/testutil/fixturedir"
+	"github.com/guangshinhaha/shinfactory/loop"
+	"github.com/guangshinhaha/shinfactory/mise"
 )
 
 type snapshotFixtureInput struct {

@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/poteto/noodle/internal/ingest"
-	"github.com/poteto/noodle/internal/state"
-	"github.com/poteto/noodle/internal/stringx"
+	"github.com/guangshinhaha/shinfactory/internal/ingest"
+	"github.com/guangshinhaha/shinfactory/internal/state"
+	"github.com/guangshinhaha/shinfactory/internal/stringx"
 )
 
 type reduceHandler func(state.State, ingest.StateEvent) (state.State, []Effect, error)

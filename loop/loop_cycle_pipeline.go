@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/poteto/noodle/internal/dispatch"
-	"github.com/poteto/noodle/mise"
+	"github.com/guangshinhaha/shinfactory/internal/dispatch"
+	"github.com/guangshinhaha/shinfactory/mise"
 )
 
 const mergeBackpressureLimit = 128

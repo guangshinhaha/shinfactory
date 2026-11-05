@@ -14,9 +14,9 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/poteto/noodle/event"
-	"github.com/poteto/noodle/internal/snapshot"
-	"github.com/poteto/noodle/loop"
+	"github.com/guangshinhaha/shinfactory/event"
+	"github.com/guangshinhaha/shinfactory/internal/snapshot"
+	"github.com/guangshinhaha/shinfactory/loop"
 )
 
 type staticProvider struct {

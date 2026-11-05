@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/poteto/noodle/internal/ingest"
-	"github.com/poteto/noodle/internal/state"
-	"github.com/poteto/noodle/internal/statever"
+	"github.com/guangshinhaha/shinfactory/internal/ingest"
+	"github.com/guangshinhaha/shinfactory/internal/state"
+	"github.com/guangshinhaha/shinfactory/internal/statever"
 )
 
 func TestReducerPureDeterministic(t *testing.T) {

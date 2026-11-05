@@ -3,7 +3,7 @@ package parse
 import (
 	"strings"
 
-	"github.com/poteto/noodle/internal/stringx"
+	"github.com/guangshinhaha/shinfactory/internal/stringx"
 )
 
 func isInterruptNotice(text string) bool {

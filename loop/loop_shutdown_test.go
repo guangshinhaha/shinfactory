@@ -6,7 +6,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	loopruntime "github.com/poteto/noodle/runtime"
+	loopruntime "github.com/guangshinhaha/shinfactory/runtime"
 )
 
 type shutdownTestSession struct {

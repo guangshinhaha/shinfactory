@@ -1,5 +1,5 @@
 packages:
-  - path: github.com/poteto/noodle/internal/snapshot
+  - path: github.com/guangshinhaha/shinfactory/internal/snapshot
     output_path: ui/src/client/generated-types.ts
     indent: "  "
     frontmatter: |
@@ -12,7 +12,7 @@ packages:
     exclude_files:
       - snapshot.go
 
-  - path: github.com/poteto/noodle/loop
+  - path: github.com/guangshinhaha/shinfactory/loop
     output_path: ui/src/client/generated-loop-types.ts
     indent: "  "
     type_mappings:

@@ -13,12 +13,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/poteto/noodle/config"
-	"github.com/poteto/noodle/internal/snapshot"
-	"github.com/poteto/noodle/internal/stringx"
-	"github.com/poteto/noodle/loop"
-	"github.com/poteto/noodle/skill"
-	"github.com/poteto/noodle/worktree"
+	"github.com/guangshinhaha/shinfactory/config"
+	"github.com/guangshinhaha/shinfactory/internal/snapshot"
+	"github.com/guangshinhaha/shinfactory/internal/stringx"
+	"github.com/guangshinhaha/shinfactory/loop"
+	"github.com/guangshinhaha/shinfactory/skill"
+	"github.com/guangshinhaha/shinfactory/worktree"
 )
 
 //go:embed placeholder.html

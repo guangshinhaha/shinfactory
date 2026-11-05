@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/poteto/noodle/config"
-	"github.com/poteto/noodle/internal/statusfile"
-	loopruntime "github.com/poteto/noodle/runtime"
+	"github.com/guangshinhaha/shinfactory/config"
+	"github.com/guangshinhaha/shinfactory/internal/statusfile"
+	loopruntime "github.com/guangshinhaha/shinfactory/runtime"
 )
 
 func TestStampStatusWarningChangeTriggersWrite(t *testing.T) {

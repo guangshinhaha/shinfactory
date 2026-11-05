@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/poteto/noodle/generate"
+	"github.com/guangshinhaha/shinfactory/generate"
 )
 
 func main() {

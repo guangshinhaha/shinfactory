@@ -6,9 +6,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/poteto/noodle/internal/orderx"
-	"github.com/poteto/noodle/internal/statusfile"
-	"github.com/poteto/noodle/mise"
+	"github.com/guangshinhaha/shinfactory/internal/orderx"
+	"github.com/guangshinhaha/shinfactory/internal/statusfile"
+	"github.com/guangshinhaha/shinfactory/mise"
 )
 
 // FieldDoc is the canonical schema metadata for one leaf field.

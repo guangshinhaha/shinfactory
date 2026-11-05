@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/poteto/noodle/internal/filex"
+	"github.com/guangshinhaha/shinfactory/internal/filex"
 )
 
 // LaunchRecordState is the two-phase launch lifecycle state.

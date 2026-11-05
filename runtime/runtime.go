@@ -5,7 +5,7 @@ import (
 	"errors"
 	"path/filepath"
 
-	"github.com/poteto/noodle/dispatcher"
+	"github.com/guangshinhaha/shinfactory/dispatcher"
 )
 
 // DispatchRequest is shared with the existing dispatcher boundary.

@@ -8,7 +8,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/poteto/noodle/internal/stringx"
+	"github.com/guangshinhaha/shinfactory/internal/stringx"
 )
 
 var recoverySuffixRegexp = regexp.MustCompile(`-recover-(\d+)$`)

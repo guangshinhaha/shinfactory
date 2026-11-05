@@ -9,10 +9,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/poteto/noodle/internal/ingest"
-	"github.com/poteto/noodle/internal/stringx"
-	loopruntime "github.com/poteto/noodle/runtime"
-	"github.com/poteto/noodle/worktree"
+	"github.com/guangshinhaha/shinfactory/internal/ingest"
+	"github.com/guangshinhaha/shinfactory/internal/stringx"
+	loopruntime "github.com/guangshinhaha/shinfactory/runtime"
+	"github.com/guangshinhaha/shinfactory/worktree"
 )
 
 // mergeCookWorktree merges the cook's worktree to main.

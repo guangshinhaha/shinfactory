@@ -8,7 +8,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/poteto/noodle/skill"
+	"github.com/guangshinhaha/shinfactory/skill"
 )
 
 type loadedSkill struct {

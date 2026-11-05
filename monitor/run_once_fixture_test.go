@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/poteto/noodle/event"
-	"github.com/poteto/noodle/internal/testutil/fixturedir"
+	"github.com/guangshinhaha/shinfactory/event"
+	"github.com/guangshinhaha/shinfactory/internal/testutil/fixturedir"
 )
 
 type monitorRunOnceFixtureInput struct {

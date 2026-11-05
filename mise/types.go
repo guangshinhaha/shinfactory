@@ -3,8 +3,8 @@ package mise
 import (
 	"time"
 
-	"github.com/poteto/noodle/adapter"
-	"github.com/poteto/noodle/event"
+	"github.com/guangshinhaha/shinfactory/adapter"
+	"github.com/guangshinhaha/shinfactory/event"
 )
 
 type ActiveSummary struct {

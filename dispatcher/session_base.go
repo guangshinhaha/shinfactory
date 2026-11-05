@@ -12,9 +12,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/poteto/noodle/event"
-	"github.com/poteto/noodle/parse"
-	"github.com/poteto/noodle/stamp"
+	"github.com/guangshinhaha/shinfactory/event"
+	"github.com/guangshinhaha/shinfactory/parse"
+	"github.com/guangshinhaha/shinfactory/stamp"
 )
 
 const (

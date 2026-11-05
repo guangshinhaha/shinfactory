@@ -14,12 +14,12 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
-	"github.com/poteto/noodle/adapter"
-	"github.com/poteto/noodle/config"
-	"github.com/poteto/noodle/internal/testutil/fixturedir"
-	"github.com/poteto/noodle/mise"
-	loopruntime "github.com/poteto/noodle/runtime"
-	"github.com/poteto/noodle/worktree"
+	"github.com/guangshinhaha/shinfactory/adapter"
+	"github.com/guangshinhaha/shinfactory/config"
+	"github.com/guangshinhaha/shinfactory/internal/testutil/fixturedir"
+	"github.com/guangshinhaha/shinfactory/mise"
+	loopruntime "github.com/guangshinhaha/shinfactory/runtime"
+	"github.com/guangshinhaha/shinfactory/worktree"
 )
 
 type loopFixtureSetup struct {

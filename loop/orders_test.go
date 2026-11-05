@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/poteto/noodle/config"
-	"github.com/poteto/noodle/internal/orderx"
-	"github.com/poteto/noodle/internal/taskreg"
-	"github.com/poteto/noodle/skill"
+	"github.com/guangshinhaha/shinfactory/config"
+	"github.com/guangshinhaha/shinfactory/internal/orderx"
+	"github.com/guangshinhaha/shinfactory/internal/taskreg"
+	"github.com/guangshinhaha/shinfactory/skill"
 )
 
 // writeCompactOrders writes a CompactOrdersFile as JSON to path.

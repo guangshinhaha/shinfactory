@@ -3,7 +3,7 @@ package loop
 import (
 	"strings"
 
-	"github.com/poteto/noodle/internal/stringx"
+	"github.com/guangshinhaha/shinfactory/internal/stringx"
 )
 
 const bootstrapSessionPrefix = "bootstrap-"

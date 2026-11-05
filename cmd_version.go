@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/poteto/noodle/cmdmeta"
+	"github.com/guangshinhaha/shinfactory/cmdmeta"
 	"github.com/spf13/cobra"
 )
 

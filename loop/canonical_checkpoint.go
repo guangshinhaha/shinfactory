@@ -10,11 +10,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/poteto/noodle/internal/ingest"
-	"github.com/poteto/noodle/internal/orderx"
-	"github.com/poteto/noodle/internal/reducer"
-	"github.com/poteto/noodle/internal/state"
-	"github.com/poteto/noodle/internal/statever"
+	"github.com/guangshinhaha/shinfactory/internal/ingest"
+	"github.com/guangshinhaha/shinfactory/internal/orderx"
+	"github.com/guangshinhaha/shinfactory/internal/reducer"
+	"github.com/guangshinhaha/shinfactory/internal/state"
+	"github.com/guangshinhaha/shinfactory/internal/statever"
 )
 
 func (l *Loop) canonicalSnapshotPath() string {

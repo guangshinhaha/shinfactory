@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/poteto/noodle/event"
-	"github.com/poteto/noodle/parse"
+	"github.com/guangshinhaha/shinfactory/event"
+	"github.com/guangshinhaha/shinfactory/parse"
 )
 
 func nowUTC() time.Time {

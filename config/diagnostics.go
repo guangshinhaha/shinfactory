@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/poteto/noodle/internal/filex"
-	"github.com/poteto/noodle/internal/stringx"
+	"github.com/guangshinhaha/shinfactory/internal/filex"
+	"github.com/guangshinhaha/shinfactory/internal/stringx"
 )
 
 var statPath = os.Stat

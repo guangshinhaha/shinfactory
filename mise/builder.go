@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/poteto/noodle/adapter"
-	"github.com/poteto/noodle/config"
-	"github.com/poteto/noodle/event"
+	"github.com/guangshinhaha/shinfactory/adapter"
+	"github.com/guangshinhaha/shinfactory/config"
+	"github.com/guangshinhaha/shinfactory/event"
 )
 
 type Builder struct {

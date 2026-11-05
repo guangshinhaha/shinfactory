@@ -7,8 +7,8 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/poteto/noodle/config"
-	"github.com/poteto/noodle/internal/shellx"
+	"github.com/guangshinhaha/shinfactory/config"
+	"github.com/guangshinhaha/shinfactory/internal/shellx"
 )
 
 type RunOptions struct {

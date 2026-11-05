@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/poteto/noodle/internal/ingest"
-	"github.com/poteto/noodle/internal/rtcap"
-	"github.com/poteto/noodle/internal/state"
-	"github.com/poteto/noodle/internal/stringx"
+	"github.com/guangshinhaha/shinfactory/internal/ingest"
+	"github.com/guangshinhaha/shinfactory/internal/rtcap"
+	"github.com/guangshinhaha/shinfactory/internal/state"
+	"github.com/guangshinhaha/shinfactory/internal/stringx"
 )
 
 type blockedReason string

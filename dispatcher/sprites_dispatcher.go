@@ -12,9 +12,9 @@ import (
 	"strings"
 	sprites "github.com/superfly/sprites-go"
 
-	"github.com/poteto/noodle/event"
-	"github.com/poteto/noodle/internal/shellx"
-	"github.com/poteto/noodle/skill"
+	"github.com/guangshinhaha/shinfactory/event"
+	"github.com/guangshinhaha/shinfactory/internal/shellx"
+	"github.com/guangshinhaha/shinfactory/skill"
 )
 
 const spriteWorkDir = "/work/repo"

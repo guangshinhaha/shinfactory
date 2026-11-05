@@ -3,7 +3,7 @@ package loop
 import (
 	"context"
 
-	"github.com/poteto/noodle/internal/stringx"
+	"github.com/guangshinhaha/shinfactory/internal/stringx"
 )
 
 // runMonitorPass refreshes session meta.json files and applies monitor-side

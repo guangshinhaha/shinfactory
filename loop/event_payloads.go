@@ -1,6 +1,6 @@
 package loop
 
-import "github.com/poteto/noodle/event"
+import "github.com/guangshinhaha/shinfactory/event"
 
 // Re-export loop event types for in-package use.
 const (

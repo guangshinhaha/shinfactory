@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/poteto/noodle/event"
-	"github.com/poteto/noodle/internal/stringx"
+	"github.com/guangshinhaha/shinfactory/event"
+	"github.com/guangshinhaha/shinfactory/internal/stringx"
 )
 
 func (l *Loop) killCook(name string) error {

@@ -5,8 +5,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/poteto/noodle/cmdmeta"
-	"github.com/poteto/noodle/worktree"
+	"github.com/guangshinhaha/shinfactory/cmdmeta"
+	"github.com/guangshinhaha/shinfactory/worktree"
 	"github.com/spf13/cobra"
 )
 

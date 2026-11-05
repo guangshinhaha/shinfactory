@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/poteto/noodle/internal/taskreg"
+	"github.com/guangshinhaha/shinfactory/internal/taskreg"
 )
 
 // RegistryDiff captures what changed between two registry snapshots.

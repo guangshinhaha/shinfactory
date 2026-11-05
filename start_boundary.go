@@ -3,7 +3,7 @@ package main
 import (
 	"strings"
 
-	"github.com/poteto/noodle/internal/failure"
+	"github.com/guangshinhaha/shinfactory/internal/failure"
 )
 
 // StartBoundaryOutcome classifies startup boundary handling.

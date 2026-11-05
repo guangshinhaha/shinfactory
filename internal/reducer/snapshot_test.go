@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/poteto/noodle/internal/state"
+	"github.com/guangshinhaha/shinfactory/internal/state"
 )
 
 func TestBuildSnapshotIncludesLedger(t *testing.T) {

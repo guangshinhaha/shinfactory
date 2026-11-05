@@ -7,9 +7,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/poteto/noodle/config"
-	"github.com/poteto/noodle/internal/filex"
-	"github.com/poteto/noodle/internal/taskreg"
+	"github.com/guangshinhaha/shinfactory/config"
+	"github.com/guangshinhaha/shinfactory/internal/filex"
+	"github.com/guangshinhaha/shinfactory/internal/taskreg"
 )
 
 // ReadOrders reads and parses an orders.json file.

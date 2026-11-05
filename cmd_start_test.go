@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/poteto/noodle/config"
-	"github.com/poteto/noodle/internal/failure"
-	"github.com/poteto/noodle/internal/statever"
-	"github.com/poteto/noodle/loop"
+	"github.com/guangshinhaha/shinfactory/config"
+	"github.com/guangshinhaha/shinfactory/internal/failure"
+	"github.com/guangshinhaha/shinfactory/internal/statever"
+	"github.com/guangshinhaha/shinfactory/loop"
 )
 
 type fakeStartLoop struct {

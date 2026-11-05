@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/poteto/noodle/config"
+	"github.com/guangshinhaha/shinfactory/config"
 )
 
 func TestRunnerRunSuccessWithArgs(t *testing.T) {

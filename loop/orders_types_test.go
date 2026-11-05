@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/poteto/noodle/internal/orderx"
+	"github.com/guangshinhaha/shinfactory/internal/orderx"
 )
 
 func TestStageJSONRoundTrip(t *testing.T) {

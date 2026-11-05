@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/poteto/noodle/parse"
+	"github.com/guangshinhaha/shinfactory/parse"
 )
 
 // Processor stamps NDJSON lines and emits canonical sidecar events.

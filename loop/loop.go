@@ -12,16 +12,16 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/poteto/noodle/config"
-	"github.com/poteto/noodle/event"
-	"github.com/poteto/noodle/internal/ingest"
-	"github.com/poteto/noodle/internal/reducer"
-	"github.com/poteto/noodle/internal/state"
-	"github.com/poteto/noodle/internal/taskreg"
-	"github.com/poteto/noodle/mise"
-	"github.com/poteto/noodle/monitor"
-	loopruntime "github.com/poteto/noodle/runtime"
-	"github.com/poteto/noodle/skill"
+	"github.com/guangshinhaha/shinfactory/config"
+	"github.com/guangshinhaha/shinfactory/event"
+	"github.com/guangshinhaha/shinfactory/internal/ingest"
+	"github.com/guangshinhaha/shinfactory/internal/reducer"
+	"github.com/guangshinhaha/shinfactory/internal/state"
+	"github.com/guangshinhaha/shinfactory/internal/taskreg"
+	"github.com/guangshinhaha/shinfactory/mise"
+	"github.com/guangshinhaha/shinfactory/monitor"
+	loopruntime "github.com/guangshinhaha/shinfactory/runtime"
+	"github.com/guangshinhaha/shinfactory/skill"
 )
 
 const (

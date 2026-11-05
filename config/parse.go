@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
-	"github.com/poteto/noodle/internal/state"
-	"github.com/poteto/noodle/internal/stringx"
+	"github.com/guangshinhaha/shinfactory/internal/state"
+	"github.com/guangshinhaha/shinfactory/internal/stringx"
 )
 
 const (

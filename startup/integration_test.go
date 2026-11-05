@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/poteto/noodle/config"
-	"github.com/poteto/noodle/startup"
+	"github.com/guangshinhaha/shinfactory/config"
+	"github.com/guangshinhaha/shinfactory/startup"
 )
 
 // TestCLIIntegrationStartScaffolds builds the noodle binary and verifies

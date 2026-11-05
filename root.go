@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/poteto/noodle/config"
-	"github.com/poteto/noodle/startup"
+	"github.com/guangshinhaha/shinfactory/config"
+	"github.com/guangshinhaha/shinfactory/startup"
 	"github.com/spf13/cobra"
 )
 

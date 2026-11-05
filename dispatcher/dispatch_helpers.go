@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/poteto/noodle/skill"
+	"github.com/guangshinhaha/shinfactory/skill"
 )
 
 // resolveSkillBundle resolves the skill bundle for a dispatch request: uses

@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/poteto/noodle/cmdmeta"
-	"github.com/poteto/noodle/event"
+	"github.com/guangshinhaha/shinfactory/cmdmeta"
+	"github.com/guangshinhaha/shinfactory/event"
 	"github.com/spf13/cobra"
 )
 

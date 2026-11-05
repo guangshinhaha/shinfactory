@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	loopruntime "github.com/poteto/noodle/runtime"
+	loopruntime "github.com/guangshinhaha/shinfactory/runtime"
 )
 
 // mockRuntime implements runtime.Runtime for tests. It provides controllable

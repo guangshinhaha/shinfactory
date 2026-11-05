@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/poteto/noodle/internal/filex"
-	"github.com/poteto/noodle/internal/statever"
+	"github.com/guangshinhaha/shinfactory/internal/filex"
+	"github.com/guangshinhaha/shinfactory/internal/statever"
 )
 
 // OrderLifecycleStatus is the lifecycle status of an order.

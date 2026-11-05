@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/poteto/noodle/dispatcher"
+	"github.com/guangshinhaha/shinfactory/dispatcher"
 )
 
 type HeartbeatObserver struct {

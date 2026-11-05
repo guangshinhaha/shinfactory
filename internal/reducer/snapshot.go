@@ -6,8 +6,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/poteto/noodle/internal/filex"
-	"github.com/poteto/noodle/internal/state"
+	"github.com/guangshinhaha/shinfactory/internal/filex"
+	"github.com/guangshinhaha/shinfactory/internal/state"
 )
 
 // DurableSnapshot is the canonical persisted form used by the reducer loop

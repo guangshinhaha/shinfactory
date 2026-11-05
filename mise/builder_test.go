@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/poteto/noodle/config"
-	"github.com/poteto/noodle/event"
+	"github.com/guangshinhaha/shinfactory/config"
+	"github.com/guangshinhaha/shinfactory/event"
 )
 
 func TestBuilderBuildWritesMiseJSON(t *testing.T) {

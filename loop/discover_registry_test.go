@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/poteto/noodle/config"
+	"github.com/guangshinhaha/shinfactory/config"
 )
 
 func TestDiscoverRegistryExpandsHomeSkillPath(t *testing.T) {

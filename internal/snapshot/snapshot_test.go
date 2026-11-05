@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/poteto/noodle/event"
-	"github.com/poteto/noodle/internal/projection"
-	"github.com/poteto/noodle/loop"
-	"github.com/poteto/noodle/mise"
+	"github.com/guangshinhaha/shinfactory/event"
+	"github.com/guangshinhaha/shinfactory/internal/projection"
+	"github.com/guangshinhaha/shinfactory/loop"
+	"github.com/guangshinhaha/shinfactory/mise"
 )
 
 func TestMapEventLinesPromptAction(t *testing.T) {

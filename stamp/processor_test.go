@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/poteto/noodle/parse"
+	"github.com/guangshinhaha/shinfactory/parse"
 )
 
 func TestProcessLineInjectsTimestampAndParsesEvent(t *testing.T) {

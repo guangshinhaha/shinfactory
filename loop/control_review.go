@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/poteto/noodle/internal/ingest"
-	"github.com/poteto/noodle/worktree"
+	"github.com/guangshinhaha/shinfactory/internal/ingest"
+	"github.com/guangshinhaha/shinfactory/worktree"
 )
 
 func (l *Loop) controlMerge(orderID string) error {

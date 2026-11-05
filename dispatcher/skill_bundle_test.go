@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/poteto/noodle/skill"
+	"github.com/guangshinhaha/shinfactory/skill"
 )
 
 func TestLoadSkillBundleCodexTruncatesReferences(t *testing.T) {

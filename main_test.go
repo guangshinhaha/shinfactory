@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/poteto/noodle/config"
-	"github.com/poteto/noodle/internal/failure"
+	"github.com/guangshinhaha/shinfactory/config"
+	"github.com/guangshinhaha/shinfactory/internal/failure"
 )
 
 func TestReportConfigDiagnosticsWarnsForReadOnlyCommands(t *testing.T) {

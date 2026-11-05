@@ -5,11 +5,11 @@ import (
 	"sort"
 	"time"
 
-	"github.com/poteto/noodle/internal/mode"
-	"github.com/poteto/noodle/internal/projection"
-	"github.com/poteto/noodle/internal/stringx"
-	"github.com/poteto/noodle/mise"
-	loopruntime "github.com/poteto/noodle/runtime"
+	"github.com/guangshinhaha/shinfactory/internal/mode"
+	"github.com/guangshinhaha/shinfactory/internal/projection"
+	"github.com/guangshinhaha/shinfactory/internal/stringx"
+	"github.com/guangshinhaha/shinfactory/mise"
+	loopruntime "github.com/guangshinhaha/shinfactory/runtime"
 )
 
 type CookSummary struct {

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/poteto/noodle/event"
+	"github.com/guangshinhaha/shinfactory/event"
 )
 
 type mockSubscriber struct {

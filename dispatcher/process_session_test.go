@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/poteto/noodle/event"
-	"github.com/poteto/noodle/parse"
+	"github.com/guangshinhaha/shinfactory/event"
+	"github.com/guangshinhaha/shinfactory/parse"
 )
 
 func TestProcessSessionClosesEventsAfterDone(t *testing.T) {

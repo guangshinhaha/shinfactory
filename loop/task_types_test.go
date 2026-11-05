@@ -3,8 +3,8 @@ package loop
 import (
 	"testing"
 
-	"github.com/poteto/noodle/internal/taskreg"
-	"github.com/poteto/noodle/skill"
+	"github.com/guangshinhaha/shinfactory/internal/taskreg"
+	"github.com/guangshinhaha/shinfactory/skill"
 )
 
 func testLoopRegistry() taskreg.Registry {

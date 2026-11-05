@@ -3,7 +3,7 @@ package loop
 import (
 	"context"
 
-	loopruntime "github.com/poteto/noodle/runtime"
+	loopruntime "github.com/guangshinhaha/shinfactory/runtime"
 )
 
 func (l *Loop) nextDispatchGeneration() uint64 {

@@ -5,7 +5,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/poteto/noodle/worktree"
+	"github.com/guangshinhaha/shinfactory/worktree"
 )
 
 func TestWorktreeCreateDispatches(t *testing.T) {

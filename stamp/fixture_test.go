@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/poteto/noodle/internal/testutil/fixturedir"
-	"github.com/poteto/noodle/parse"
+	"github.com/guangshinhaha/shinfactory/internal/testutil/fixturedir"
+	"github.com/guangshinhaha/shinfactory/parse"
 )
 
 func TestProcessorDirectoryFixtures(t *testing.T) {

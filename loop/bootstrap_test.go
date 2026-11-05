@@ -8,12 +8,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/poteto/noodle/adapter"
-	"github.com/poteto/noodle/config"
-	"github.com/poteto/noodle/internal/taskreg"
-	"github.com/poteto/noodle/mise"
-	loopruntime "github.com/poteto/noodle/runtime"
-	"github.com/poteto/noodle/skill"
+	"github.com/guangshinhaha/shinfactory/adapter"
+	"github.com/guangshinhaha/shinfactory/config"
+	"github.com/guangshinhaha/shinfactory/internal/taskreg"
+	"github.com/guangshinhaha/shinfactory/mise"
+	loopruntime "github.com/guangshinhaha/shinfactory/runtime"
+	"github.com/guangshinhaha/shinfactory/skill"
 )
 
 // testRegistryWithoutSchedule returns a registry that has execute but no

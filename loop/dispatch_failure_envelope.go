@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/poteto/noodle/internal/failure"
-	"github.com/poteto/noodle/internal/stringx"
+	"github.com/guangshinhaha/shinfactory/internal/failure"
+	"github.com/guangshinhaha/shinfactory/internal/stringx"
 )
 
 // AgentStartFailureClass classifies session start attempts by retry behavior.

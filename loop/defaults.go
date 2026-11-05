@@ -6,15 +6,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/poteto/noodle/adapter"
-	"github.com/poteto/noodle/config"
-	"github.com/poteto/noodle/dispatcher"
-	"github.com/poteto/noodle/internal/stringx"
-	"github.com/poteto/noodle/mise"
-	"github.com/poteto/noodle/monitor"
-	loopruntime "github.com/poteto/noodle/runtime"
-	"github.com/poteto/noodle/skill"
-	"github.com/poteto/noodle/worktree"
+	"github.com/guangshinhaha/shinfactory/adapter"
+	"github.com/guangshinhaha/shinfactory/config"
+	"github.com/guangshinhaha/shinfactory/dispatcher"
+	"github.com/guangshinhaha/shinfactory/internal/stringx"
+	"github.com/guangshinhaha/shinfactory/mise"
+	"github.com/guangshinhaha/shinfactory/monitor"
+	loopruntime "github.com/guangshinhaha/shinfactory/runtime"
+	"github.com/guangshinhaha/shinfactory/skill"
+	"github.com/guangshinhaha/shinfactory/worktree"
 )
 
 type noOpWorktree struct{}

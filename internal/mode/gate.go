@@ -1,6 +1,6 @@
 package mode
 
-import "github.com/poteto/noodle/internal/state"
+import "github.com/guangshinhaha/shinfactory/internal/state"
 
 // Action names used by BlockedReason and the gate matrix.
 const (

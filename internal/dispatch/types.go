@@ -3,7 +3,7 @@ package dispatch
 import (
 	"time"
 
-	"github.com/poteto/noodle/internal/state"
+	"github.com/guangshinhaha/shinfactory/internal/state"
 )
 
 // DispatchPlan is the planner output for a single scheduling cycle.

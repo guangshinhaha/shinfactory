@@ -5,10 +5,10 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/poteto/noodle/config"
-	"github.com/poteto/noodle/dispatcher"
-	"github.com/poteto/noodle/internal/failure"
-	loopruntime "github.com/poteto/noodle/runtime"
+	"github.com/guangshinhaha/shinfactory/config"
+	"github.com/guangshinhaha/shinfactory/dispatcher"
+	"github.com/guangshinhaha/shinfactory/internal/failure"
+	loopruntime "github.com/guangshinhaha/shinfactory/runtime"
 )
 
 func TestDispatchSessionFallsBackToProcess(t *testing.T) {

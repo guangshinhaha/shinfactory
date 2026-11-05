@@ -3,7 +3,7 @@ package loop
 import (
 	"strings"
 
-	"github.com/poteto/noodle/internal/failure"
+	"github.com/guangshinhaha/shinfactory/internal/failure"
 )
 
 // FailureProjection is the canonical failure classification payload projected

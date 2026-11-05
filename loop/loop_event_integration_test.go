@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/poteto/noodle/config"
-	"github.com/poteto/noodle/event"
-	"github.com/poteto/noodle/mise"
+	"github.com/guangshinhaha/shinfactory/config"
+	"github.com/guangshinhaha/shinfactory/event"
+	"github.com/guangshinhaha/shinfactory/mise"
 )
 
 // readNDJSON reads loop-events.ndjson and returns parsed events.

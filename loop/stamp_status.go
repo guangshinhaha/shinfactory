@@ -4,7 +4,7 @@ import (
 	"slices"
 	"sort"
 
-	"github.com/poteto/noodle/internal/statusfile"
+	"github.com/guangshinhaha/shinfactory/internal/statusfile"
 )
 
 // stampStatus writes active IDs, loop state, and mode into status.json

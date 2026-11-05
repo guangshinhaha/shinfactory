@@ -11,13 +11,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/poteto/noodle/internal/dispatch"
-	"github.com/poteto/noodle/internal/ingest"
-	"github.com/poteto/noodle/internal/mode"
-	"github.com/poteto/noodle/internal/projection"
-	"github.com/poteto/noodle/internal/reducer"
-	"github.com/poteto/noodle/internal/state"
-	"github.com/poteto/noodle/internal/statever"
+	"github.com/guangshinhaha/shinfactory/internal/dispatch"
+	"github.com/guangshinhaha/shinfactory/internal/ingest"
+	"github.com/guangshinhaha/shinfactory/internal/mode"
+	"github.com/guangshinhaha/shinfactory/internal/projection"
+	"github.com/guangshinhaha/shinfactory/internal/reducer"
+	"github.com/guangshinhaha/shinfactory/internal/state"
+	"github.com/guangshinhaha/shinfactory/internal/statever"
 )
 
 func TestResilienceVerification(t *testing.T) {

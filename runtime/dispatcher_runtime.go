@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/poteto/noodle/dispatcher"
-	"github.com/poteto/noodle/internal/stringx"
+	"github.com/guangshinhaha/shinfactory/dispatcher"
+	"github.com/guangshinhaha/shinfactory/internal/stringx"
 )
 
 type DispatcherRuntime struct {

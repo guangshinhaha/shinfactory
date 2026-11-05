@@ -10,15 +10,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/poteto/noodle/adapter"
-	"github.com/poteto/noodle/config"
-	"github.com/poteto/noodle/internal/failure"
-	"github.com/poteto/noodle/internal/state"
-	"github.com/poteto/noodle/internal/statusfile"
-	"github.com/poteto/noodle/mise"
-	"github.com/poteto/noodle/monitor"
-	loopruntime "github.com/poteto/noodle/runtime"
-	"github.com/poteto/noodle/worktree"
+	"github.com/guangshinhaha/shinfactory/adapter"
+	"github.com/guangshinhaha/shinfactory/config"
+	"github.com/guangshinhaha/shinfactory/internal/failure"
+	"github.com/guangshinhaha/shinfactory/internal/state"
+	"github.com/guangshinhaha/shinfactory/internal/statusfile"
+	"github.com/guangshinhaha/shinfactory/mise"
+	"github.com/guangshinhaha/shinfactory/monitor"
+	loopruntime "github.com/guangshinhaha/shinfactory/runtime"
+	"github.com/guangshinhaha/shinfactory/worktree"
 )
 
 type fakeWorktree struct {

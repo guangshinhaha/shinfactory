@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/poteto/noodle/internal/failure"
+	"github.com/guangshinhaha/shinfactory/internal/failure"
 )
 
 // CycleFailureClass classifies loop-cycle failure behavior.

@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/poteto/noodle/internal/jsonx"
-	"github.com/poteto/noodle/parse"
+	"github.com/guangshinhaha/shinfactory/internal/jsonx"
+	"github.com/guangshinhaha/shinfactory/parse"
 )
 
 type spawnPayload struct {

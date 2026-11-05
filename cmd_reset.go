@@ -6,8 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/poteto/noodle/cmdmeta"
-	"github.com/poteto/noodle/internal/lockfile"
+	"github.com/guangshinhaha/shinfactory/cmdmeta"
+	"github.com/guangshinhaha/shinfactory/internal/lockfile"
 	"github.com/spf13/cobra"
 )
 

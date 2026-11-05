@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/poteto/noodle/internal/testutil/fixturedir"
+	"github.com/guangshinhaha/shinfactory/internal/testutil/fixturedir"
 )
 
 func TestDirectoryFixtures(t *testing.T) {

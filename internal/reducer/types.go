@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/poteto/noodle/internal/ingest"
-	"github.com/poteto/noodle/internal/state"
+	"github.com/guangshinhaha/shinfactory/internal/ingest"
+	"github.com/guangshinhaha/shinfactory/internal/state"
 )
 
 // Reducer is a pure state-transition function.

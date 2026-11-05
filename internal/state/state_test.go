@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/poteto/noodle/internal/statever"
+	"github.com/guangshinhaha/shinfactory/internal/statever"
 )
 
 // fullState returns a State with active and completed orders for testing.

@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/poteto/noodle/event"
+	"github.com/guangshinhaha/shinfactory/event"
 )
 
 type EventTicketMaterializer struct {

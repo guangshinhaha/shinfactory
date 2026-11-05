@@ -7,16 +7,16 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/poteto/noodle/config"
-	"github.com/poteto/noodle/internal/ingest"
-	"github.com/poteto/noodle/internal/schemadoc"
-	loopruntime "github.com/poteto/noodle/runtime"
+	"github.com/guangshinhaha/shinfactory/config"
+	"github.com/guangshinhaha/shinfactory/internal/ingest"
+	"github.com/guangshinhaha/shinfactory/internal/schemadoc"
+	loopruntime "github.com/guangshinhaha/shinfactory/runtime"
 )
 
 const scheduleOrderID = "schedule"
 const scheduleBootstrapOrderID = "oops-bootstrap-schedule"
-const scheduleSkillExamplePath = "https://github.com/poteto/noodle/tree/main/.agents/skills/schedule/"
-const scheduleSkillExampleHint = "github.com/poteto/noodle/.agents/skills/schedule/"
+const scheduleSkillExamplePath = "https://github.com/guangshinhaha/shinfactory/tree/main/.agents/skills/schedule/"
+const scheduleSkillExampleHint = "github.com/guangshinhaha/shinfactory/.agents/skills/schedule/"
 
 func isScheduleStage(stage Stage) bool {
 	return strings.EqualFold(strings.TrimSpace(stage.TaskKey), scheduleOrderID)

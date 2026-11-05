@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/poteto/noodle/config"
-	loopruntime "github.com/poteto/noodle/runtime"
+	"github.com/guangshinhaha/shinfactory/config"
+	loopruntime "github.com/guangshinhaha/shinfactory/runtime"
 )
 
 func TestStageResultFromSessionMetaStatus(t *testing.T) {

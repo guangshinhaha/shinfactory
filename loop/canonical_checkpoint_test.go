@@ -7,14 +7,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/poteto/noodle/adapter"
-	"github.com/poteto/noodle/config"
-	"github.com/poteto/noodle/internal/ingest"
-	"github.com/poteto/noodle/internal/reducer"
-	"github.com/poteto/noodle/internal/state"
-	"github.com/poteto/noodle/internal/statever"
-	"github.com/poteto/noodle/mise"
-	loopruntime "github.com/poteto/noodle/runtime"
+	"github.com/guangshinhaha/shinfactory/adapter"
+	"github.com/guangshinhaha/shinfactory/config"
+	"github.com/guangshinhaha/shinfactory/internal/ingest"
+	"github.com/guangshinhaha/shinfactory/internal/reducer"
+	"github.com/guangshinhaha/shinfactory/internal/state"
+	"github.com/guangshinhaha/shinfactory/internal/statever"
+	"github.com/guangshinhaha/shinfactory/mise"
+	loopruntime "github.com/guangshinhaha/shinfactory/runtime"
 )
 
 func TestLoadOrBootstrapCanonicalFromLegacyState(t *testing.T) {

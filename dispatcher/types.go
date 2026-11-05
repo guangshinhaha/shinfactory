@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/poteto/noodle/event"
+	"github.com/guangshinhaha/shinfactory/event"
 )
 
 // ProviderConfig holds optional CLI binary directory and extra flags by provider.

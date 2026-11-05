@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/poteto/noodle/internal/procx"
+	"github.com/guangshinhaha/shinfactory/internal/procx"
 )
 
 // PidObserver checks session liveness by reading the PID from process.json

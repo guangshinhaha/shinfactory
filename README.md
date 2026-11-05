@@ -1,3 +1,5 @@
+> Shin's fork of [poteto/noodle](https://github.com/poteto/noodle) (MIT), being reshaped into a software factory driven by [shinstack](https://github.com/guangshinhaha/shinstack) skills.
+
 # Noodle
 
 Skill-based agent orchestration. Built in Go.

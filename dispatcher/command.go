@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/poteto/noodle/internal/shellx"
-	"github.com/poteto/noodle/internal/stringx"
+	"github.com/guangshinhaha/shinfactory/internal/shellx"
+	"github.com/guangshinhaha/shinfactory/internal/stringx"
 )
 
 const codexSkillRefsLimitBytes = 50 * 1024

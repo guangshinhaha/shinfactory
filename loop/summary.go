@@ -3,8 +3,8 @@ package loop
 import (
 	"strings"
 
-	"github.com/poteto/noodle/internal/stringx"
-	"github.com/poteto/noodle/mise"
+	"github.com/guangshinhaha/shinfactory/internal/stringx"
+	"github.com/guangshinhaha/shinfactory/mise"
 )
 
 const recentHistoryLimit = 20

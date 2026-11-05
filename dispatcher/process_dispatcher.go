@@ -9,11 +9,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/poteto/noodle/event"
-	"github.com/poteto/noodle/internal/filex"
-	"github.com/poteto/noodle/internal/stringx"
-	"github.com/poteto/noodle/skill"
-	wt "github.com/poteto/noodle/worktree"
+	"github.com/guangshinhaha/shinfactory/event"
+	"github.com/guangshinhaha/shinfactory/internal/filex"
+	"github.com/guangshinhaha/shinfactory/internal/stringx"
+	"github.com/guangshinhaha/shinfactory/skill"
+	wt "github.com/guangshinhaha/shinfactory/worktree"
 )
 
 // ProcessDispatcherConfig configures a process dispatcher.

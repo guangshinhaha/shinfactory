@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/poteto/noodle/internal/filex"
+	"github.com/guangshinhaha/shinfactory/internal/filex"
 )
 
 // Status holds runtime state written by the loop.

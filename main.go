@@ -11,11 +11,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/poteto/noodle/config"
-	"github.com/poteto/noodle/dispatcher"
-	"github.com/poteto/noodle/internal/failure"
-	"github.com/poteto/noodle/loop"
-	"github.com/poteto/noodle/worktree"
+	"github.com/guangshinhaha/shinfactory/config"
+	"github.com/guangshinhaha/shinfactory/dispatcher"
+	"github.com/guangshinhaha/shinfactory/internal/failure"
+	"github.com/guangshinhaha/shinfactory/loop"
+	"github.com/guangshinhaha/shinfactory/worktree"
 )
 
 type repairLaunchResult struct {

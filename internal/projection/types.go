@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/poteto/noodle/internal/statever"
+	"github.com/guangshinhaha/shinfactory/internal/statever"
 )
 
 // ProjectionVersion is a monotonic version derived from the last applied event ID.

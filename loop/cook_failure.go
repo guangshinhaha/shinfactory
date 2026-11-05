@@ -3,7 +3,7 @@ package loop
 import (
 	"strings"
 
-	"github.com/poteto/noodle/worktree"
+	"github.com/guangshinhaha/shinfactory/worktree"
 )
 
 // recordStageFailure performs the state transition for a stage failure:

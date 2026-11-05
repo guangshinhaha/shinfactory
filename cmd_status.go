@@ -5,10 +5,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/poteto/noodle/cmdmeta"
-	"github.com/poteto/noodle/internal/orderx"
-	"github.com/poteto/noodle/internal/snapshot"
-	"github.com/poteto/noodle/internal/statusfile"
+	"github.com/guangshinhaha/shinfactory/cmdmeta"
+	"github.com/guangshinhaha/shinfactory/internal/orderx"
+	"github.com/guangshinhaha/shinfactory/internal/snapshot"
+	"github.com/guangshinhaha/shinfactory/internal/statusfile"
 	"github.com/spf13/cobra"
 )
 

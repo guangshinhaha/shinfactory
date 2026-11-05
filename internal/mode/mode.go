@@ -10,7 +10,7 @@ package mode
 import (
 	"time"
 
-	"github.com/poteto/noodle/internal/state"
+	"github.com/guangshinhaha/shinfactory/internal/state"
 )
 
 // ModeEpoch is a monotonic counter incremented on every mode transition.

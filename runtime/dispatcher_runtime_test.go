@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/poteto/noodle/dispatcher"
+	"github.com/guangshinhaha/shinfactory/dispatcher"
 )
 
 type fakeSession struct {

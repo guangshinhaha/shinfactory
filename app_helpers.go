@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/poteto/noodle/dispatcher"
-	"github.com/poteto/noodle/skill"
+	"github.com/guangshinhaha/shinfactory/dispatcher"
+	"github.com/guangshinhaha/shinfactory/skill"
 )
 
 func (a *App) ProjectDir() (string, error) {

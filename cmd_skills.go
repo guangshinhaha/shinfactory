@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/poteto/noodle/cmdmeta"
-	"github.com/poteto/noodle/skill"
+	"github.com/guangshinhaha/shinfactory/cmdmeta"
+	"github.com/guangshinhaha/shinfactory/skill"
 	"github.com/spf13/cobra"
 )
 

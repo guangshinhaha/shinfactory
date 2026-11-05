@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/poteto/noodle/internal/stringx"
+	"github.com/guangshinhaha/shinfactory/internal/stringx"
 )
 
 func decodeClaudeMessage(raw json.RawMessage) (claudeMessage, bool) {

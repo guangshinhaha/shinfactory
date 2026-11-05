@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/poteto/noodle/loop"
+	"github.com/guangshinhaha/shinfactory/loop"
 )
 
 func readSteerEvents(controlPath string) []FeedEvent {

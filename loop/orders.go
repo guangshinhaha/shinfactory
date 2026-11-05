@@ -8,10 +8,10 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/poteto/noodle/config"
-	"github.com/poteto/noodle/internal/orderx"
-	"github.com/poteto/noodle/internal/taskreg"
-	"github.com/poteto/noodle/mise"
+	"github.com/guangshinhaha/shinfactory/config"
+	"github.com/guangshinhaha/shinfactory/internal/orderx"
+	"github.com/guangshinhaha/shinfactory/internal/taskreg"
+	"github.com/guangshinhaha/shinfactory/mise"
 )
 
 func activeTicketTargetSet(brief mise.Brief) map[string]struct{} {

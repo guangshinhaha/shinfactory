@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/poteto/noodle/internal/filex"
+	"github.com/guangshinhaha/shinfactory/internal/filex"
 )
 
 // ErrNotFound is returned when a skill cannot be found in any search path.

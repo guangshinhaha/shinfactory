@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/poteto/noodle/config"
-	"github.com/poteto/noodle/internal/taskreg"
-	loopruntime "github.com/poteto/noodle/runtime"
-	"github.com/poteto/noodle/skill"
+	"github.com/guangshinhaha/shinfactory/config"
+	"github.com/guangshinhaha/shinfactory/internal/taskreg"
+	loopruntime "github.com/guangshinhaha/shinfactory/runtime"
+	"github.com/guangshinhaha/shinfactory/skill"
 )
 
 func writeTaskTypeSkill(t *testing.T, projectDir, name, scheduleHint string) {
@@ -426,7 +426,7 @@ func TestReconcileInjectsOopsBootstrapOrderWhenScheduleMissing(t *testing.T) {
 	if stage.TaskKey != "oops" || stage.Skill != "oops" {
 		t.Fatalf("bootstrap order stage = %#v, want oops task+skill", stage)
 	}
-	if !strings.Contains(stage.Prompt, "github.com/poteto/noodle/.agents/skills/schedule/") {
+	if !strings.Contains(stage.Prompt, "github.com/guangshinhaha/shinfactory/.agents/skills/schedule/") {
 		t.Fatalf("bootstrap prompt missing schedule skill example reference: %q", stage.Prompt)
 	}
 

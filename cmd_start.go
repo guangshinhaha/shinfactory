@@ -17,12 +17,12 @@ import (
 	"time"
 
 	charmlog "github.com/charmbracelet/log"
-	"github.com/poteto/noodle/cmdmeta"
-	"github.com/poteto/noodle/config"
-	"github.com/poteto/noodle/internal/lockfile"
-	"github.com/poteto/noodle/internal/statever"
-	"github.com/poteto/noodle/loop"
-	"github.com/poteto/noodle/server"
+	"github.com/guangshinhaha/shinfactory/cmdmeta"
+	"github.com/guangshinhaha/shinfactory/config"
+	"github.com/guangshinhaha/shinfactory/internal/lockfile"
+	"github.com/guangshinhaha/shinfactory/internal/statever"
+	"github.com/guangshinhaha/shinfactory/loop"
+	"github.com/guangshinhaha/shinfactory/server"
 	"github.com/spf13/cobra"
 )
 

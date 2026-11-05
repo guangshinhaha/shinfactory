@@ -6,8 +6,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/poteto/noodle/event"
-	"github.com/poteto/noodle/internal/stringx"
+	"github.com/guangshinhaha/shinfactory/event"
+	"github.com/guangshinhaha/shinfactory/internal/stringx"
 )
 
 // ReadSessionEvents reads canonical events for a single session on demand.

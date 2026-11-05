@@ -8,12 +8,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/poteto/noodle/adapter"
-	"github.com/poteto/noodle/event"
-	"github.com/poteto/noodle/internal/ingest"
-	"github.com/poteto/noodle/internal/mode"
-	"github.com/poteto/noodle/internal/state"
-	"github.com/poteto/noodle/internal/stringx"
+	"github.com/guangshinhaha/shinfactory/adapter"
+	"github.com/guangshinhaha/shinfactory/event"
+	"github.com/guangshinhaha/shinfactory/internal/ingest"
+	"github.com/guangshinhaha/shinfactory/internal/mode"
+	"github.com/guangshinhaha/shinfactory/internal/state"
+	"github.com/guangshinhaha/shinfactory/internal/stringx"
 )
 
 func (l *Loop) drainCompletions(ctx context.Context) error {

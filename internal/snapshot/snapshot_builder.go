@@ -6,11 +6,11 @@ import (
 	"sort"
 	"time"
 
-	"github.com/poteto/noodle/event"
-	"github.com/poteto/noodle/internal/orderx"
-	"github.com/poteto/noodle/internal/projection"
-	"github.com/poteto/noodle/internal/stringx"
-	"github.com/poteto/noodle/loop"
+	"github.com/guangshinhaha/shinfactory/event"
+	"github.com/guangshinhaha/shinfactory/internal/orderx"
+	"github.com/guangshinhaha/shinfactory/internal/projection"
+	"github.com/guangshinhaha/shinfactory/internal/stringx"
+	"github.com/guangshinhaha/shinfactory/loop"
 )
 
 const defaultContextWindowTokens = 200_000

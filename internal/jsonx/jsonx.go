@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/poteto/noodle/internal/filex"
+	"github.com/guangshinhaha/shinfactory/internal/filex"
 )
 
 // ReadJSON reads a JSON file at path and unmarshals it into T.
