@@ -38,7 +38,7 @@ Tell the user this task doesn't need a plan and suggest implementing directly wi
 
 ## Step 1 — Load Principles
 
-Load the `shinstack` skill and follow its `multi-phase-plan` playbook for how to slice the work; the files still go in `brain/plans/` in the template below. Read the principles the router lists for this change, in full. These principles govern all plan decisions — cite them by name in the plan overview and phase files. For types or module boundaries, sketch them as shinstack `architect` would, skipping its human checkpoint in autonomous mode.
+Load the `shinstack:craft` skill and follow its `multi-phase-plan` playbook for how to slice the work; the files still go in `brain/plans/` in the template below. Read the principles the router lists for this change, in full. These principles govern all plan decisions — cite them by name in the plan overview and phase files. For types or module boundaries, sketch them as shinstack `architect` would, skipping its human checkpoint in autonomous mode.
 
 **Do NOT skip this. Do NOT use memorized principle content — always read fresh.** The self-check in Step 5b will verify citations exist.
 
