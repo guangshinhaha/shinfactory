@@ -37,7 +37,7 @@ Skills that run themselves. Write skills with a ` + "`" + `schedule:` + "`" + ` 
 
 A skill is a directory with a ` + "`SKILL.md`" + `. The body is the agent's instructions. The frontmatter is metadata.
 
-**General skills** (no ` + "`schedule:`" + `) are invoked directly by agents. Examples: ` + "`commit`" + `, ` + "`debugging`" + `.
+**General skills** (no ` + "`schedule:`" + `) are invoked directly by agents. Examples: ` + "`commit`" + `, ` + "`worktree`" + `.
 
 **Scheduled skills** (with ` + "`schedule:`" + `) run autonomously. The scheduler reads the ` + "`schedule:`" + ` value as prose and uses judgment to decide when conditions are met.
 

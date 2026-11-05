@@ -17,7 +17,7 @@ The brain is the foundation of the entire workflow — every agent, skill, and s
 
 Read `brain/index.md` first. Then read the relevant entrypoint for your topic:
 
-- `brain/principles.md` for principle updates
+- `brain/principles.md` points to shinstack; principles are not written here
 - `brain/plans/index.md` for plan-related notes
 
 For directories without a dedicated index file yet (`brain/codebase/`, `brain/audits/`), scan nearby files directly and edit an existing note when possible.
@@ -27,11 +27,10 @@ For directories without a dedicated index file yet (`brain/codebase/`, `brain/au
 ```
 brain/
 ├── index.md              ← root entry point, links to everything
-├── principles.md         ← index for principles/
+├── principles.md         ← pointer: principles live in shinstack
 ├── todos.md              ← product backlog
 ├── vision.md             ← elevator pitch + link to architecture
 ├── architecture.md       ← full technical reference
-├── principles/           ← engineering and design principles
 ├── codebase/             ← project-specific knowledge and gotchas
 ├── plans/                ← numbered feature plans (02-arrow-bindings/, etc.)
 └── audits/               ← design and quality audits (date-prefixed filenames, e.g. 2026-02-20-quality-audit.md)

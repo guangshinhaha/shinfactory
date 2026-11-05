@@ -2,7 +2,7 @@
 
 set -u
 
-PRINCIPLES_FILE="brain/principles/boundary-discipline.md"
+PRINCIPLES_FILE="shinstack principles/engineering/boundary-discipline.md"
 ERROR_COUNT=0
 WARN_COUNT=0
 

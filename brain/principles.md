@@ -1,32 +1,5 @@
 # Principles
 
-## Core
+Principles live in [shinstack](https://github.com/guangshinhaha/shinstack), not in this brain. Load the `shinstack` skill: its router lists every principle by trigger and links the files. Read a principle in full before applying it, and cite it by name.
 
-- [[principles/foundational-thinking]]
-- [[principles/redesign-from-first-principles]]
-- [[principles/subtract-before-you-add]]
-- [[principles/outcome-oriented-execution]]
-- [[principles/experience-first]]
-- [[principles/exhaust-the-design-space]]
-
-## Architecture
-
-- [[principles/boundary-discipline]]
-- [[principles/make-operations-idempotent]]
-- [[principles/migrate-callers-then-delete-legacy-apis]]
-- [[principles/serialize-shared-state-mutations]]
-
-## Verification
-
-- [[principles/prove-it-works]]
-- [[principles/fix-root-causes]]
-
-## Delegation
-
-- [[principles/cost-aware-delegation]]
-- [[principles/guard-the-context-window]]
-- [[principles/never-block-on-the-human]]
-
-## Meta
-
-- [[principles/encode-lessons-in-structure]]
+This brain holds project knowledge only: architecture, gotchas, plans, todos. A lesson about how to work in general belongs in shinstack, through shinstack's `reflect`, not here.
