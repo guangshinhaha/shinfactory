@@ -1,0 +1,18 @@
+#!/bin/sh
+# Creates a GitHub issue from JSON on stdin ({"title": "...", "section": "..."}) and
+# prints its number. A section becomes a label. Agents can also call `gh issue create`
+# directly; this exists so the adapter contract is complete.
+set -eu
+
+payload=$(cat)
+title=$(printf '%s' "$payload" | sed -n 's/.*"title"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1)
+section=$(printf '%s' "$payload" | sed -n 's/.*"section"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1)
+[ -n "$title" ] || { echo "title required" >&2; exit 1; }
+
+if [ -n "$section" ]; then
+  gh label create "$section" --force >/dev/null
+  url=$(gh issue create --title "$title" --body "" --label "$section")
+else
+  url=$(gh issue create --title "$title" --body "")
+fi
+echo "${url##*/}"

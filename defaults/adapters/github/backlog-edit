@@ -1,0 +1,12 @@
+#!/bin/sh
+# Renames a GitHub issue from JSON on stdin ({"title": "..."}).
+set -eu
+
+id=${1:-}
+[ -n "$id" ] || { echo "id required" >&2; exit 1; }
+
+payload=$(cat)
+title=$(printf '%s' "$payload" | sed -n 's/.*"title"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1)
+[ -n "$title" ] || { echo "title required" >&2; exit 1; }
+
+gh issue edit "$id" --title "$title" >/dev/null

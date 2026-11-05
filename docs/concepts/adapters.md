@@ -116,7 +116,9 @@ backlog sync line 12: missing required field id
 
 ## Writing an adapter
 
-A minimal GitHub Issues adapter might use `gh` CLI to list open issues tagged with a label, format them as backlog items, and print NDJSON to stdout. The commands are simple enough that an agent can write them for you. Point it at your issue tracker and the schema above and it'll produce the scripts.
+A ready-made GitHub Issues adapter lives in `defaults/adapters/github/`: every open issue is a backlog item, labels become tags, a `Plan: brain/plans/NN-slug/overview.md` line in the body links a plan, and `done` labels the issue `shinfactory-done` instead of closing it (the human's push with `Closes #N` closes it). Copy the four scripts into your project and point `[adapters.backlog.scripts]` at them; it needs `gh` signed in. Env: `NOODLE_GH_LABEL` limits the backlog to one label, `NOODLE_GH_DONE_LABEL` renames the done label.
+
+For another tracker, an agent can write the scripts from the schema above.
 
 ## Configuration reference
 

@@ -1,0 +1,32 @@
+#!/bin/sh
+# GitHub Issues backlog: each open issue in the current repo is a backlog item.
+#
+# Needs the gh CLI, signed in. Env:
+#   NOODLE_GH_LABEL       only issues with this label (default: every open issue)
+#   NOODLE_GH_DONE_LABEL  label that backlog-done adds (default: shinfactory-done);
+#                         open issues carrying it sync as status "done"
+#   NOODLE_GH_LIMIT       max issues to read (default: 200)
+#
+# A plan is linked by a line in the issue body: "Plan: brain/plans/NN-slug/overview.md".
+set -eu
+
+done_label="${NOODLE_GH_DONE_LABEL:-shinfactory-done}"
+
+filter='.[]
+  | [.labels[].name] as $tags
+  | ([(.body // "") | capture("(?m)^Plan:[ \t]*(?<p>[^ \t\r\n]+)") | .p] | first) as $plan
+  | {id: (.number | tostring),
+     title: .title,
+     status: (if ($tags | any(. == "'"$done_label"'")) then "done" else "open" end),
+     url: .url,
+     description: ((.body // "") | .[0:2000])}
+  + (if ($tags | length) > 0 then {tags: $tags} else {} end)
+  + (if $plan then {plan: $plan} else {} end)'
+
+if [ -n "${NOODLE_GH_LABEL:-}" ]; then
+  gh issue list --state open --limit "${NOODLE_GH_LIMIT:-200}" --label "$NOODLE_GH_LABEL" \
+    --json number,title,labels,body,url --jq "$filter"
+else
+  gh issue list --state open --limit "${NOODLE_GH_LIMIT:-200}" \
+    --json number,title,labels,body,url --jq "$filter"
+fi
