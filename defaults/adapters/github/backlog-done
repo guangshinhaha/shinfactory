@@ -1,0 +1,16 @@
+#!/bin/sh
+# Marks a GitHub issue as done by the factory. It does not close the issue: the work
+# is only on local main until a human pushes it, and a "Closes #N" commit or PR closes
+# it then. The label makes backlog-sync report the issue as done so it isn't rescheduled.
+set -eu
+
+id=${1:-}
+[ -n "$id" ] || { echo "id required" >&2; exit 1; }
+done_label="${NOODLE_GH_DONE_LABEL:-shinfactory-done}"
+
+gh label create "$done_label" --color 0E8A16 \
+  --description "Done by a shinfactory order on local main; closes when the work is pushed" \
+  --force >/dev/null
+gh issue edit "$id" --add-label "$done_label" >/dev/null
+gh issue comment "$id" \
+  --body "shinfactory: order completed on local main. This closes when the work is pushed with \`Closes #$id\`." >/dev/null

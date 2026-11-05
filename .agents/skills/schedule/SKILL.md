@@ -34,7 +34,7 @@ Read `task_types` from mise to discover every schedulable task type and its `sch
 
 Schedule execute tasks from the `backlog` array in mise. Use the backlog item ID (as a string) as the order `id`.
 
-Backlog items always have `id` and `title`. Other fields are adapter-defined and may vary. The default adapter (todos.md) provides: `status`, `section`, `tags`, `estimate`, and `plan`. Custom adapters may include any fields — treat unknown fields as useful context.
+Backlog items always have `id` and `title`. Other fields are adapter-defined and may vary. The todos.md adapter provides: `status`, `section`, `tags`, `estimate`, and `plan`. The GitHub adapter provides `status`, `tags` (labels), `plan`, `url`, and `description` (the issue body, truncated) — use the description as the task brief. Custom adapters may include any fields — treat unknown fields as useful context.
 
 **Shared infrastructure:** When multiple plans depend on common infrastructure (shared types, utilities, base packages), propose a standalone infra order before the plan's phases. Use a descriptive slug ID (e.g., `"infra-shared-types"`). If the infra work is substantial, create a backlog item via the adapter (`noodle adapter run backlog add`), then use that item's ID as the order ID.
 

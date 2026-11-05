@@ -12,6 +12,8 @@ func TestBuildSessionPreamble(t *testing.T) {
 	}
 	for _, expected := range []string{
 		"todos.md",
+		"GitHub issues",
+		"`todo` skill",
 		".noodle/",
 		"conventional commit",
 	} {

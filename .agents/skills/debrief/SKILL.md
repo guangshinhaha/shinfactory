@@ -61,7 +61,7 @@ If the session revealed systemic orchestration issues, route to:
 - **Skill mechanics change** (monitoring loop, review step) → relevant skill file
 - **New skill opportunity** (recurring workflow that could be encoded) → note in summary for the user
 
-### Backlog items (`brain/todos.md`)
+### Backlog items
 
 Follow-up work that can't be done during the debrief — bugs, non-trivial rewrites, tooling gaps. Use the `todo` skill to file.
 

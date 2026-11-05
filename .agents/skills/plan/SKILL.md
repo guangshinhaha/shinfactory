@@ -90,13 +90,13 @@ Don't bolt changes onto existing designs — redesign holistically.
 
 For architectural decisions, briefly sketch 2-3 approaches in the overview's Constraints section. State which was chosen and why. This prevents premature commitment and documents the design space explored. See shinstack's `exhaust-the-design-space` (situational).
 
-### Update plans index and todos
+### Update plans index and backlog
 
-Verify both entries exist after writing the plan:
+NN is the backlog item ID (the issue number on a GitHub backlog). Verify both after writing the plan:
 - `brain/plans/index.md` has `- [[plans/NN-plan-name/overview]]`
-- `brain/todos.md` has the plan wikilink on the todo item
+- the backlog item links the plan: use the `todo` skill (Link a plan)
 
-New todo: read `<!-- next-id: N -->`, append `N. [ ] description [[plans/NN-plan-name/overview]]`, increment next-id. Do NOT edit `brain/index.md` — the auto-index hook maintains it.
+No backlog item yet: add one with the `todo` skill first, then link the plan. Do NOT edit `brain/index.md` — the auto-index hook maintains it.
 
 ### Archiving completed plans
 

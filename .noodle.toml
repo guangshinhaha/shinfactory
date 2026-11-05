@@ -20,11 +20,12 @@ path = "~/.codex"
 [adapters.backlog]
 skill = "todo"
 
+# Backlog is this repo's GitHub issues (defaults/adapters/github; needs gh signed in).
 [adapters.backlog.scripts]
-sync = "go run adapters/main.go backlog-sync"
-add = "go run adapters/main.go backlog-add"
-done = "go run adapters/main.go backlog-done"
-edit = "go run adapters/main.go backlog-edit"
+sync = "defaults/adapters/github/backlog-sync"
+add = "defaults/adapters/github/backlog-add"
+done = "defaults/adapters/github/backlog-done"
+edit = "defaults/adapters/github/backlog-edit"
 
 [runtime]
 # "process" | "sprites"
