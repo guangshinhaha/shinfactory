@@ -19,7 +19,7 @@ reviewers — those run on *your own* model, which defeats the purpose.
 
 ## Step 1 — Load Principles
 
-Load the `shinstack` skill and read the principles its router lists for this work, in full.
+Load the `shinstack:craft` skill and read the principles its router lists for this work, in full.
 These govern reviewer judgments. Apply shinstack `interrogate`'s rule to every finding: it
 counts only if the reviewer can show it (a failing run, a concrete input, a cited line), not
 assert it.

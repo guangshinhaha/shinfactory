@@ -10,7 +10,7 @@ The `brain/` directory is an Obsidian vault — persistent memory across session
 - **Write** after mistakes, corrections, or notable codebase learnings.
 - **Structure:** One topic per file. Directories with `[[wikilink]]` indexes — no inlined content.
 - **Maintain:** Delete outdated notes. Clean completed/abandoned plans from `brain/plans/`.
-- **Principles live in shinstack, not the brain.** The brain holds project knowledge only. For how to work (principles, playbooks), load the `shinstack` skill.
+- **Principles live in shinstack, not the brain.** The brain holds project knowledge only. For how to work (principles, playbooks), load the `shinstack:craft` skill.
 
 ## Workflow
 

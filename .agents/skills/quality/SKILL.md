@@ -12,7 +12,7 @@ Operate fully autonomously. Never ask the user.
 
 ## Step 0 -- Load Principles
 
-Load the `shinstack` skill and read the principles its router lists for this change, in full. These govern the review. Do NOT skip this.
+Load the `shinstack:craft` skill and read the principles its router lists for this change, in full. These govern the review. Do NOT skip this.
 
 **Block only on what you can show** (shinstack `interrogate` rule): a failing run, a bug a user would hit, a failed gate, or a doc line the change made wrong. Everything else is a non-blocking issue.
 
