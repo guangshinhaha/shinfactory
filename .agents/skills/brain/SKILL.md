@@ -57,7 +57,7 @@ Format: `[[section/file-name]]`. Resolution order: same directory, then relative
 
 ## After Writing
 
-Update `brain/index.md` for any files you added or removed. Also update the relevant entrypoint (`brain/principles.md`, `brain/delegation.md`, or `brain/plans/index.md`) when applicable. Keep indexes link-only and scannable.
+Update `brain/index.md` for any files you added or removed. Also update the relevant entrypoint (`brain/plans/index.md`) when applicable. Keep indexes link-only and scannable.
 
 ## Durability Test
 

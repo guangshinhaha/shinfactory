@@ -52,10 +52,10 @@ Prompt spec:
 - Look for recurring patterns that reveal unstated engineering principles
 - A valid new principle must be: (1) genuinely independent — not derivable from existing principles, (2) evidenced by 2+ separate notes, (3) actionable — changes how you'd approach future work
 - Do NOT propose restatements of existing principles applied to a new domain
-- Each proposed principle: insight, evidence (which notes), why independent, suggested path under `brain/principles/`
+- Each proposed principle: insight, evidence (which notes), why independent, which shinstack folder it fits (general, engineering, product)
 
 **Section 3 — Skill review:**
-- For each skill, check against brain principles:
+- For each skill, check against shinstack principles:
   - Does it contradict any principle?
   - Does it miss a structural enforcement opportunity? (can an instruction become a lint rule, script, metadata flag, or runtime check?)
   - Does it duplicate instructions that a mechanism already handles?

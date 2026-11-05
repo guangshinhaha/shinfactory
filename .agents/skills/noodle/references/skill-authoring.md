@@ -60,7 +60,7 @@ schedule: "When and where to place this task type in order pipelines"
 
 ### Two Kinds of Skills
 
-**Task-type skills** have a `schedule` field and appear in `mise.json` as `task_types`. The scheduler places them as stages in orders. Examples: execute, quality, reflect, meditate.
+**Task-type skills** have a `schedule` field and appear in `mise.json` as `task_types`. The scheduler places them as stages in orders. Examples: execute, quality, debrief, meditate.
 
 **Domain/workflow skills** have no `schedule` field. They're loaded alongside task-type skills to provide context. Examples: go-best-practices, react-best-practices, noodle.
 
@@ -84,11 +84,11 @@ Real examples from this project:
 # quality — follow-up
 schedule: "Follow-up stage after execute. Cross-provider review preferred — if codex executed, schedule quality on claude; if claude executed, schedule on codex."
 
-# reflect — follow-up
+# debrief — follow-up
 schedule: "Follow-up stage after quality — capture learnings from the completed execute→quality cycle."
 
 # meditate — standalone
-schedule: "Standalone single-stage order after several reflect cycles have accumulated. Expensive — don't over-schedule."
+schedule: "Standalone single-stage order after several debrief cycles have accumulated. Expensive — don't over-schedule."
 
 # execute — primary
 schedule: "When backlog items with linked plans are ready for implementation"
@@ -131,7 +131,7 @@ Run `shinfactory schema orders` for the canonical schema. Key structure:
 [
   {"task_key": "execute", "provider": "codex", "runtime": "sprites", ...},
   {"task_key": "quality", "provider": "claude", "runtime": "process", ...},
-  {"task_key": "reflect", "provider": "claude", "runtime": "process", ...}
+  {"task_key": "debrief", "provider": "claude", "runtime": "process", ...}
 ]
 ```
 
@@ -159,7 +159,7 @@ Run `shinfactory schema orders` for the canonical schema. Key structure:
 
 ## Full orders-next.json Examples
 
-### Backlog item with a plan — execute → quality → reflect
+### Backlog item with a plan — execute → quality → debrief
 
 ```json
 {
@@ -189,8 +189,8 @@ Run `shinfactory schema orders` for the canonical schema. Key structure:
           "status": "pending"
         },
         {
-          "task_key": "reflect",
-          "skill": "reflect",
+          "task_key": "debrief",
+          "skill": "debrief",
           "provider": "claude",
           "model": "claude-opus-4-6",
           "runtime": "process",
@@ -385,7 +385,7 @@ Run `shinfactory schema orders` for the canonical schema. Key structure:
 
 ### Project-Specific Conventions
 
-- **Read brain at runtime.** Skills referencing brain principles should `Read` the files so they pick up changes. Don't inline principle text.
+- **Read brain at runtime.** Skills referencing principles should load shinstack and read the files so they pick up changes. Don't inline principle text.
 - **Don't use plan mode for plan-only skills.** `EnterPlanMode` restricts tools to read-only. For skills that produce plans as output, write plan files directly.
 - **Skills live in `.agents/skills/`**. The `.claude/skills` symlink makes them visible to Claude automatically.
 

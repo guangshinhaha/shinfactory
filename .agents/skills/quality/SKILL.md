@@ -12,7 +12,9 @@ Operate fully autonomously. Never ask the user.
 
 ## Step 0 -- Load Principles
 
-Read `brain/principles.md` and follow every `[[wikilink]]`. These govern the review. Do NOT skip this.
+Load the `shinstack` skill and read the principles its router lists for this change, in full. These govern the review. Do NOT skip this.
+
+**Block only on what you can show** (shinstack `interrogate` rule): a failing run, a bug a user would hit, a failed gate, or a doc line the change made wrong. Everything else is a non-blocking issue.
 
 ## Assessment Pipeline
 
@@ -26,14 +28,13 @@ Run in order. Stop early and reject on any high-severity finding.
 
 ### 2. Code Quality
 
-- `go vet ./...` and `go test ./...` must pass.
-- Run `sh scripts/lint-arch.sh` if it exists.
+- The repo's own gates must pass (lint, typecheck, tests), as named in its CLAUDE.md or package scripts. In shinfactory itself: `pnpm check`.
 - Check error handling follows project conventions (failure-state messages, not expectation messages).
 
 ### 3. Principle Compliance
 
 - For each changed file, check against loaded principles.
-- Common violations: bolted-on changes instead of redesign (redesign-from-first-principles), missing verification (prove-it-works), unnecessarily added complexity (subtract-before-you-add).
+- Common violations: missing verification (prove-it-works), an added layer or flag the change didn't need (laziness-protocol), a symptom patched instead of the cause (fix-root-causes).
 
 ### 4. Test Evidence
 
@@ -74,5 +75,4 @@ Issues that don't warrant rejection (style nits, minor improvements, documentati
 
 ## Principles
 
-- [[prove-it-works]]
-- [[outcome-oriented-execution]]
+From shinstack: prove-it-works, test-behavior-not-implementation, fix-root-causes.

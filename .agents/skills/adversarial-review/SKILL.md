@@ -10,7 +10,7 @@ schedule: "After cook sessions that produce large diffs (200+ lines), implement 
 # Adversarial Review
 
 Spawn reviewers on the **opposite model** to challenge work. Reviewers attack from distinct
-lenses grounded in brain principles. The deliverable is a synthesized verdict — do NOT make
+lenses grounded in shinstack principles. The deliverable is a synthesized verdict — do NOT make
 changes.
 
 **Hard constraint:** Reviewers MUST run via the opposite model's CLI (`codex exec` or
@@ -19,8 +19,10 @@ reviewers — those run on *your own* model, which defeats the purpose.
 
 ## Step 1 — Load Principles
 
-Read `brain/principles.md`. Follow every `[[wikilink]]` and read each linked principle file.
-These govern reviewer judgments.
+Load the `shinstack` skill and read the principles its router lists for this work, in full.
+These govern reviewer judgments. Apply shinstack `interrogate`'s rule to every finding: it
+counts only if the reviewer can show it (a failing run, a concrete input, a cited line), not
+assert it.
 
 ## Step 2 — Determine Scope and Intent
 
@@ -88,7 +90,7 @@ Produce a single verdict using the format in `references/verdict-format.md`.
 
 ## Step 5 — Render Judgment
 
-After synthesizing the reviewers, apply your own judgment. Using the stated intent and brain
+After synthesizing the reviewers, apply your own judgment. Using the stated intent and shinstack
 principles as your frame, state which findings you would accept and which you would reject —
 and why. Reviewers are adversarial by design; not every finding warrants action. Call out
 false positives, overreach, and findings that mistake style for substance.

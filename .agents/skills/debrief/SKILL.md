@@ -1,15 +1,17 @@
 ---
-name: reflect
+name: debrief
 description: >-
-  Reflect on the conversation and update the brain. Use when wrapping up, after mistakes
-  or corrections, or when significant codebase knowledge was gained. Triggers: "reflect",
-  "remember this".
+  Debrief a finished factory order and record what this project taught us in the brain.
+  Use when wrapping up a session, after mistakes or corrections, or when significant
+  codebase knowledge was gained. Triggers: "debrief", "remember this".
 schedule: "Follow-up stage after quality — capture learnings from the completed execute→quality cycle."
 ---
 
-# Reflect
+# Debrief
 
-Review the conversation and persist learnings — to `brain/`, to skill files, or as structural enforcement.
+Review the session and persist what it taught about **this project**: to `brain/`, to this repo's skill files, or as structural enforcement.
+
+Debrief is project-scoped. Shinstack's `reflect` is the separate, human-approved review that changes how agents work across every project. Don't edit shinstack from here.
 
 ## Process
 
@@ -34,11 +36,15 @@ Not everything belongs in the brain. Route each learning to where it will have t
 
 ### Structural enforcement check
 
-Before routing a learning to `brain/`, ask: can this be a lint rule, script, metadata flag, or runtime check? If yes, encode it structurally and skip the brain note. See `brain/principles/encode-lessons-in-structure.md`.
+Before routing a learning to `brain/`, ask: can this be a lint rule, script, metadata flag, or runtime check? If yes, encode it structurally and skip the brain note. See shinstack's `encode-lessons-in-structure` principle.
+
+### Lessons about how to work in general (not this project)
+
+A lesson that would apply to any project (a principle, a playbook gap, a shinstack file that was wrong or ignored) does not go in `brain/`. Append one line to `~/.claude/shinstack-friction.md` (`date | file | what went wrong`, no code or private content). Shinstack's `reflect` reads it and proposes the edit for the human to approve.
 
 ### Brain files (`brain/`)
 
-Codebase knowledge, delegation principles, gotchas — anything that informs future sessions. This is the default destination. Use the `brain` skill for writing conventions.
+Codebase knowledge, gotchas, project decisions — anything about this project that informs future sessions. This is the default destination. Use the `brain` skill for writing conventions.
 
 - One topic per file. File name = topic slug.
 - Group in directories with index files using `[[wikilinks]]`.
@@ -51,20 +57,21 @@ If a learning is about how a specific skill works — its process, prompts, or e
 ### Orchestration workflow improvements
 
 If the session revealed systemic orchestration issues, route to:
-- **Brain principle** (new delegation heuristic) → `brain/delegation/`
+- **General delegation heuristic** → the shinstack friction line above, not the brain
 - **Skill mechanics change** (monitoring loop, review step) → relevant skill file
 - **New skill opportunity** (recurring workflow that could be encoded) → note in summary for the user
 
 ### Backlog items (`brain/todos.md`)
 
-Follow-up work that can't be done during reflection — bugs, non-trivial rewrites, tooling gaps. Use the `todo` skill to file.
+Follow-up work that can't be done during the debrief — bugs, non-trivial rewrites, tooling gaps. Use the `todo` skill to file.
 
 ## Summary
 
 ```
-## Reflect Summary
+## Debrief Summary
 - Brain: [files created/updated, one-line each]
 - Skills: [skill files modified, one-line each]
 - Structural: [rules/scripts/checks added]
 - Todos: [follow-up items filed]
+- Shinstack friction: [lines appended, one each]
 ```

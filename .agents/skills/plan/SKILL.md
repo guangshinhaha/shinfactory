@@ -17,7 +17,7 @@ When this skill runs in a non-interactive Noodle execution session (for example 
 
 - **Skip Step 2** (AskUserQuestion) — the scope is fully defined in the initial prompt.
 - **Skip Step 6's pause** — write the plan, commit it, emit `stage_yield` (see Step 6), and end the session. Do not wait for human review.
-- **Step 4** (find-skills) — install skills autonomously without confirmation.
+- **Step 4** — use installed skills only; note any missing domain skill in the plan instead of installing one.
 
 All other steps proceed normally.
 
@@ -38,7 +38,7 @@ Tell the user this task doesn't need a plan and suggest implementing directly wi
 
 ## Step 1 — Load Principles
 
-Read `brain/principles.md`. Follow every `[[wikilink]]` and read each linked principle file. These principles govern all plan decisions — cite them by name in the plan overview and phase files.
+Load the `shinstack` skill and follow its `multi-phase-plan` playbook for how to slice the work; the files still go in `brain/plans/` in the template below. Read the principles the router lists for this change, in full. These principles govern all plan decisions — cite them by name in the plan overview and phase files. For types or module boundaries, sketch them as shinstack `architect` would, skipping its human checkpoint in autonomous mode.
 
 **Do NOT skip this. Do NOT use memorized principle content — always read fresh.** The self-check in Step 5b will verify citations exist.
 
@@ -88,7 +88,7 @@ Don't bolt changes onto existing designs — redesign holistically.
 
 ### Alternatives check
 
-For architectural decisions, briefly sketch 2-3 approaches in the overview's Constraints section. State which was chosen and why. This prevents premature commitment and documents the design space explored. See `brain/principles/exhaust-the-design-space.md`.
+For architectural decisions, briefly sketch 2-3 approaches in the overview's Constraints section. State which was chosen and why. This prevents premature commitment and documents the design space explored. See shinstack's `exhaust-the-design-space` (situational).
 
 ### Update plans index and todos
 
@@ -106,7 +106,7 @@ Move directory to `brain/archive/plans/`, update `brain/plans/index.md`, mark to
 
 After writing all plan files, verify these three constraints before proceeding. Fix any violations before moving on.
 
-**Principles cited:** The overview must reference at least 2 brain principles by `[[wikilink]]`. If not, re-read `brain/principles.md` and add the most relevant ones to the overview's design decisions.
+**Principles cited:** The overview must cite at least 2 shinstack principles by name. If not, re-read the shinstack router's principle list and add the most relevant ones to the overview's design decisions.
 
 **Phase sizing:** Review each phase. If any phase touches >3 files or lists >5 test cases, split it into smaller phases. Count the files listed under "Changes" — if the list exceeds 3, the phase is too big.
 

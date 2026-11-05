@@ -10,6 +10,8 @@ schedule: "When backlog items with linked plans are ready for implementation"
 
 Implementation methodology. Loads alongside the domain skill (e.g., "noodle") — this teaches process, the domain skill teaches the codebase. Operate fully autonomously. Never ask the user. Don't stop until the work is fully complete.
 
+**Craft comes from shinstack.** Load the `shinstack` skill and follow its playbook for the work: `bug-fix` for a bug, `feature` for a backlog item or plan phase, `refactoring` for a behavior-preserving reshape. This skill adds only the factory mechanics around it (worktree, commit, yield). Where they overlap, the router's "Inside shinfactory" rule wins: commit and yield, never push or open a PR.
+
 **Track all work with Tasks** (TaskCreate, TaskUpdate, TaskList). One task per decomposed change; mark in_progress when starting, completed when done.
 
 ## 1. Scope
@@ -41,7 +43,7 @@ If CWD is already inside `.worktrees/`, use it. Otherwise: `shinfactory worktree
 
 Use absolute paths or `shinfactory worktree exec <name> <cmd>`. **Never `cd` into a worktree** — if it gets removed while the shell is inside, the session dies permanently.
 
-Commit inside the worktree. When done: `shinfactory worktree merge <name>`
+Commit inside the worktree. If the loop gave you this worktree, stop at commit and yield; the loop merges it. Only merge worktrees you created yourself (e.g. team-execution phases): `shinfactory worktree merge <name>`
 
 Skip only when the user is interactively driving a single-agent session and explicitly chooses main.
 
@@ -80,10 +82,9 @@ Without this, the stage only completes on clean process exit — interrupted wor
 
 ## Principles
 
-Read at runtime from `brain/principles/`:
-- [[prove-it-works]]
-- [[subtract-before-you-add]]
-- [[cost-aware-delegation]]
-- [[guard-the-context-window]]
-- [[boundary-discipline]]
-- [[outcome-oriented-execution]]
+From shinstack (read each in full before applying):
+- prove-it-works
+- laziness-protocol
+- guard-the-context-window
+- boundary-discipline
+- sequence-verifiable-units

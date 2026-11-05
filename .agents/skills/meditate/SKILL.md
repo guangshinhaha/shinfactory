@@ -4,7 +4,7 @@ description: >-
   Audit and evolve the brain vault — prune outdated content, discover cross-cutting principles,
   review skills for structural encoding opportunities. Triggers: "meditate", "audit the brain",
   "prune brain", "review skills", "consolidate notes", "prune notes".
-schedule: "Standalone single-stage order after several reflect cycles have accumulated. Expensive — don't over-schedule."
+schedule: "Standalone single-stage order after several debrief cycles have accumulated. Expensive — don't over-schedule."
 ---
 
 # Meditate
@@ -46,7 +46,7 @@ Spawn one `general-purpose` subagent. See `references/agents.md § Reviewer` for
 Combines three concerns in a single pass:
 - **Synthesis**: Proposes missing wikilinks, flags principle tensions, suggests clarifications.
 - **Distillation**: Identifies recurring patterns that reveal unstated principles. New principles must be (1) independent, (2) evidenced by 2+ notes, (3) actionable.
-- **Skill review**: Cross-references skills against brain principles. Finds contradictions, missed structural enforcement, redundant instructions. Audits description frontmatters for context bloat.
+- **Skill review**: Cross-references skills against shinstack principles. Finds contradictions, missed structural enforcement, redundant instructions. Audits description frontmatters for context bloat.
 
 ### 4. Review reports
 
@@ -66,8 +66,8 @@ Apply all changes directly. The user reviews the diff.
 - **Verbose notes**: Condense in place
 - **New connections**: Add `[[wikilinks]]`
 - **Tensions**: Reword to clarify boundaries
-- **New principles**: Only from the distillation section, only if genuinely independent. Write brain files and update `brain/principles.md`
-- **Merge principles**: Look for principles that are subsets or specific applications of each other — merge the narrower into the broader and pick a name that captures the combined insight
+- **New principles**: Only from the distillation section, only if genuinely independent. Principles live in shinstack: append one line per candidate to `~/.claude/shinstack-friction.md` for shinstack's `reflect` to review. Never write principle files into the brain
+- **Merge principles**: not done here; principles live in shinstack
 - **Bloated skill descriptions**: Tighten frontmatter descriptions — cut what Claude can infer, keep only distinctive triggers and purpose
 - **CLAUDE.md issues**: Rewrite or delete
 - **Stale memories**: Delete or rewrite

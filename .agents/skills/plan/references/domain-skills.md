@@ -12,4 +12,4 @@ Check installed skills (`.claude/skills/`) for any that match the plan's domain.
 
 ## Discover Missing Skills
 
-If the plan touches a domain **not covered** by the table above, use the `find-skills` skill to search for a relevant skill. If one is found, install it (without `-g` — project-local only) and incorporate its guidance into the plan. Note what was installed so the user can see it. After the plan is written, delete any one-off skills that won't be needed again.
+If the plan touches a domain **not covered** by the table above, say so in the plan overview ("no domain skill for X") so the human can add one. Don't install skills from a planning session.
