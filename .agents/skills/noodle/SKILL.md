@@ -42,7 +42,7 @@ For the full guide on writing skills, orders, and schedule fields, see [referenc
 
 ## Configuration
 
-Noodle reads `.noodle.toml` at project root. Scaffolded on first `noodle start`. Most projects only need:
+Noodle reads `.noodle.toml` at project root. Scaffolded on first `shinfactory start`. Most projects only need:
 
 ```toml
 mode = "supervised"  # auto | supervised | manual
@@ -65,50 +65,50 @@ All commands accept `--project-dir` (default: current directory, env: `NOODLE_PR
 
 | Command | Description |
 |---------|-------------|
-| `noodle start` | Start the noodle loop |
-| `noodle start --once` | Run one scheduling cycle and exit |
-| `noodle status` | Show runtime status (active agents, queue depth, loop state) |
-| `noodle reset` | Clear all runtime state (refuses if loop is running) |
+| `shinfactory start` | Start the noodle loop |
+| `shinfactory start --once` | Run one scheduling cycle and exit |
+| `shinfactory status` | Show runtime status (active agents, queue depth, loop state) |
+| `shinfactory reset` | Clear all runtime state (refuses if loop is running) |
 
 ### Skills & Schemas
 
 | Command | Description |
 |---------|-------------|
-| `noodle skills` | List resolved skills |
-| `noodle skills list` | List all resolved skills |
-| `noodle schema <target>` | Print schema docs for a target |
-| `noodle schema list` | List available schema targets (`mise`, `orders`, `status`) |
+| `shinfactory skills` | List resolved skills |
+| `shinfactory skills list` | List all resolved skills |
+| `shinfactory schema <target>` | Print schema docs for a target |
+| `shinfactory schema list` | List available schema targets (`mise`, `orders`, `status`) |
 
 ### Worktrees
 
 | Command | Description |
 |---------|-------------|
-| `noodle worktree create <name>` | Create a new linked worktree |
-| `noodle worktree create <name> --from <ref>` | Create from a specific branch or commit |
-| `noodle worktree exec <name> <command...>` | Run a command inside a worktree (CWD-safe) |
-| `noodle worktree merge <name>` | Merge a worktree branch into integration branch |
-| `noodle worktree merge <name> --into <branch>` | Merge into a specific target branch |
-| `noodle worktree list` | List all worktrees with merge status |
-| `noodle worktree prune` | Remove merged and patch-equivalent worktrees |
-| `noodle worktree cleanup <name>` | Remove a worktree without merging |
-| `noodle worktree cleanup <name> --force` | Remove even with unmerged commits |
-| `noodle worktree hook` | Run worktree session hook (used internally) |
+| `shinfactory worktree create <name>` | Create a new linked worktree |
+| `shinfactory worktree create <name> --from <ref>` | Create from a specific branch or commit |
+| `shinfactory worktree exec <name> <command...>` | Run a command inside a worktree (CWD-safe) |
+| `shinfactory worktree merge <name>` | Merge a worktree branch into integration branch |
+| `shinfactory worktree merge <name> --into <branch>` | Merge into a specific target branch |
+| `shinfactory worktree list` | List all worktrees with merge status |
+| `shinfactory worktree prune` | Remove merged and patch-equivalent worktrees |
+| `shinfactory worktree cleanup <name>` | Remove a worktree without merging |
+| `shinfactory worktree cleanup <name> --force` | Remove even with unmerged commits |
+| `shinfactory worktree hook` | Run worktree session hook (used internally) |
 
 ### Events
 
 | Command | Description |
 |---------|-------------|
-| `noodle event emit <type>` | Emit an external event into the loop |
-| `noodle event emit <type> --payload <json>` | Emit with a JSON payload |
-| `noodle event emit <type> --session <id>` | Emit to a specific session's event log |
+| `shinfactory event emit <type>` | Emit an external event into the loop |
+| `shinfactory event emit <type> --payload <json>` | Emit with a JSON payload |
+| `shinfactory event emit <type> --session <id>` | Emit to a specific session's event log |
 
 Full CLI reference: https://poteto.github.io/noodle/reference/cli
 
 ## Troubleshooting
 
-1. **"fatal config diagnostics prevent start"** — Check `.noodle.toml` against `noodle schema`.
+1. **"fatal config diagnostics prevent start"** — Check `.noodle.toml` against `shinfactory schema`.
 2. **Missing adapter scripts** — Create scripts or update paths in config.
-3. **Stale worktrees** — `noodle worktree list`, then `noodle worktree prune`.
+3. **Stale worktrees** — `shinfactory worktree list`, then `shinfactory worktree prune`.
 
 ## References
 

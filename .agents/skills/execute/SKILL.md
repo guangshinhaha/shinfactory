@@ -37,11 +37,11 @@ Single-change scopes skip decomposition.
 
 **Never edit files on main.** Multiple sessions run concurrently; editing main causes merge conflicts and lost work.
 
-If CWD is already inside `.worktrees/`, use it. Otherwise: `noodle worktree create <descriptive-name>`
+If CWD is already inside `.worktrees/`, use it. Otherwise: `shinfactory worktree create <descriptive-name>`
 
-Use absolute paths or `noodle worktree exec <name> <cmd>`. **Never `cd` into a worktree** — if it gets removed while the shell is inside, the session dies permanently.
+Use absolute paths or `shinfactory worktree exec <name> <cmd>`. **Never `cd` into a worktree** — if it gets removed while the shell is inside, the session dies permanently.
 
-Commit inside the worktree. When done: `noodle worktree merge <name>`
+Commit inside the worktree. When done: `shinfactory worktree merge <name>`
 
 Skip only when the user is interactively driving a single-agent session and explicitly chooses main.
 
@@ -67,7 +67,7 @@ Run the full verification suite before committing. See `references/verification.
 After all changes are committed and verified, emit `stage_yield`:
 
 ```bash
-noodle event emit --session $NOODLE_SESSION_ID stage_yield --payload '{"message": "Implemented: <brief summary>"}'
+shinfactory event emit --session $NOODLE_SESSION_ID stage_yield --payload '{"message": "Implemented: <brief summary>"}'
 ```
 
 Without this, the stage only completes on clean process exit — interrupted work is lost to the pipeline.

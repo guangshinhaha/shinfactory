@@ -100,7 +100,7 @@ Write instructions for what the agent should do when dispatched. The body should
 
 ## Orders Schema
 
-Run `noodle schema orders` for the canonical schema. Key structure:
+Run `shinfactory schema orders` for the canonical schema. Key structure:
 
 ```json
 {

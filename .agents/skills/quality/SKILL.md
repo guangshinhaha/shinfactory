@@ -51,7 +51,7 @@ Run in order. Stop early and reject on any high-severity finding.
 Emit a `stage_message` event with your assessment:
 
 ```sh
-noodle event emit --session $NOODLE_SESSION_ID stage_message --payload '<json>'
+shinfactory event emit --session $NOODLE_SESSION_ID stage_message --payload '<json>'
 ```
 
 **Accept**: Emit with `blocking: false`. The pipeline continues and the scheduler sees the green light.

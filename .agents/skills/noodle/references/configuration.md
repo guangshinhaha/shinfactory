@@ -1,6 +1,6 @@
 # Configuration Reference
 
-Noodle reads `.noodle.toml` at project root. When no config file exists, `noodle start` uses sensible defaults.
+Noodle reads `.noodle.toml` at project root. When no config file exists, `shinfactory start` uses sensible defaults.
 
 ## Minimal config
 

@@ -8,7 +8,7 @@ schedule: "When orders are empty, after backlog changes, or when session history
 
 Read `.noodle/mise.json`, write `.noodle/orders-next.json`.
 The loop atomically promotes `orders-next.json` into `orders.json` — never write `orders.json` directly.
-Use `noodle schema mise` and `noodle schema orders` as the schema source of truth.
+Use `shinfactory schema mise` and `shinfactory schema orders` as the schema source of truth.
 
 Operate fully autonomously. Never ask the user to choose or pause for confirmation.
 
@@ -84,7 +84,7 @@ Always set `"runtime": "process"` on all stages. The `sprites` runtime is still 
 
 ## Output
 
-Write valid JSON to `.noodle/orders-next.json` matching `noodle schema orders`.
+Write valid JSON to `.noodle/orders-next.json` matching `shinfactory schema orders`.
 
 See [references/examples.md](references/examples.md) for order JSON examples and `extra_prompt` field usage.
 

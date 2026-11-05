@@ -16,14 +16,14 @@ description: >-
 - **Not valid by default**: primary checkout at repo root
 - **Allowed exception**: interactive, single-agent, small changes can run in primary checkout when that is the deliberate choice
 
-All operations use `noodle worktree` — it enforces CWD safety, correct sequencing, stash/rebase handling, and dep reinstall.
+All operations use `shinfactory worktree` — it enforces CWD safety, correct sequencing, stash/rebase handling, and dep reinstall.
 
 ## Commands
 
 ### Preflight
 
 ```bash
-noodle worktree list
+shinfactory worktree list
 ```
 
 Shows all worktrees with merge status. Run at session start to spot stale worktrees from crashed sessions.
@@ -31,7 +31,7 @@ Shows all worktrees with merge status. Run at session start to spot stale worktr
 ### Create
 
 ```bash
-noodle worktree create <name>
+shinfactory worktree create <name>
 ```
 
 Creates worktree + branch at `.worktrees/<name>`, symlinks `.claude/settings.local.json`, auto-detects package manager, installs deps.
@@ -39,15 +39,15 @@ Creates worktree + branch at `.worktrees/<name>`, symlinks `.claude/settings.loc
 ### Run commands inside a worktree
 
 ```bash
-noodle worktree exec <name> <command...>
+shinfactory worktree exec <name> <command...>
 ```
 
 Runs the command inside the worktree via `cmd.Dir`. **The parent shell's CWD never changes** — this is the safe way to run builds, tests, or any tool that needs the worktree as CWD.
 
 ```bash
 # Examples
-noodle worktree exec my-feature go test ./...
-noodle worktree exec my-feature go build ./...
+shinfactory worktree exec my-feature go test ./...
+shinfactory worktree exec my-feature go build ./...
 ```
 
 For git operations, `git -C` also works and doesn't need `exec`:
@@ -63,8 +63,8 @@ File reads/edits use absolute paths directly — no `exec` needed.
 ### Merge
 
 ```bash
-noodle worktree merge <name>
-noodle worktree merge <name> --into <branch>
+shinfactory worktree merge <name>
+shinfactory worktree merge <name> --into <branch>
 ```
 
 Single command does: CWD safety check -> stash worktree noise -> rebase onto target branch -> merge -> remove worktree -> delete branch -> prune -> reinstall deps. Refuses to run if CWD is inside the worktree or if root checkout is not on the target branch.
@@ -78,7 +78,7 @@ Merges are serialized via lockfile (`.worktrees/.merge-lock`). If another merge 
 ### Prune merged/patch-equivalent worktrees
 
 ```bash
-noodle worktree prune
+shinfactory worktree prune
 ```
 
 Auto-cleans safe worktrees:
@@ -89,7 +89,7 @@ Auto-cleans safe worktrees:
 ### Clean up without merging
 
 ```bash
-noodle worktree cleanup <name>
+shinfactory worktree cleanup <name>
 ```
 
 Warns if there are unmerged commits. Use `--force` to discard them.
@@ -104,24 +104,24 @@ Warns if there are unmerged commits. Use `--force` to discard them.
 The Bash tool maintains a persistent shell — `cd` in one call persists to ALL future calls. A later `rm -rf` or `git worktree remove` on that path kills the shell instantly.
 
 **Always use one of these instead:**
-1. `noodle worktree exec <name> <cmd>` — CWD-safe by design
+1. `shinfactory worktree exec <name> <cmd>` — CWD-safe by design
 2. Subshells: `(cd /path && cmd)` — CWD resets when subshell exits
 3. Absolute paths: `go build /path/to/pkg/...`
 4. Tool flags: `git -C <path>`, `go -C <path>`
 
 ## Parallel Agent Teams
 
-1. Lead creates one worktree per teammate: `noodle worktree create phase-1`
+1. Lead creates one worktree per teammate: `shinfactory worktree create phase-1`
 2. Spawn each with `mode: "acceptEdits"` — worktrees are isolated scratch space
 3. Each teammate commits on its own branch
-4. Lead merges each: `noodle worktree merge phase-1`
+4. Lead merges each: `shinfactory worktree merge phase-1`
 
 **Sub-agent hierarchies**: A lead agent working in its own worktree (branch `lead-work`) can spawn sub-agents with their own worktrees. Sub-agents merge back into the lead's branch, not main:
 
 ```bash
 # Root checkout must be on the target branch
 git checkout lead-work
-noodle worktree merge sub-work --into lead-work
+shinfactory worktree merge sub-work --into lead-work
 ```
 
 **Foundational changes**: If Phase 1 is a foundation later phases need, do it on main first, commit, then create parallel worktrees. Branches start from the commit they were created at.
@@ -137,8 +137,8 @@ noodle worktree merge sub-work --into lead-work
 
 ## Stale Worktree Triage
 
-Use `noodle worktree list` to check status, then:
+Use `shinfactory worktree list` to check status, then:
 
-1. **Merged** (shows "safe to clean up") -> `noodle worktree cleanup <name>`
+1. **Merged** (shows "safe to clean up") -> `shinfactory worktree cleanup <name>`
 2. **Unmerged with commits** -> report to user, let them decide merge vs discard
-3. **No commits** -> crashed session artifact -> `noodle worktree cleanup <name>`
+3. **No commits** -> crashed session artifact -> `shinfactory worktree cleanup <name>`

@@ -119,7 +119,7 @@ Summarize the plan: list the phases, scope boundaries, applicable skills, and ve
 **Emit `stage_yield`** to signal the deliverable is complete:
 
 ```bash
-noodle event emit --session $NOODLE_SESSION_ID stage_yield --payload '{"message": "Plan written to brain/plans/NN-slug-name/overview.md"}'
+shinfactory event emit --session $NOODLE_SESSION_ID stage_yield --payload '{"message": "Plan written to brain/plans/NN-slug-name/overview.md"}'
 ```
 
 This tells the Noodle backend the stage's work is done, even if the agent process hasn't exited yet. Without this, the stage only completes on clean process exit.

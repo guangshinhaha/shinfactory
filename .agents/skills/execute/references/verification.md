@@ -17,7 +17,7 @@ Or equivalently: `pnpm check` (runs build, Go tests, vet, arch lint, and fixture
 
 After integrating changes, before merging to main:
 - `pnpm test:smoke` — Go e2e tests with `-tags e2e`
-- In a worktree: `noodle worktree exec <name> pnpm test:smoke`
+- In a worktree: `shinfactory worktree exec <name> pnpm test:smoke`
 - When UI changes: write NEW test cases covering the changed interface
 
 ## Fixture Tests

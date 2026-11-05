@@ -25,13 +25,13 @@ func TestGeneratedSkillContainsAllCommands(t *testing.T) {
 	}
 
 	requiredCommands := []string{
-		"noodle start",
-		"noodle status",
-		"noodle skills",
-		"noodle worktree",
-		"noodle schema",
-		"noodle event",
-		"noodle reset",
+		"shinfactory start",
+		"shinfactory status",
+		"shinfactory skills",
+		"shinfactory worktree",
+		"shinfactory schema",
+		"shinfactory event",
+		"shinfactory reset",
 	}
 
 	for _, cmd := range requiredCommands {

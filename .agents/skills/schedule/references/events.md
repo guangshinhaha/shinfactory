@@ -17,4 +17,4 @@ Emitted automatically by the loop. The V2 backend uses canonical event types:
 
 ## External Events
 
-Users can inject custom events via `noodle event emit <type> [payload]`. These have arbitrary types like `ci.failed`, `deploy.completed`, `test.flaky`, etc. You won't know every possible type — interpret them from context and the summary string.
+Users can inject custom events via `shinfactory event emit <type> [payload]`. These have arbitrary types like `ci.failed`, `deploy.completed`, `test.flaky`, etc. You won't know every possible type — interpret them from context and the summary string.

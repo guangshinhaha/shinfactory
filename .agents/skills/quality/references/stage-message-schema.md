@@ -1,6 +1,6 @@
 # Stage Message Schema
 
-Emitted by agents via `noodle event emit --session $NOODLE_SESSION_ID stage_message --payload '<json>'`.
+Emitted by agents via `shinfactory event emit --session $NOODLE_SESSION_ID stage_message --payload '<json>'`.
 
 ```json
 {
