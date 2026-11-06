@@ -45,3 +45,4 @@ __pycache__/
 
 # Test artifacts
 e2e/ui/test-results/
+.worktrees/
