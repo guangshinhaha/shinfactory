@@ -11,6 +11,7 @@ The `brain/` directory is an Obsidian vault — persistent memory across session
 - **Structure:** One topic per file. Directories with `[[wikilink]]` indexes — no inlined content.
 - **Maintain:** Delete outdated notes. Clean completed/abandoned plans from `brain/plans/`.
 - **Principles live in shinstack, not the brain.** The brain holds project knowledge only. For how to work (principles, playbooks), load the `shinstack:craft` skill.
+- **Ownership:** shinfactory owns when work runs and who runs it; shinstack owns how. A rule that would still apply to one session with no loop goes in shinstack, not in a skill here. See the [boundary decision](https://github.com/guangshinhaha/shinstack/blob/main/docs/decisions/shinstack-vs-shinfactory.md).
 
 ## Workflow
 

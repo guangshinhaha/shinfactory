@@ -4,6 +4,19 @@
 
 Skill-based agent orchestration. Built in Go.
 
+## shinfactory and shinstack
+
+shinfactory decides when work runs and who runs it. [shinstack](https://github.com/guangshinhaha/shinstack) says how to work. shinfactory depends on shinstack, never the reverse.
+
+| Concern | Owner |
+|---|---|
+| Stage order, scheduling, retries, and which provider or model runs a stage | shinfactory |
+| Merge and PRs inside a factory order | shinfactory |
+| Principles, playbooks, craft skills, review standards | shinstack |
+| Push, PR, merge and deploy outside the factory | shinstack |
+
+To place a new rule, ask: would it still apply to one person running one agent session with no loop? If yes, it goes in shinstack. If it needs a schedule, a stage or an event, it goes here. Full reasoning: [the decision record](https://github.com/guangshinhaha/shinstack/blob/main/docs/decisions/shinstack-vs-shinfactory.md).
+
 ## Install
 
 Give this to your agent:
