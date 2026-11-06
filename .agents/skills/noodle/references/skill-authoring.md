@@ -62,7 +62,7 @@ schedule: "When and where to place this task type in order pipelines"
 
 **Task-type skills** have a `schedule` field and appear in `mise.json` as `task_types`. The scheduler places them as stages in orders. Examples: execute, quality, debrief, meditate.
 
-**Domain/workflow skills** have no `schedule` field. They're loaded alongside task-type skills to provide context. Examples: go-best-practices, react-best-practices, noodle.
+**Domain/workflow skills** have no `schedule` field. They're loaded alongside task-type skills to provide context. Examples: noodle.
 
 ## Writing Task-Type Skills
 
