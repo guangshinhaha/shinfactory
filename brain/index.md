@@ -42,8 +42,5 @@
 - [[codebase/worktree-skill-entrypoint]]
 - [[codebase/ws-http-snapshot-race-after-control-ack]]
 
-## Backlog
-- [[todos]]
-
 ## Plans
 - [[plans/index]]
