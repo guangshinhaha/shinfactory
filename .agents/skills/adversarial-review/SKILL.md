@@ -2,7 +2,8 @@
 name: adversarial-review
 description: >-
   Adversarial code review using cross-model approach. Spawns reviewers on the opposing model
-  (Claude uses Codex, Codex uses Claude) to challenge work from distinct critical lenses.
+  (Claude uses Codex, Codex uses Claude) to challenge work from distinct critical lenses. Work
+  involving sensitive data stays on the same provider, with synthetic data.
   Produces a synthesized verdict with findings and lead judgment. Triggers: "adversarial review".
 schedule: "After cook sessions that produce large diffs (200+ lines), implement plan phases, or complete a planning session"
 ---
@@ -13,7 +14,10 @@ Spawn reviewers on the **opposite model** to challenge work. Reviewers attack fr
 lenses grounded in shinstack principles. The deliverable is a synthesized verdict — do NOT make
 changes.
 
-**Hard constraint:** Reviewers MUST run via the opposite model's CLI (`codex exec` or
+**Hard constraint:** Sensitive data never goes to another provider. Run the data check in Step 3
+before anything reaches a reviewer.
+
+When the data check is clear, reviewers MUST run via the opposite model's CLI (`codex exec` or
 `claude -p`). Do NOT use subagents, the Agent tool, or any internal delegation mechanism as
 reviewers — those run on *your own* model, which defeats the purpose.
 
@@ -42,7 +46,26 @@ Assess change size:
 
 Read `references/reviewer-lenses.md` for lens definitions.
 
-## Step 3 — Detect Model and Spawn Reviewers
+## Step 3 — Check the Data, Detect Model, and Spawn Reviewers
+
+**Data check.** Before building any prompt, decide whether the work is sensitive. It is sensitive
+if either of these holds:
+
+- Anything a reviewer would receive (diff, fixtures, logs, plans) contains personal data about
+  students, staff or citizens, real or possibly real.
+- The repo's `CLAUDE.md` or docs say the project handles such data, even if this diff has none.
+
+If you cannot tell, treat it as sensitive.
+
+**If sensitive:**
+
+1. If the review can't work without real data, don't run any reviewers. Report the review as not
+   run, and why, then stop.
+2. Replace real data with synthetic data in everything the prompt contains.
+3. Run reviewers on your own provider's CLI (Claude uses `claude -p`, Codex uses `codex exec`).
+   Never use the opposite model's CLI.
+
+**If clear:** spawn reviewers on the opposite model, as below.
 
 Create a temp directory for reviewer output:
 
@@ -50,7 +73,8 @@ Create a temp directory for reviewer output:
 REVIEW_DIR=$(mktemp -d /tmp/adversarial-review.XXXXXX)
 ```
 
-Determine which model you are, then spawn reviewers on the opposite:
+Determine which model you are. Unless the data check sent you to your own provider, spawn
+reviewers on the opposite:
 
 **If you are Claude** — spawn Codex reviewers via `codex exec`:
 
@@ -78,9 +102,12 @@ Build each reviewer's prompt using the template in `references/reviewer-prompt.m
 Before reading reviewer output, log which CLI was used and confirm the output files exist:
 
 ```sh
-echo "reviewer_cli=codex|claude"
+echo "reviewer_cli=codex|claude data_check=clear|sensitive"
 ls "$REVIEW_DIR"/*.md
 ```
+
+If the data check was sensitive, state in the verdict that reviewers shared your provider, so the
+cross-model check did not happen.
 
 If any output file is missing or empty, note the failure in the verdict — do not silently skip
 a reviewer.
