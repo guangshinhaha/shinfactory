@@ -58,3 +58,5 @@ func (a *App) ProviderConfigs() dispatcher.ProviderConfigs {
 		},
 	}
 }
+
+// gantry#45 proof: clean code change.
