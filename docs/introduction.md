@@ -56,3 +56,5 @@ You write the skills. Noodle makes them run themselves.
 - [Getting Started](/getting-started) — install Noodle and run your first loop
 - [Skills](/concepts/skills) — the full picture on writing and composing skills
 - [FAQ](/reference/faq) — common questions about Noodle
+
+<!-- issue 45 verify, do not merge -->
