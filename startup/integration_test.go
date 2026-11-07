@@ -20,6 +20,9 @@ func TestCLIIntegrationStartScaffolds(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
+	// A dispatched agent inherits the factory's NOODLE_PROJECT_DIR, which would point
+	// the binary at the live project instead of this test's directory.
+	t.Setenv("NOODLE_PROJECT_DIR", "")
 
 	// Build UI assets then the binary
 	projectRoot := findProjectRoot(t)

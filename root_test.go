@@ -65,6 +65,8 @@ func TestProjectDirFlagRegistered(t *testing.T) {
 }
 
 func TestResolveProjectDirDefaultsToCwd(t *testing.T) {
+	// A dispatched agent inherits the factory's NOODLE_PROJECT_DIR.
+	t.Setenv("NOODLE_PROJECT_DIR", "")
 	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
