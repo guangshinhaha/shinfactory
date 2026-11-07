@@ -8,7 +8,7 @@ schedule: "When backlog items with linked plans are ready for implementation"
 
 # Execute
 
-Implementation methodology. Loads alongside the domain skill (e.g., "noodle") — this teaches process, the domain skill teaches the codebase. Operate fully autonomously. Never ask the user. Don't stop until the work is fully complete.
+Implementation methodology. Loads alongside the domain skill (e.g., "noodle") — this teaches process, the domain skill teaches the codebase. Operate fully autonomously. Never ask the user. Don't stop until the work is fully complete or the item is unbuildable (see Scope).
 
 **Craft comes from shinstack.** Load the `shinstack:craft` skill and follow its playbook for the work: `bug-fix` for a bug, `feature` for a backlog item or plan phase, `refactoring` for a behavior-preserving reshape. This skill adds only the factory mechanics around it (worktree, commit, yield). Where they overlap, the router's "Inside shinfactory" rule wins: commit and yield, never push or open a PR.
 
@@ -19,10 +19,18 @@ Implementation methodology. Loads alongside the domain skill (e.g., "noodle") �
 Establish what needs doing:
 
 - **Plan phase**: Read the assigned phase from `brain/plans/`. Read the overview for scope boundaries. Invoke Skill(backlog) for project-specific context. Load domain skills listed in "Applicable skills."
-- **Backlog item**: Read the item with the `todo` skill (a GitHub issue or a `brain/todos.md` line). If a linked plan exists, read it. Otherwise, scope from the description.
+- **Backlog item**: Read the item with the `todo` skill (a GitHub issue or a `brain/todos.md` line). For a GitHub issue, read the full body with `gh issue view N --json body` first: the backlog's `description` is cut at 2,000 characters, and Decided, Assumed and Open often come last. If a linked plan exists, read it. Otherwise, scope from the full body.
 - **Ad-hoc request**: The user prompt is the scope. Identify affected files and packages before starting.
 
 Output: a clear, bounded description of what changes and what doesn't.
+
+**Unbuildable item:** if the item has no observable Done when, or something only a person can settle blocks the build, don't guess and don't change any code. Fail the stage, name what's missing, and stop:
+
+```bash
+shinfactory event emit --session $NOODLE_SESSION_ID stage_fail --payload '{"message": "Unbuildable: <what is missing and who can settle it>"}'
+```
+
+The loop fails the stage, discards the worktree, and the scheduler sees the reason like any other stage failure. This is the one case where you stop before the work is complete.
 
 ## 2. Decompose
 
