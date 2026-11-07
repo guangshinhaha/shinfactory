@@ -4,20 +4,29 @@
 # stands, so a body keeps its newlines and quotes; the API ignores the section field. Agents
 # can also call `gh issue create` directly; this exists so the adapter contract is complete.
 #
-# It refuses a labels field, because the ready label is a person's permission to build.
+# The ready label is a person's permission to build, so nothing added here may carry it. It
+# refuses a labels field and a ready section, then sets the new issue's labels to exactly the
+# section (or none), which also strips a labels field spelled with JSON escapes.
 set -eu
 
+ready=${NOODLE_GH_LABEL:-ready}
 payload=$(cat)
 title=$(printf '%s' "$payload" | sed -n 's/.*"title"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1)
 section=$(printf '%s' "$payload" | sed -n 's/.*"section"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1)
 [ -n "$title" ] || { echo "title required" >&2; exit 1; }
-case "$payload" in
-  *'"labels"'*) echo "labels field not accepted; use section" >&2; exit 1 ;;
-esac
+if printf '%s' "$payload" | grep -q '"labels"[[:space:]]*:'; then
+  echo "labels field not accepted; use section" >&2; exit 1
+fi
+if printf '%s' "$payload" | grep -q '"section"[[:space:]]*:[[:space:]]*"[^"]*\\'; then
+  echo "section has quotes or escapes; use plain text" >&2; exit 1
+fi
+[ "$section" != "$ready" ] || { echo "section $ready not accepted; only a person marks an issue $ready" >&2; exit 1; }
 
 [ -z "$section" ] || gh label create "$section" --force >/dev/null
 number=$(printf '%s' "$payload" | gh api 'repos/{owner}/{repo}/issues' --method POST --input - --jq .number)
 if [ -n "$section" ]; then
-  gh issue edit "$number" --add-label "$section" >/dev/null
+  gh api "repos/{owner}/{repo}/issues/$number/labels" --method PUT -f "labels[]=$section" >/dev/null
+else
+  gh api "repos/{owner}/{repo}/issues/$number/labels" --method DELETE >/dev/null
 fi
 echo "$number"

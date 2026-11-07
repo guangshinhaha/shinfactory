@@ -12,7 +12,7 @@ import (
 // fakeGH puts a stub `gh` first on PATH. It appends its arguments to a log file and,
 // for `issue list --label <label> --jq <filter>`, evaluates the filter with jq over the
 // canned issues carrying that label, so the adapter's real label and filter are exercised.
-// `api` calls save stdin to api-input.json beside the log and print issue number 42.
+// `api ... --input -` calls save stdin to api-input.json beside the log and print issue number 42.
 func fakeGH(t *testing.T, issuesJSON string) (env []string, logPath string) {
 	t.Helper()
 	dir := t.TempDir()
@@ -31,7 +31,7 @@ if [ "$1 $2" = "issue list" ]; then
     shift
   done
 fi
-if [ "$1" = "api" ]; then cat > "` + filepath.Join(dir, "api-input.json") + `"; echo 42; fi
+case "$1 $*" in api*--input*) cat > "` + filepath.Join(dir, "api-input.json") + `"; echo 42 ;; esac
 `
 	if err := os.WriteFile(filepath.Join(dir, "gh"), []byte(stub), 0o755); err != nil {
 		t.Fatalf("write stub: %v", err)
@@ -171,7 +171,7 @@ func TestGitHubBacklogAddPrintsIssueNumber(t *testing.T) {
 	if strings.TrimSpace(out) != "42" {
 		t.Fatalf("add printed %q, want 42", out)
 	}
-	if !strings.Contains(readLog(t, logPath), "issue edit 42 --add-label Bugs") {
+	if !strings.Contains(readLog(t, logPath), "api repos/{owner}/{repo}/issues/42/labels --method PUT -f labels[]=Bugs") {
 		t.Fatalf("section not mapped to a label: %s", readLog(t, logPath))
 	}
 }
@@ -208,6 +208,8 @@ func TestGitHubBacklogAddRefusesBadPayloads(t *testing.T) {
 	for _, tc := range []struct{ name, payload, want string }{
 		{"missing title", `{"body":"no title"}`, "title required"},
 		{"labels field", `{"title":"x","labels":["ready"]}`, "labels field not accepted"},
+		{"ready section", `{"title":"x","section":"ready"}`, "section ready not accepted"},
+		{"section with escapes", `{"title":"x","section":"say \"hi\" now"}`, "section has quotes or escapes"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			env, logPath := fakeGH(t, `[]`)
@@ -230,6 +232,24 @@ func TestGitHubBacklogAddAllowsTheWordLabelsInABody(t *testing.T) {
 	out := runGitHubAdapter(t, env, "backlog-add", `{"title":"x","body":"the \"labels\" field"}`)
 	if strings.TrimSpace(out) != "42" {
 		t.Fatalf("add printed %q, want 42", out)
+	}
+}
+
+func TestGitHubBacklogAddAllowsASectionNamedLabels(t *testing.T) {
+	env, logPath := fakeGH(t, `[]`)
+	runGitHubAdapter(t, env, "backlog-add", `{"title":"x","section":"labels"}`)
+	if !strings.Contains(readLog(t, logPath), "labels[]=labels") {
+		t.Fatalf("section labels not applied: %s", readLog(t, logPath))
+	}
+}
+
+// A labels key spelled with a JSON escape gets past the text check, so add must clear
+// whatever labels the API applied.
+func TestGitHubBacklogAddClearsLabelsTheAPIApplied(t *testing.T) {
+	env, logPath := fakeGH(t, `[]`)
+	runGitHubAdapter(t, env, "backlog-add", `{"title":"x","lab\u0065ls":["ready"]}`)
+	if !strings.Contains(readLog(t, logPath), "api repos/{owner}/{repo}/issues/42/labels --method DELETE") {
+		t.Fatalf("add left the API's labels in place: %s", readLog(t, logPath))
 	}
 }
 
