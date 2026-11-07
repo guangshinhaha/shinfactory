@@ -28,6 +28,7 @@
 - [[codebase/schedule-order-normalized-away-when-skill-missing]]
 - [[codebase/scheduler-active-order-amendments]]
 - [[codebase/scheduler-steer-alias-prefers-live-session]]
+- [[codebase/session-events-need-project-dir]]
 - [[codebase/session-failure-classification-crash-only]]
 - [[codebase/sprites-session-outcome-resolution-ordering]]
 - [[codebase/sidebar-stage-list-labels-and-visibility]]
