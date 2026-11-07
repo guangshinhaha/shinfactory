@@ -21,12 +21,22 @@ Quality accept:
 { "message": "All checks pass. Tests green, scope clean.", "blocking": false }
 ```
 
-Quality reject:
+## Failing a stage
+
+To fail a stage, emit `stage_fail` instead. A blocking `stage_message` only parks the order for review; `stage_fail` fails the stage and the order, stops later stages, discards the stage's worktree, and puts the reason in `recent_events` for the scheduler.
+
+Emitted by agents via `shinfactory event emit --session $NOODLE_SESSION_ID stage_fail --payload '<json>'`.
+
 ```json
-{ "message": "Rejected: 3 high issues. [1] Missing test for edge case in handleCompletion. [2] Scope violation: modified cook_merge.go outside plan phase scope. [3] Error message uses expectation form.", "blocking": true }
+{ "message": "string — why the stage failed, natural language" }
 ```
 
-Execute complete:
+Quality reject:
 ```json
-{ "message": "Implementation complete. 3 files changed, 2 new tests added. Ready for review.", "blocking": true }
+{ "message": "Rejected: 2 high issues. [1] Done when missed: \"running ./greet prints hello\", but it printed nothing. [2] Scope violation: modified cook_merge.go outside plan phase scope." }
+```
+
+Execute on an unbuildable item:
+```json
+{ "message": "Unbuildable: the issue says \"make onboarding better\" with nothing to check. It needs an observable Done when from a person." }
 ```

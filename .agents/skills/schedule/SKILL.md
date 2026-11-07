@@ -34,9 +34,19 @@ Read `task_types` from mise to discover every schedulable task type and its `sch
 
 Schedule execute tasks from the `backlog` array in mise. Use the backlog item ID (as a string) as the order `id`.
 
-Backlog items always have `id` and `title`. Other fields are adapter-defined and may vary. The todos.md adapter provides: `status`, `section`, `tags`, `estimate`, and `plan`. The GitHub adapter provides `status`, `tags` (labels), `plan`, `url`, and `description` (the issue body, truncated) — use the description as the task brief. Custom adapters may include any fields — treat unknown fields as useful context.
+Backlog items always have `id` and `title`. Other fields are adapter-defined and may vary. The todos.md adapter provides: `status`, `section`, `tags`, `estimate`, and `plan`. The GitHub adapter provides `status`, `tags` (labels), `plan`, `url`, and `description` (the issue body, cut at 2,000 characters) — use the description as the task brief. Custom adapters may include any fields — treat unknown fields as useful context.
 
-**Shared infrastructure:** When multiple plans depend on common infrastructure (shared types, utilities, base packages), propose a standalone infra order before the plan's phases. Use a descriptive slug ID (e.g., `"infra-shared-types"`). If the infra work is substantial, create a backlog item via the adapter (`noodle adapter run backlog add`), then use that item's ID as the order ID.
+**No Done when, no build.** Before scheduling any backlog item, check that the item or its linked plan states something observable that a person or test can check when the work is done. Exact headings aren't required: "Running `greet` prints hello" passes under any wording. A goal with nothing to check ("make onboarding better") fails. If the `description` has no Done when and is 2,000 characters long, read the full issue with the `todo` skill before deciding, because it may have been cut off.
+
+An item that fails gets no order. Listing it in `action_needed` isn't enough, because only the loop reads that. Send it back yourself in this session, naming what's missing, so the person sees why. Find the backlog in `.noodle.toml` under `[adapters.backlog]`:
+
+- **GitHub Issues** (the `sync` script is the ready-made `defaults/adapters/github` one, or calls `gh`): run `gh issue comment <id> --body "shinfactory: not built. <what's missing>. Fix the issue, then add the ${NOODLE_GH_LABEL:-ready} label again."`, then `gh issue edit <id> --remove-label "${NOODLE_GH_LABEL:-ready}"`. Run them from the project root without `--repo`, so `gh` uses the project's own remote; if it has none, don't send back.
+- **todos.md** (no `scripts`): add `#not_ready` and the reason to the item's line, for example `3. [ ] Make it faster #not_ready (shinfactory: not built, no observable Done when)`.
+- **Any other backlog**: follow the `todo` skill's Send back.
+
+Skip any item tagged `not_ready`. Items with no plan and items with a plan both go through this check, and every order that builds a backlog item ends in a `quality` stage, which tests the work against the Done when.
+
+**Shared infrastructure:** When multiple plans depend on common infrastructure (shared types, utilities, base packages), propose a standalone infra order before the plan's phases. Use a descriptive slug ID (e.g., `"infra-shared-types"`).
 
 **Items with plans:** When a backlog item has a `plan` field (a relative path like `brain/plans/29-foo/overview.md`), read the plan overview and phase files to understand the work. Schedule one order with a stage per remaining unfinished phase (each unchecked `- [ ]` item). Populate `order.plan` with the plan path(s). Use `extra_prompt` on each stage to inject plan context: the phase brief and any cross-phase dependencies.
 
@@ -60,7 +70,7 @@ The mise brief includes a `recent_events` array — lifecycle events emitted by 
 
 Events are context, not commands. Consider them alongside backlog state and session history when deciding what to schedule:
 
-- After `stage.failed` or `order.failed` — consider whether the failure needs a debugging order, or if the item should be retried with a different approach.
+- After `stage.failed` or `order.failed` — consider whether the failure needs a debugging order, or if the item should be retried with a different approach. If the reason starts with `Unbuildable:`, don't retry: send the item back as above, quoting the reason. To retry a `quality` rejection, write a fresh order with the same ID that ends in `quality`. Never use `add-stage` or `advance` to get past a failed `quality` stage: the order would complete and mark the item done with the rejection unanswered.
 - After `order.completed` — consider follow-up work (debrief, related items that were blocked).
 - After `merge.conflict` — the affected order may need manual attention; avoid re-scheduling it immediately.
 - After external events like `ci.failed` — consider scheduling an investigation or fix order if it seems actionable.

@@ -17,9 +17,11 @@ The one place that knows where the backlog lives. Other skills say "use the `tod
 Item IDs are issue numbers. Use the `gh` CLI.
 
 - **View:** `gh issue list --state open`. Issues labelled `shinfactory-done` are finished on local main and waiting for a push; skip them.
-- **Add:** `gh issue create --title "<title>" --body "<what, where, what done looks like>"`. Add `--label needs_plan` when it needs a plan before code. Report the new number.
+- **Read:** `gh issue view N --json body --jq .body` gives the full body. The backlog's `description` is cut at 2,000 characters.
+- **Add:** `gh issue create --title "<title>" --body "<goal, an observable Done when, out of scope>"`. Add `--label needs_plan` when it needs a plan before code. Report the new number. Never add the `ready` label (or `NOODLE_GH_LABEL`, if set): it is a person's permission to build.
 - **Link a plan:** the issue body carries one line `Plan: brain/plans/NN-slug/overview.md`, where NN is the issue number. Add or replace it with `gh issue edit N --body-file <file>` (read the current body first with `gh issue view N --json body --jq .body`), and remove the `needs_plan` label.
 - **Edit:** `gh issue edit N --title ...` or `--body-file ...`.
+- **Send back:** tell the person why the factory won't build it, and take it out of the backlog until they fix it: `gh issue comment N --body "shinfactory: not built. <reason>. Fix the issue, then add the ${NOODLE_GH_LABEL:-ready} label again."`, then `gh issue edit N --remove-label "${NOODLE_GH_LABEL:-ready}"`.
 - **Mark done:** inside a factory order, don't close the issue; the loop labels it `shinfactory-done`, and the human's push with `Closes #N` closes it. Outside the factory, close with a reason: `gh issue close N --comment "<why>"`, adding `--reason "not planned"` for an item that is outdated or superseded.
 
 ## todos.md backend
@@ -60,6 +62,14 @@ Change `[ ]` to `[x]` and update the description with a reason:
 ```
 
 Then move the done item from `brain/todos.md` to `brain/archive/todos.md` (create the file if it doesn't exist). Remove empty sections left behind.
+
+#### Send back
+
+Add the `#not_ready` tag and the reason to the item's line. The scheduler skips the item until a person fixes it and removes the tag:
+
+```
+3. [ ] Make it faster #not_ready (shinfactory: not built, no observable Done when)
+```
 
 #### Link a plan
 

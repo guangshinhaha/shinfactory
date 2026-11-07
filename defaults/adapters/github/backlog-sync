@@ -1,8 +1,9 @@
 #!/bin/sh
-# GitHub Issues backlog: each open issue in the current repo is a backlog item.
+# GitHub Issues backlog: each open issue labelled ready is a backlog item. The label
+# is a person's permission to build, so an unlabelled issue never reaches the scheduler.
 #
 # Needs the gh CLI, signed in. Env:
-#   NOODLE_GH_LABEL       only issues with this label (default: every open issue)
+#   NOODLE_GH_LABEL       the label that marks an issue ready (default: ready)
 #   NOODLE_GH_DONE_LABEL  label that backlog-done adds (default: shinfactory-done);
 #                         open issues carrying it sync as status "done"
 #   NOODLE_GH_LIMIT       max issues to read (default: 200)
@@ -23,10 +24,5 @@ filter='.[]
   + (if ($tags | length) > 0 then {tags: $tags} else {} end)
   + (if $plan then {plan: $plan} else {} end)'
 
-if [ -n "${NOODLE_GH_LABEL:-}" ]; then
-  gh issue list --state open --limit "${NOODLE_GH_LIMIT:-200}" --label "$NOODLE_GH_LABEL" \
-    --json number,title,labels,body,url --jq "$filter"
-else
-  gh issue list --state open --limit "${NOODLE_GH_LIMIT:-200}" \
-    --json number,title,labels,body,url --jq "$filter"
-fi
+gh issue list --state open --limit "${NOODLE_GH_LIMIT:-200}" --label "${NOODLE_GH_LABEL:-ready}" \
+  --json number,title,labels,body,url --jq "$filter"

@@ -119,6 +119,16 @@ func (l *Loop) handleCompletion(ctx context.Context, cook *cookHandle, resultSta
 		status = stringx.Normalize(cook.session.Outcome().Status.String())
 	}
 
+	if !isScheduleStage(cook.stage) {
+		if fail := l.readStageFail(cook.session.ID()); fail != nil {
+			reason := strings.TrimSpace(fail.Message)
+			if reason == "" {
+				reason = "stage reported failure with no reason"
+			}
+			return l.failStage(ctx, cook, reason)
+		}
+	}
+
 	if resultStatus == StageResultCompleted {
 		if isScheduleStage(cook.stage) {
 			return l.handleScheduleCompletion(cook)
@@ -457,6 +467,28 @@ func (l *Loop) readStageYield(sessionID string) *event.StageYieldPayload {
 	var payload event.StageYieldPayload
 	if err := json.Unmarshal(last.Payload, &payload); err != nil {
 		return nil
+	}
+	return &payload
+}
+
+// readStageFail reads the most recent stage_fail event from a session's event
+// log. Returns nil if no stage_fail was emitted. A log it can't read counts as a
+// failure, because a rejection in that log must not pass as success.
+func (l *Loop) readStageFail(sessionID string) *event.StageFailPayload {
+	reader := event.NewEventReader(l.runtimeDir)
+	events, err := reader.ReadSession(sessionID, event.EventFilter{
+		Types: map[event.EventType]struct{}{event.EventStageFail: {}},
+	})
+	if err != nil {
+		return &event.StageFailPayload{Message: "session event log unreadable: " + err.Error()}
+	}
+	if len(events) == 0 {
+		return nil
+	}
+	last := events[len(events)-1]
+	var payload event.StageFailPayload
+	if err := json.Unmarshal(last.Payload, &payload); err != nil {
+		return &event.StageFailPayload{}
 	}
 	return &payload
 }

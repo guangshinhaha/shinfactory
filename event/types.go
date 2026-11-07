@@ -27,6 +27,9 @@ const (
 	// Stage yield events (emitted by agents to declare deliverable complete).
 	EventStageYield EventType = "stage_yield"
 
+	// Stage fail events (emitted by agents to fail their stage with a reason).
+	EventStageFail EventType = "stage_fail"
+
 	// Ticket protocol events.
 	EventTicketClaim    EventType = "ticket_claim"
 	EventTicketProgress EventType = "ticket_progress"
@@ -62,6 +65,13 @@ func (p StageMessagePayload) IsBlocking() bool {
 // Agents emit this when their deliverable is complete, decoupling
 // result delivery from process exit.
 type StageYieldPayload struct {
+	Message string `json:"message"`
+}
+
+// StageFailPayload is the payload for stage_fail events.
+// Agents emit this when the stage must fail even though the agent finished
+// cleanly, such as an unbuildable issue or work that misses its Done when.
+type StageFailPayload struct {
 	Message string `json:"message"`
 }
 

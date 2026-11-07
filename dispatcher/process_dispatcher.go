@@ -159,6 +159,16 @@ func (d *ProcessDispatcher) prepareSessionDir(
 	return eventWriter, skillBundle, systemPrompt, composedPrompt, nil
 }
 
+// sessionEnv is the environment of a session's agent process. The agent runs in
+// its worktree, so NOODLE_PROJECT_DIR points its shinfactory commands back at the
+// project's runtime directory, the only one the loop reads events from.
+func (d *ProcessDispatcher) sessionEnv(req DispatchRequest, sessionID string) []string {
+	return append(buildDispatchEnv(req),
+		"NOODLE_SESSION_ID="+sessionID,
+		"NOODLE_PROJECT_DIR="+d.projectDir,
+	)
+}
+
 // startSessionProcess builds the command, starts the child process, configures
 // the controller for stdin steering, drains stderr, and writes metadata.
 func (d *ProcessDispatcher) startSessionProcess(
@@ -170,7 +180,7 @@ func (d *ProcessDispatcher) startSessionProcess(
 		return nil, nil, fmt.Errorf("build command: %w", err)
 	}
 	cmd.Dir = req.WorktreePath
-	cmd.Env = append(buildDispatchEnv(req), "NOODLE_SESSION_ID="+sessionID)
+	cmd.Env = d.sessionEnv(req, sessionID)
 
 	process, err := StartProcess(cmd)
 	if err != nil {
