@@ -150,7 +150,7 @@ Create `todos.md` in the default backlog-adapter format:
 
 Ask the user what they want to work on and set that as the first task line (`1. [ ] ...`).
 
-Also ask if they want to sync backlog items from another source (GitHub Issues, Linear, Jira, a custom script, etc.). If yes, configure a backlog adapter in `.noodle.toml`. See the noodle skill's configuration reference for adapter options.
+Also ask if they want to sync backlog items from another source (GitHub Issues, Linear, Jira, a custom script, etc.). If yes, configure a backlog adapter in `.noodle.toml`. See the noodle skill's configuration reference for adapter options. With the ready-made GitHub Issues adapter, only issues labelled `ready` reach the factory, so tell the user to run `gh label create ready` once and add the label to each issue they want built. See "Handing an issue to the factory" in `docs/concepts/adapters.md`.
 
 ### 7. Ask about brainmaxxing
 

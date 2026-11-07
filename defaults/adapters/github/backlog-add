@@ -1,18 +1,23 @@
 #!/bin/sh
-# Creates a GitHub issue from JSON on stdin ({"title": "...", "section": "..."}) and
-# prints its number. A section becomes a label. Agents can also call `gh issue create`
-# directly; this exists so the adapter contract is complete.
+# Creates a GitHub issue from JSON on stdin ({"title": "...", "body": "...", "section": "..."})
+# and prints its number. A section becomes a label. The JSON goes to the GitHub API as it
+# stands, so a body keeps its newlines and quotes; the API ignores the section field. Agents
+# can also call `gh issue create` directly; this exists so the adapter contract is complete.
+#
+# It refuses a labels field, because the ready label is a person's permission to build.
 set -eu
 
 payload=$(cat)
 title=$(printf '%s' "$payload" | sed -n 's/.*"title"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1)
 section=$(printf '%s' "$payload" | sed -n 's/.*"section"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1)
 [ -n "$title" ] || { echo "title required" >&2; exit 1; }
+case "$payload" in
+  *'"labels"'*) echo "labels field not accepted; use section" >&2; exit 1 ;;
+esac
 
+[ -z "$section" ] || gh label create "$section" --force >/dev/null
+number=$(printf '%s' "$payload" | gh api 'repos/{owner}/{repo}/issues' --method POST --input - --jq .number)
 if [ -n "$section" ]; then
-  gh label create "$section" --force >/dev/null
-  url=$(gh issue create --title "$title" --body "" --label "$section")
-else
-  url=$(gh issue create --title "$title" --body "")
+  gh issue edit "$number" --add-label "$section" >/dev/null
 fi
-echo "${url##*/}"
+echo "$number"

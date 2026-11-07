@@ -82,7 +82,7 @@ my-adapters/backlog-done <id>
 
 ### `add` _(planned)_
 
-Not yet called by the noodle loop. When implemented, your `add` command will receive JSON on stdin and should create the item in your external system, then print the new item's ID to stdout.
+Not yet called by the noodle loop. When implemented, your `add` command will receive JSON on stdin (`title`, plus optional `section`; the ready-made GitHub adapter also takes `body`) and should create the item in your external system, then print the new item's ID to stdout.
 
 ### `edit` _(planned)_
 
@@ -116,7 +116,17 @@ backlog sync line 12: missing required field id
 
 ## Writing an adapter
 
-A ready-made GitHub Issues adapter lives in `defaults/adapters/github/`: every open issue is a backlog item, labels become tags, a `Plan: brain/plans/NN-slug/overview.md` line in the body links a plan, and `done` labels the issue `shinfactory-done` instead of closing it (the human's push with `Closes #N` closes it). Copy the four scripts into your project and point `[adapters.backlog.scripts]` at them; it needs `gh` signed in. Env: `NOODLE_GH_LABEL` limits the backlog to one label, `NOODLE_GH_DONE_LABEL` renames the done label.
+A ready-made GitHub Issues adapter lives in `defaults/adapters/github/`: every open issue labelled `ready` is a backlog item, labels become tags, a `Plan: brain/plans/NN-slug/overview.md` line in the body links a plan, and `done` labels the issue `shinfactory-done` instead of closing it (the human's push with `Closes #N` closes it). Copy the four scripts into your project and point `[adapters.backlog.scripts]` at them; it needs `gh` signed in. Env: `NOODLE_GH_LABEL` renames the `ready` label, `NOODLE_GH_DONE_LABEL` renames the done label.
+
+### Handing an issue to the factory
+
+The `ready` label is a person's permission to build. The factory never sees an open issue without it, and there is no setting that syncs every issue.
+
+1. Write the issue with a Goal, an observable Done when, and an Out of scope. Exact headings aren't required, but the issue must state something you can test.
+2. Create the label once per repo: `gh label create ready`. Until it exists, the backlog is empty.
+3. Add it to the issue: `gh issue edit N --add-label ready`.
+
+If the issue has no observable Done when, the scheduler doesn't build it. It comments the reason on the issue and removes `ready`. Fix the issue, then add the label again.
 
 For another tracker, an agent can write the scripts from the schema above.
 
