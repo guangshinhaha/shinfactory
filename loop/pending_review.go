@@ -113,7 +113,7 @@ func (l *Loop) loadPendingReview() error {
 		}
 		name := strings.TrimSpace(review.WorktreeName)
 		if name == "" {
-			name = defaultPendingReviewWorktreeName(id, review.StageIndex, review.TaskKey)
+			name = l.cookWorktreeName(id, review.StageIndex, review.TaskKey)
 		}
 		next[id] = &pendingReviewCook{
 			cookIdentity: cookIdentity{
@@ -137,14 +137,6 @@ func (l *Loop) loadPendingReview() error {
 	}
 	l.cooks.pendingReview = next
 	return nil
-}
-
-func defaultPendingReviewWorktreeName(orderID string, stageIndex int, taskKey string) string {
-	name := cookBaseName(orderID, stageIndex, strings.TrimSpace(taskKey))
-	if name == "" {
-		return orderID
-	}
-	return name
 }
 
 // reconcilePendingReview removes pending review entries whose canonical order

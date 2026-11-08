@@ -58,7 +58,7 @@ func (l *Loop) spawnCook(ctx context.Context, cand dispatchCandidate, order Orde
 		l.ensureSkillFresh(skillName)
 	}
 
-	name := cookBaseName(cand.OrderID, cand.StageIndex, stage.TaskKey)
+	name := l.cookWorktreeName(cand.OrderID, cand.StageIndex, stage.TaskKey)
 
 	created, err := l.ensureWorktree(name)
 	if err != nil {
