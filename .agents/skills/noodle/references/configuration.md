@@ -7,7 +7,7 @@ Noodle reads `.noodle.toml` at project root. When no config file exists, `shinfa
 ```toml
 [routing.defaults]
 provider = "claude"
-model = "claude-opus-4-6"
+model = "claude-opus-5-5"
 
 [skills]
 paths = [".agents/skills"]
