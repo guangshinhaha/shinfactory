@@ -49,7 +49,10 @@ mode = "supervised"  # auto | supervised | manual
 
 [routing.defaults]
 provider = "claude"
-model = "claude-opus-4-6"
+model = "claude-sonnet-5-5"
+
+[routing.roles]  # optional: model per role (scheduler, planner, builder, ...)
+planner = { provider = "claude", model = "claude-opus-5-5" }
 
 [skills]
 paths = [".agents/skills"]

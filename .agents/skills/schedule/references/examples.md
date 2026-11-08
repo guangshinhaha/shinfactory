@@ -22,9 +22,9 @@ Use cases:
       "plan": ["plans/49-work-orders-redesign/overview"],
       "rationale": "foundation-before-feature: core infra needed by all other work",
       "stages": [
-        {"do": "execute", "with": "codex", "model": "gpt-5.4", "runtime": "process"},
-        {"do": "quality", "with": "claude", "model": "claude-opus-4-6", "runtime": "process"},
-        {"do": "debrief", "with": "claude", "model": "claude-opus-4-6", "runtime": "process"}
+        {"do": "execute", "runtime": "process"},
+        {"do": "quality", "runtime": "process"},
+        {"do": "debrief", "runtime": "process"}
       ]
     }
   ]
@@ -43,9 +43,9 @@ No `do` on the planning stage — avoids loading the execute skill, which would 
       "title": "adapter schema validator — plan",
       "rationale": "complex cross-cutting item without a plan; needs plan-first then adversarial review",
       "stages": [
-        {"with": "claude", "model": "claude-opus-4-6", "runtime": "process",
+        {"runtime": "process",
          "prompt": "Plan backlog item #97: adapter schema validator. Use /plan to break it down into phases. Do not implement — planning only."},
-        {"do": "adversarial-review", "with": "claude", "model": "claude-opus-4-6", "runtime": "process"}
+        {"do": "adversarial-review", "runtime": "process"}
       ]
     }
   ]
@@ -62,9 +62,9 @@ No `do` on the planning stage — avoids loading the execute skill, which would 
       "title": "design cache invalidation strategy",
       "rationale": "unresolved design question needs structured debate before implementation",
       "stages": [
-        {"do": "debate", "with": "claude", "model": "claude-opus-4-6", "runtime": "process"},
-        {"do": "execute", "with": "codex", "model": "gpt-5.4", "runtime": "process"},
-        {"do": "quality", "with": "claude", "model": "claude-opus-4-6", "runtime": "process"}
+        {"do": "debate", "runtime": "process"},
+        {"do": "execute", "runtime": "process"},
+        {"do": "quality", "runtime": "process"}
       ]
     }
   ]
@@ -81,9 +81,9 @@ No `do` on the planning stage — avoids loading the execute skill, which would 
       "title": "shared event types used by subagent-tracking and diffs-integration",
       "rationale": "foundation-before-feature: both plan 84 and plan 86 depend on shared event types",
       "stages": [
-        {"do": "execute", "with": "codex", "model": "gpt-5.4", "runtime": "process",
+        {"do": "execute", "runtime": "process",
          "extra_prompt": "Create shared event types in internal/event/ that both subagent-tracking and diffs-integration will consume. Keep scope narrow — only the shared interfaces, not plan-specific logic."},
-        {"do": "quality", "with": "claude", "model": "claude-opus-4-6", "runtime": "process"}
+        {"do": "quality", "runtime": "process"}
       ]
     }
   ]
@@ -103,13 +103,13 @@ One order, three execute stages. Phase 1 is sequential (phases 2 and 3 depend on
       "plan": ["brain/plans/84-notifications/overview.md"],
       "rationale": "one-plan-at-a-time: highest-priority plan with remaining phases; phases 2+3 parallelized (independent packages)",
       "stages": [
-        {"do": "execute", "with": "codex", "model": "gpt-5.4", "runtime": "process",
+        {"do": "execute", "runtime": "process",
          "extra_prompt": "Phase 1: define shared event types in internal/event/. Phases 2 and 3 depend on these types."},
-        {"do": "execute", "with": "codex", "model": "gpt-5.4", "runtime": "process",
+        {"do": "execute", "runtime": "process",
          "extra_prompt": "Phase 2: wire event types into internal/adapter/. Independent of phase 3 — can run in parallel."},
-        {"do": "execute", "with": "codex", "model": "gpt-5.4", "runtime": "process",
+        {"do": "execute", "runtime": "process",
          "extra_prompt": "Phase 3: build notification panel in internal/ui/. Independent of phase 2 — can run in parallel."},
-        {"do": "quality", "with": "claude", "model": "claude-opus-4-6", "runtime": "process"}
+        {"do": "quality", "runtime": "process"}
       ]
     }
   ]
@@ -126,7 +126,7 @@ One order, three execute stages. Phase 1 is sequential (phases 2 and 3 depend on
       "title": "audit brain vault after recent reflects",
       "rationale": "3 reflects accumulated, time to consolidate",
       "stages": [
-        {"do": "meditate", "with": "claude", "model": "claude-opus-4-6", "runtime": "process"}
+        {"do": "meditate", "runtime": "process"}
       ]
     }
   ]

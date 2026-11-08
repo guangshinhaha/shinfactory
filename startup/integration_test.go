@@ -96,8 +96,8 @@ func TestCLIIntegrationStartScaffolds(t *testing.T) {
 	if cfg.Routing.Defaults.Provider != "claude" {
 		t.Errorf("routing.defaults.provider = %q, want claude", cfg.Routing.Defaults.Provider)
 	}
-	if cfg.Routing.Defaults.Model != "claude-opus-4-6" {
-		t.Errorf("routing.defaults.model = %q, want claude-opus-4-6", cfg.Routing.Defaults.Model)
+	if cfg.Routing.Defaults.Model != "claude-sonnet-5-5" {
+		t.Errorf("routing.defaults.model = %q, want claude-sonnet-5-5", cfg.Routing.Defaults.Model)
 	}
 
 	// Run again — should be idempotent

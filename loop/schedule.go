@@ -84,6 +84,7 @@ func bootstrapScheduleOrder(cfg config.Config) OrdersFile {
 }
 
 func scheduleOrder(cfg config.Config, prompt string) Order {
+	schedulerPolicy := cfg.PolicyForRole(config.RoleScheduler)
 	order := Order{
 		ID:     scheduleOrderID,
 		Title:  "scheduling tasks based on your backlog",
@@ -92,8 +93,8 @@ func scheduleOrder(cfg config.Config, prompt string) Order {
 			{
 				TaskKey:  scheduleOrderID,
 				Skill:    "schedule",
-				Provider: strings.TrimSpace(cfg.Routing.Defaults.Provider),
-				Model:    strings.TrimSpace(cfg.Routing.Defaults.Model),
+				Provider: schedulerPolicy.Provider,
+				Model:    schedulerPolicy.Model,
 				Status:   StageStatusPending,
 			},
 		},
@@ -106,6 +107,7 @@ func scheduleOrder(cfg config.Config, prompt string) Order {
 }
 
 func scheduleBootstrapOopsOrder(cfg config.Config) Order {
+	oopsPolicy := cfg.PolicyForTask("oops")
 	return Order{
 		ID:        scheduleBootstrapOrderID,
 		Title:     "bootstrapping missing schedule skill",
@@ -115,8 +117,8 @@ func scheduleBootstrapOopsOrder(cfg config.Config) Order {
 			{
 				TaskKey:  "oops",
 				Skill:    "oops",
-				Provider: strings.TrimSpace(cfg.Routing.Defaults.Provider),
-				Model:    strings.TrimSpace(cfg.Routing.Defaults.Model),
+				Provider: oopsPolicy.Provider,
+				Model:    oopsPolicy.Model,
 				Status:   StageStatusPending,
 				Prompt: strings.Join([]string{
 					"Schedule skill is missing. Bootstrap it now so Noodle can recover scheduler dispatch.",
@@ -154,11 +156,12 @@ func (l *Loop) spawnSchedule(ctx context.Context, order Order, attempt int, resu
 	promotionError := l.lastPromotionError
 	l.lastPromotionError = ""
 	failures := l.reconciledFailures
+	stageProvider, stageModel := l.config.ResolveStageRouting("schedule", stage.Provider, stage.Model)
 	req := loopruntime.DispatchRequest{
 		Name:                 name,
 		Prompt:               buildSchedulePrompt(skillName, taskTypesPrompt, order, resumePrompt, l.runtimeDir, promotionError, failures, l.lastMiseWarnings),
-		Provider:             nonEmpty(stage.Provider, l.config.Routing.Defaults.Provider),
-		Model:                nonEmpty(stage.Model, l.config.Routing.Defaults.Model),
+		Provider:             stageProvider,
+		Model:                stageModel,
 		Skill:                skillName,
 		WorktreePath:         l.projectDir,
 		AllowPrimaryCheckout: true,
@@ -235,8 +238,7 @@ func (l *Loop) spawnBootstrapIfNeeded(ctx context.Context, order Order) error {
 	}
 
 	stage := order.Stages[0]
-	provider := nonEmpty(stage.Provider, l.config.Routing.Defaults.Provider)
-	model := nonEmpty(stage.Model, l.config.Routing.Defaults.Model)
+	provider, model := l.config.ResolveStageRouting("oops", stage.Provider, stage.Model)
 
 	prompt := buildBootstrapPrompt(provider)
 

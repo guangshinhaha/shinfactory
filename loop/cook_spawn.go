@@ -80,11 +80,12 @@ func (l *Loop) spawnCook(ctx context.Context, cand dispatchCandidate, order Orde
 	prompt := buildCookPrompt(cand.OrderID, stage, order.Plan, order.Title, order.Rationale, resumePrompt)
 
 	taskType, _ := l.registry.ByKey(stage.TaskKey)
+	stageProvider, stageModel := l.config.ResolveStageRouting(nonEmpty(stage.TaskKey, stage.Skill), stage.Provider, stage.Model)
 	req := loopruntime.DispatchRequest{
 		Name:         name,
 		Prompt:       prompt,
-		Provider:     nonEmpty(stage.Provider, l.config.Routing.Defaults.Provider),
-		Model:        nonEmpty(stage.Model, l.config.Routing.Defaults.Model),
+		Provider:     stageProvider,
+		Model:        stageModel,
 		Skill:        stage.Skill,
 		WorktreePath: worktreePath,
 		TaskKey:      taskType.Key,
@@ -146,9 +147,9 @@ func (l *Loop) spawnCook(ctx context.Context, cand dispatchCandidate, order Orde
 
 	// Emit V2 canonical state events for dispatch.
 	l.emitEvent(ingest.EventDispatchCompleted, map[string]any{
-		"order_id":      cand.OrderID,
-		"stage_index":   cand.StageIndex,
-		"attempt_id":    attemptID,
+		"order_id":    cand.OrderID,
+		"stage_index": cand.StageIndex,
+		"attempt_id":  attemptID,
 		"session_id":    session.ID(),
 		"worktree_name": name,
 	})

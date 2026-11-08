@@ -20,8 +20,8 @@ source_hash: d680d50cfc39b497b4c93858ada550da1b7ea4343636a5fdd581f725107f2326
       "first_spawn": {
         "name": "stale-1-0-execute",
         "skill": "execute",
-        "provider": "old-provider",
-        "model": "old-model"
+        "provider": "claude",
+        "model": "claude-sonnet-5-5"
       }
     }
   }

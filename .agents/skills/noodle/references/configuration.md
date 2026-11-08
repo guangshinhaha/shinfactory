@@ -26,7 +26,24 @@ mode = "supervised"
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `provider` | string | `"claude"` | Agent provider (`"claude"`, `"codex"`) |
-| `model` | string | `"claude-opus-4-6"` | Model identifier |
+| `model` | string | `"claude-sonnet-5-5"` | Model identifier |
+
+## `[routing.roles]`
+
+Maps a role to a provider and model. Omitted roles use the defaults below. The loop resolves a stage's role from its task key and fills the stage's provider and model.
+
+| Role | Default model |
+|------|---------------|
+| `scheduler`, `debrief` | `claude-haiku-5-5` |
+| `builder`, `explorer`, `reviewer`, `adversary` | `claude-sonnet-5-5` |
+| `planner`, `verifier` | `claude-opus-5-5` |
+
+```toml
+[routing.roles]
+builder = { provider = "claude", model = "claude-sonnet-5-5" }
+```
+
+A provider is used only when the config names it. `[routing] sensitive = true` keeps every stage on `routing.defaults.provider`.
 
 ## `[skills]`
 

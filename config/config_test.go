@@ -16,7 +16,7 @@ func TestDefaultConfigValues(t *testing.T) {
 	if config.Routing.Defaults.Provider != "claude" {
 		t.Fatalf("routing.defaults.provider default = %q", config.Routing.Defaults.Provider)
 	}
-	if config.Routing.Defaults.Model != "claude-opus-4-6" {
+	if config.Routing.Defaults.Model != "claude-sonnet-5-5" {
 		t.Fatalf("routing.defaults.model default = %q", config.Routing.Defaults.Model)
 	}
 	if config.Mode != "supervised" {

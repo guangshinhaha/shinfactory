@@ -1,11 +1,20 @@
+# Fallback for task keys with no role.
 [routing.defaults]
 provider = "claude"
-model = "claude-opus-5-5"
+model = "claude-sonnet-5-5"
 
-# Tag-specific routing overrides. Example:
-# [routing.tags.urgent]
-# provider = "claude"
-# model = "claude-opus-4-6"
+# Model per role. Cheaper models by default; Opus only for planning and
+# verification. Name a codex provider here only if you want work to leave claude.
+# Set `sensitive = true` under [routing] to pin every stage to one provider.
+[routing.roles]
+scheduler = { provider = "claude", model = "claude-haiku-5-5" }
+debrief   = { provider = "claude", model = "claude-haiku-5-5" }
+builder   = { provider = "claude", model = "claude-sonnet-5-5" }
+explorer  = { provider = "claude", model = "claude-sonnet-5-5" }
+reviewer  = { provider = "claude", model = "claude-sonnet-5-5" }
+adversary = { provider = "claude", model = "claude-sonnet-5-5" }
+planner   = { provider = "claude", model = "claude-opus-5-5" }
+verifier  = { provider = "claude", model = "claude-opus-5-5" }
 
 [skills]
 paths = [".agents/skills"]

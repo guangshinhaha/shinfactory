@@ -80,13 +80,12 @@ Don't react mechanically to every event. Use judgment: a single stage failure in
 
 ## Scheduling Heuristics
 
-- **Cheapest mode**: Prefer the lowest-cost provider/model that can handle the task.
 - **Explicit rationale**: Every order must cite which principle or rule drove its placement.
 - **Timebox failures**: If an item has failed 2+ times in `recent_history`, deschedule or split it.
 
 ## Model Routing
 
-See [references/model-routing.md](references/model-routing.md) for model selection.
+Do not choose models. Leave `with` and `model` off your stages: the loop fills them from `[routing.roles]` in `.noodle.toml`, using each stage's role (`routing.roles` in the mise brief shows the table). A provider the config does not name is replaced by the role's.
 
 ## Runtime Routing
 

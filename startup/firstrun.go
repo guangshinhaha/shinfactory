@@ -34,7 +34,7 @@ func EnsureProjectStructure(projectDir string, w io.Writer) error {
 
 [routing.defaults]
 provider = "claude"
-model = "claude-opus-4-6"
+model = "claude-sonnet-5-5"
 
 [skills]
 paths = [".agents/skills"]

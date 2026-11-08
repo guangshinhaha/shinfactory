@@ -46,8 +46,8 @@ func TestEnsureProjectStructureFreshDirectory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generated config did not parse: %v", err)
 	}
-	if parsed.Routing.Defaults.Model != "claude-opus-4-6" {
-		t.Fatalf("routing.defaults.model = %q, want claude-opus-4-6", parsed.Routing.Defaults.Model)
+	if parsed.Routing.Defaults.Model != "claude-sonnet-5-5" {
+		t.Fatalf("routing.defaults.model = %q, want claude-sonnet-5-5", parsed.Routing.Defaults.Model)
 	}
 
 	// Verify welcome message was printed
