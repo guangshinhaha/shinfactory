@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/guangshinhaha/shinfactory/internal/filex"
@@ -34,6 +35,34 @@ func Validate(config Config) ValidationResult {
 			Fix:       "Set routing.defaults.provider to \"claude\" or \"codex\" in .noodle.toml.",
 			Code:      DiagnosticCodeProviderUnknown,
 		})
+	}
+
+	roleNames := make([]string, 0, len(config.Routing.Roles))
+	for name := range config.Routing.Roles {
+		roleNames = append(roleNames, name)
+	}
+	sort.Strings(roleNames)
+	for _, name := range roleNames {
+		policy := config.Routing.Roles[name]
+		field := "routing.roles." + name + ".provider"
+		switch {
+		case !isKnownProvider(policy.Provider):
+			result.Diagnostics = append(result.Diagnostics, ConfigDiagnostic{
+				FieldPath: field,
+				Message:   fmt.Sprintf("unknown provider %q (valid: claude, codex)", policy.Provider),
+				Severity:  DiagnosticSeverityFatal,
+				Fix:       "Set the role's provider to \"claude\" or \"codex\" in .noodle.toml.",
+				Code:      DiagnosticCodeProviderUnknown,
+			})
+		case config.Routing.Sensitive && stringx.Normalize(policy.Provider) != stringx.Normalize(config.Routing.Defaults.Provider):
+			result.Diagnostics = append(result.Diagnostics, ConfigDiagnostic{
+				FieldPath: field,
+				Message:   fmt.Sprintf("role routes to %q but routing.sensitive keeps every stage on %q", policy.Provider, config.Routing.Defaults.Provider),
+				Severity:  DiagnosticSeverityFatal,
+				Fix:       "Point the role at routing.defaults.provider, or unset routing.sensitive.",
+				Code:      DiagnosticCodeSensitiveProvider,
+			})
+		}
 	}
 
 	if rd := stringx.Normalize(config.Runtime.Default); rd != "" {

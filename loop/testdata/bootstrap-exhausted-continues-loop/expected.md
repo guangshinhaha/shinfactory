@@ -20,8 +20,8 @@ source_hash: a36de77a45d6944cbf732c5c46d1364ac6e0310c14758f31bc8493693d0319e9
       "first_spawn": {
         "name": "schedule",
         "skill": "schedule",
-        "provider": "codex",
-        "model": "gpt-5.4"
+        "provider": "claude",
+        "model": "claude-haiku-5-5"
       }
     }
   }

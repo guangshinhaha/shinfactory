@@ -89,6 +89,11 @@ func (b *Builder) Build(ctx context.Context, activeSummary ActiveSummary, recent
 	routing := RoutingSnapshot{
 		Defaults:          routingPolicyFromModelPolicy(b.config.Routing.Defaults),
 		AvailableRuntimes: b.config.AvailableRuntimes(),
+		Roles:             map[string]RoutingPolicy{},
+		Sensitive:         b.config.Routing.Sensitive,
+	}
+	for _, role := range config.AllRoles() {
+		routing.Roles[string(role)] = routingPolicyFromModelPolicy(b.config.PolicyForRole(role))
 	}
 
 	recentEvents := readRecentEvents(b.runtimeDir)

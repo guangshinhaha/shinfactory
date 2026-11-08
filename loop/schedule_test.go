@@ -68,7 +68,7 @@ func TestHasNonScheduleOrders(t *testing.T) {
 func TestBootstrapScheduleOrderCreatesSingleStageOrder(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Routing.Defaults.Provider = "claude"
-	cfg.Routing.Defaults.Model = "claude-opus-4-6"
+	cfg.Routing.Defaults.Model = "claude-haiku-5-5"
 
 	of := bootstrapScheduleOrder(cfg)
 	if len(of.Orders) != 1 {
@@ -94,8 +94,8 @@ func TestBootstrapScheduleOrderCreatesSingleStageOrder(t *testing.T) {
 	if stage.Provider != "claude" {
 		t.Fatalf("stage provider = %q, want %q", stage.Provider, "claude")
 	}
-	if stage.Model != "claude-opus-4-6" {
-		t.Fatalf("stage model = %q, want %q", stage.Model, "claude-opus-4-6")
+	if stage.Model != "claude-haiku-5-5" {
+		t.Fatalf("stage model = %q, want %q", stage.Model, "claude-haiku-5-5")
 	}
 }
 

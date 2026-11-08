@@ -29,7 +29,13 @@ type AdapterConfig struct {
 }
 
 type RoutingConfig struct {
+	// Defaults applies to task keys that have no role.
 	Defaults ModelPolicy `toml:"defaults"`
+	// Roles maps a role (see Role) to its provider and model.
+	Roles map[string]ModelPolicy `toml:"roles"`
+	// Sensitive keeps every stage on Defaults.Provider; roles naming another
+	// provider are a fatal config error.
+	Sensitive bool `toml:"sensitive"`
 }
 
 type ModelPolicy struct {
@@ -130,6 +136,7 @@ const (
 	DiagnosticCodeAdapterScriptEmpty     = "adapter_script_empty"
 	DiagnosticCodeAdapterScriptMissing   = "adapter_script_missing"
 	DiagnosticCodeProviderUnknown        = "provider_unknown"
+	DiagnosticCodeSensitiveProvider      = "routing_sensitive_provider"
 	DiagnosticCodeRuntimeDefaultUnknown  = "runtime_default_unknown"
 	DiagnosticCodeNoBacklogAdapter       = "no_backlog_adapter"
 	DiagnosticCodeConfigFieldRemoved     = "config_field_removed"
@@ -174,8 +181,9 @@ func DefaultConfig() Config {
 		Routing: RoutingConfig{
 			Defaults: ModelPolicy{
 				Provider: "claude",
-				Model:    "claude-opus-4-6",
+				Model:    defaultRoutingModel,
 			},
+			Roles: DefaultRoles(),
 		},
 		Skills: SkillsConfig{
 			Paths: defaultSkillPaths(),

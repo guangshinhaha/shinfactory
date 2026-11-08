@@ -318,6 +318,10 @@ func startRepairSession(
 }
 
 func repairModelForProvider(provider string, loaded config.Config) string {
+	if policy := loaded.PolicyForTask(string(config.RoleBuilder)); strings.EqualFold(provider, policy.Provider) &&
+		strings.TrimSpace(policy.Model) != "" {
+		return policy.Model
+	}
 	if strings.EqualFold(provider, loaded.Routing.Defaults.Provider) &&
 		strings.TrimSpace(loaded.Routing.Defaults.Model) != "" {
 		return loaded.Routing.Defaults.Model
@@ -326,7 +330,7 @@ func repairModelForProvider(provider string, loaded config.Config) string {
 	case "codex":
 		return "gpt-5.4"
 	default:
-		return "claude-opus-4-6"
+		return "claude-sonnet-5-5"
 	}
 }
 

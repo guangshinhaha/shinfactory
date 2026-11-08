@@ -79,21 +79,19 @@ func ApplyOrderRoutingDefaults(of OrdersFile, reg taskreg.Registry, cfg config.C
 }
 
 func applyStageRoutingDefaults(stage *Stage, _ taskreg.Registry, cfg config.Config) bool {
-	changed := false
-	defaultProvider := strings.TrimSpace(cfg.Routing.Defaults.Provider)
-	defaultModel := strings.TrimSpace(cfg.Routing.Defaults.Model)
-
-	if strings.TrimSpace(stage.Provider) == "" {
-		if defaultProvider != "" {
-			stage.Provider = defaultProvider
-			changed = true
-		}
+	taskKey := stage.TaskKey
+	if strings.TrimSpace(taskKey) == "" {
+		taskKey = stage.Skill
 	}
-	if strings.TrimSpace(stage.Model) == "" {
-		if defaultModel != "" {
-			stage.Model = defaultModel
-			changed = true
-		}
+	provider, model := cfg.ResolveStageRouting(taskKey, stage.Provider, stage.Model)
+	changed := false
+	if provider != "" && stage.Provider != provider {
+		stage.Provider = provider
+		changed = true
+	}
+	if model != "" && stage.Model != model {
+		stage.Model = model
+		changed = true
 	}
 	return changed
 }

@@ -30,8 +30,11 @@ type HistoryItem struct {
 }
 
 type RoutingSnapshot struct {
-	Defaults          RoutingPolicy `json:"defaults"`
-	AvailableRuntimes []string      `json:"available_runtimes,omitempty"`
+	Defaults RoutingPolicy `json:"defaults"`
+	// Roles is the resolved role -> provider/model table from [routing.roles].
+	Roles             map[string]RoutingPolicy `json:"roles,omitempty"`
+	Sensitive         bool                     `json:"sensitive,omitempty"`
+	AvailableRuntimes []string                 `json:"available_runtimes,omitempty"`
 }
 
 type RoutingPolicy struct {

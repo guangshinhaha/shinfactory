@@ -13,7 +13,7 @@ import (
 
 const (
 	defaultRoutingProvider = "claude"
-	defaultRoutingModel    = "claude-opus-4-6"
+	defaultRoutingModel    = modelStandard
 	defaultMode            = string(state.RunModeSupervised)
 	defaultMaxConcurrency  = 4
 	defaultRuntimeName     = "process"
@@ -250,6 +250,8 @@ func normalizeParsedValues(config *Config, metadata toml.MetaData, diagnostics *
 		}
 		config.Routing.Defaults.Model = defaultRoutingModel
 	}
+
+	normalizeRoles(config, diagnostics)
 
 	if config.Concurrency.MaxConcurrency <= 0 {
 		if metadata.IsDefined("concurrency", "max_concurrency") {
