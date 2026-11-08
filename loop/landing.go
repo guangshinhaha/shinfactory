@@ -243,6 +243,29 @@ func (l *Loop) shipPR(ctx context.Context, cook *cookHandle, pr PullRequest) err
 // parked final stage, so ready and merge its PR, then finish the order.
 func (l *Loop) approvePRShip(cook *cookHandle) error {
 	ctx := context.Background()
+	if !l.isFinalStage(cook) {
+		// A parked non-final stage (e.g. a blocking stage message): approving
+		// it moves the order on; only the last stage ships the PR.
+		if err := l.emitEventChecked(ingest.EventStageReviewApproved, map[string]any{
+			"order_id":    cook.orderID,
+			"stage_index": cook.stageIndex,
+			"reason":      "approved by user",
+		}); err != nil {
+			return err
+		}
+		if err := l.emitEventChecked(ingest.EventStageCompleted, map[string]any{
+			"order_id":      cook.orderID,
+			"stage_index":   cook.stageIndex,
+			"worktree_name": cook.worktreeName,
+			"mergeable":     false,
+		}); err != nil {
+			return err
+		}
+		if err := l.advanceAndPersist(ctx, cook); err != nil {
+			return err
+		}
+		return l.syncPendingReviewProjection()
+	}
 	order, _ := l.orderByID(cook.orderID)
 	pr, err := l.lander().PushAndEnsureDraft(ctx, cook.worktreePath, prSpecFor(order, l.config.Landing.Base))
 	if err != nil {

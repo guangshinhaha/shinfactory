@@ -209,3 +209,20 @@ func TestLocalLandingStillMergesLocally(t *testing.T) {
 		t.Fatalf("local mode: merged=%v pushes=%v", h.wt.merged, h.ln.pushes)
 	}
 }
+
+func TestPRLandingApprovingNonFinalStageDoesNotShip(t *testing.T) {
+	h := newLandingHarness(t, "auto", 2)
+	h.runStage(t, 1)
+	// Park the first stage as a blocking stage message would.
+	cook := &cookHandle{
+		cookIdentity: cookIdentity{orderID: "42", stageIndex: 0, stage: Stage{TaskKey: "execute", Skill: "execute"}},
+		worktreeName: "42-0-task",
+		worktreePath: h.l.worktreePath("42-0-task"),
+	}
+	if err := h.l.approvePRShip(cook); err != nil {
+		t.Fatalf("approve: %v", err)
+	}
+	if len(h.ln.merged) != 0 || len(h.wt.cleaned) != 0 {
+		t.Fatalf("non-final approval shipped: merged=%d cleaned=%v", len(h.ln.merged), h.wt.cleaned)
+	}
+}
