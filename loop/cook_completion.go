@@ -247,6 +247,10 @@ func (l *Loop) handleStageFailure(ctx context.Context, cook *cookHandle, resultS
 		return l.handleCompletion(ctx, cook, StageResultCompleted, "completed")
 	}
 
+	if cook.session.Outcome().UsageLimit {
+		return l.requeueAfterUsageLimit(cook)
+	}
+
 	reason := "cook exited with status " + status
 	if resultStatus == StageResultCancelled {
 		reason = "cook cancelled with status " + status

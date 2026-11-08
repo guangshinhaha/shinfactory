@@ -211,6 +211,8 @@ type Loop struct {
 	effectLedger *reducer.EffectLedger
 	eventCounter atomic.Uint64
 
+	limitHolds usageLimitHolds
+
 	reconciledFailures []reconciledFailure
 	lastMiseWarnings   []string
 

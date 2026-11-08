@@ -1,0 +1,129 @@
+package loop
+
+import (
+	"sync"
+	"time"
+
+	"github.com/guangshinhaha/shinfactory/internal/state"
+	"github.com/guangshinhaha/shinfactory/internal/stringx"
+)
+
+// usageLimitHolds records runtimes whose account is out of usage. While a
+// runtime is held the loop launches nothing on it: stages stay pending instead
+// of failing. When the hold lapses the next launch is the probe: it clears the
+// hold if it succeeds and renews it if the limit is still there.
+type usageLimitHolds struct {
+	mu    sync.Mutex
+	until map[string]time.Time
+}
+
+// heldUntil returns when the runtime's hold lapses, and whether it is held at now.
+func (h *usageLimitHolds) heldUntil(runtime string, now time.Time) (time.Time, bool) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	until, ok := h.until[stringx.Normalize(runtime)]
+	return until, ok && now.Before(until)
+}
+
+func (h *usageLimitHolds) hold(runtime string, until time.Time) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.until == nil {
+		h.until = map[string]time.Time{}
+	}
+	h.until[stringx.Normalize(runtime)] = until
+}
+
+// release clears the runtime's hold and reports whether there was one.
+func (h *usageLimitHolds) release(runtime string) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	key := stringx.Normalize(runtime)
+	_, was := h.until[key]
+	delete(h.until, key)
+	return was
+}
+
+// stageRuntime resolves the runtime a stage launches on: its own, else the
+// configured default, else process. A runtime that is not wired (orca without
+// the orca CLI) resolves to process, so the factory runs as it does without it.
+func (l *Loop) stageRuntime(stageRuntime string) string {
+	name := stringx.Normalize(stageRuntime)
+	if name == "" {
+		name = stringx.Normalize(l.config.Runtime.Default)
+	}
+	if name == "" {
+		name = "process"
+	}
+	if name == "orca" && l.deps.Runtimes["orca"] == nil && l.deps.Runtimes["process"] != nil {
+		return "process"
+	}
+	return name
+}
+
+func (l *Loop) runtimeHeld(runtimeName string) bool {
+	until, held := l.limitHolds.heldUntil(runtimeName, l.deps.Now())
+	if held {
+		l.logger.Debug("runtime held by usage limit", "runtime", runtimeName, "until", until)
+	}
+	return held
+}
+
+func (l *Loop) holdRuntime(runtimeName, reason string) {
+	until := l.deps.Now().Add(l.config.Runtime.Orca.LimitRetry())
+	l.limitHolds.hold(runtimeName, until)
+	l.logger.Warn("runtime out of usage; holding launches",
+		"runtime", runtimeName, "until", until, "reason", reason)
+}
+
+func (l *Loop) releaseRuntime(runtimeName string) {
+	if l.limitHolds.release(runtimeName) {
+		l.logger.Info("runtime launched again after usage limit; resuming", "runtime", runtimeName)
+	}
+}
+
+// requeueAfterUsageLimit handles a stage whose worker died on a usage limit:
+// hold the runtime and put the stage back to pending. The worktree is kept, so
+// the relaunch resumes from its commits instead of starting over.
+func (l *Loop) requeueAfterUsageLimit(cook *cookHandle) error {
+	runtimeName := nonEmpty(cook.dispatchedRuntime, l.stageRuntime(cook.stage.Runtime))
+	reason := nonEmpty(cook.session.Outcome().Reason, "usage limit reached")
+	l.holdRuntime(runtimeName, reason)
+
+	now := timeNowUTC(l.deps.Now)
+	if node, ok := l.canonical.Orders[cook.orderID]; ok && cook.stageIndex < len(node.Stages) {
+		stage := node.Stages[cook.stageIndex]
+		stage.Status = state.StagePending
+		if n := len(stage.Attempts); n > 0 {
+			last := &stage.Attempts[n-1]
+			if last.Status == state.AttemptLaunching || last.Status == state.AttemptRunning {
+				last.Status = state.AttemptCancelled
+				last.CompletedAt = now
+				last.Error = reason
+			}
+		}
+		node.Stages[cook.stageIndex] = stage
+		node.Status = state.OrderPending
+		node.UpdatedAt = now
+		l.canonical.Orders[cook.orderID] = node
+	}
+	if err := l.mutateOrdersState(func(orders *OrdersFile) (bool, error) {
+		for oi := range orders.Orders {
+			order := &orders.Orders[oi]
+			if order.ID != cook.orderID || cook.stageIndex >= len(order.Stages) {
+				continue
+			}
+			if order.Stages[cook.stageIndex].Status != StageStatusActive {
+				return false, nil
+			}
+			order.Stages[cook.stageIndex].Status = StageStatusPending
+			return true, nil
+		}
+		return false, nil
+	}); err != nil {
+		return err
+	}
+	l.logger.Warn("stage requeued after usage limit",
+		"order", cook.orderID, "stage", cook.stageIndex, "session", cook.session.ID())
+	return l.persistCanonicalCheckpoint()
+}

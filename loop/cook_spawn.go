@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/guangshinhaha/shinfactory/dispatcher"
 	"github.com/guangshinhaha/shinfactory/internal/ingest"
 	"github.com/guangshinhaha/shinfactory/internal/stringx"
 	loopruntime "github.com/guangshinhaha/shinfactory/runtime"
@@ -46,6 +47,10 @@ func (l *Loop) spawnCook(ctx context.Context, cand dispatchCandidate, order Orde
 	}
 
 	stage := cand.Stage
+	runtimeName := l.stageRuntime(stage.Runtime)
+	if l.runtimeHeld(runtimeName) {
+		return nil // out of usage: the stage stays pending until a launch can succeed
+	}
 
 	// Belt-and-suspenders: give the registry one last chance to pick up
 	// the skill before dispatch, in case fsnotify missed an event.
@@ -89,7 +94,7 @@ func (l *Loop) spawnCook(ctx context.Context, cand dispatchCandidate, order Orde
 		Skill:        stage.Skill,
 		WorktreePath: worktreePath,
 		TaskKey:      taskType.Key,
-		Runtime:      nonEmpty(stage.Runtime, "process"),
+		Runtime:      runtimeName,
 		DisplayName:  opts.displayName,
 		Title:        order.Title,
 		RetryCount:   opts.attempt,
@@ -159,24 +164,28 @@ func (l *Loop) spawnCook(ctx context.Context, cand dispatchCandidate, order Orde
 }
 
 func (l *Loop) dispatchSession(ctx context.Context, req loopruntime.DispatchRequest) (loopruntime.SessionHandle, RuntimeFallbackOutcome, error) {
-	runtimeName := stringx.Normalize(req.Runtime)
-	if runtimeName == "" {
-		runtimeName = stringx.Normalize(l.config.Runtime.Default)
-	}
-	if runtimeName == "" {
-		runtimeName = "process"
-	}
+	runtimeName := l.stageRuntime(req.Runtime)
 
 	runtime := l.deps.Runtimes[runtimeName]
 	if runtime == nil {
 		notConfigured := newRuntimeNotConfiguredError(runtimeName)
 		return nil, RuntimeFallbackOutcome{}, classifyAgentStartFailure(runtimeName, notConfigured)
 	}
+	if l.runtimeHeld(runtimeName) {
+		return nil, RuntimeFallbackOutcome{}, dispatcher.UsageLimitError{Runtime: runtimeName, Detail: "launches held until the limit resets"}
+	}
 
 	req.Runtime = runtimeName
 	session, err := runtime.Dispatch(ctx, req)
 	if err == nil {
+		l.releaseRuntime(runtimeName)
 		return session, RuntimeFallbackOutcome{}, nil
+	}
+	if dispatcher.IsUsageLimit(err) {
+		// The same account fails the same way on any fallback, so hold the
+		// runtime and let the caller leave the stage pending.
+		l.holdRuntime(runtimeName, err.Error())
+		return nil, RuntimeFallbackOutcome{}, err
 	}
 	if runtimeName != "process" {
 		if fallback := l.deps.Runtimes["process"]; fallback != nil {
@@ -202,6 +211,13 @@ func (l *Loop) dispatchSession(ctx context.Context, req loopruntime.DispatchRequ
 func (l *Loop) handleCookDispatchFailure(cand dispatchCandidate, stage Stage, worktreeName string, created bool, attemptID string, err error) error {
 	if created {
 		_ = l.deps.Worktree.Cleanup(worktreeName, worktree.CleanupOpts{Force: true})
+	}
+	if dispatcher.IsUsageLimit(err) {
+		// Not a failure of the order: the stage stays pending and the runtime
+		// is held (see dispatchSession), so the next launch after the hold resumes it.
+		l.logger.Warn("dispatch paused by usage limit",
+			"order", cand.OrderID, "stage", cand.StageIndex, "error", err)
+		return nil
 	}
 	envelope, ok := asDispatchFailureEnvelope(err)
 	if !ok {

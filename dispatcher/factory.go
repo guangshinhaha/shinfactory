@@ -40,7 +40,7 @@ func (f *DispatcherFactory) Dispatch(ctx context.Context, req DispatchRequest) (
 	}
 	req.Runtime = runtime
 	session, err := dispatcher.Dispatch(ctx, req)
-	if err != nil && runtime != "process" {
+	if err != nil && runtime != "process" && !IsUsageLimit(err) {
 		fallback, hasFallback := f.runtimes["process"]
 		if hasFallback {
 			fmt.Fprintf(os.Stderr, "dispatch: %s runtime failed, falling back to process: %v\n", runtime, err)

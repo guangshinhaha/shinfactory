@@ -75,14 +75,14 @@ func Validate(config Config) ValidationResult {
 
 	if rd := stringx.Normalize(config.Runtime.Default); rd != "" {
 		switch rd {
-		case "process", "sprites", "cursor":
+		case "process", "sprites", "cursor", "orca":
 			// Known runtimes — ok.
 		default:
 			result.Diagnostics = append(result.Diagnostics, ConfigDiagnostic{
 				FieldPath: "runtime.default",
-				Message:   fmt.Sprintf("unknown runtime %q (valid: process, sprites, cursor)", config.Runtime.Default),
+				Message:   fmt.Sprintf("unknown runtime %q (valid: process, sprites, cursor, orca)", config.Runtime.Default),
 				Severity:  DiagnosticSeverityWarning,
-				Fix:       "Set runtime.default to \"process\", \"sprites\", or \"cursor\" in .noodle.toml.",
+				Fix:       "Set runtime.default to \"process\", \"sprites\", \"cursor\", or \"orca\" in .noodle.toml.",
 				Code:      DiagnosticCodeRuntimeDefaultUnknown,
 			})
 		}
