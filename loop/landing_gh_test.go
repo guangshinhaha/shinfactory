@@ -107,3 +107,41 @@ func TestGHLanderPushesBranchOpensDraftOnceAndMergesWithoutAdmin(t *testing.T) {
 		t.Fatalf("merge must never use --admin:\n%s", log)
 	}
 }
+
+func TestGHLanderRefusesToReuseAPRWithTheWrongBaseOrFromAFork(t *testing.T) {
+	remote := t.TempDir()
+	gitIn(t, remote, "init", "--bare", "-b", "main")
+	work := t.TempDir()
+	gitIn(t, work, "init", "-b", "order-42")
+	gitIn(t, work, "remote", "add", "origin", remote)
+	if err := os.WriteFile(filepath.Join(work, "a.txt"), []byte("one"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gitIn(t, work, "add", ".")
+	gitIn(t, work, "commit", "-m", "execute")
+
+	for name, listing := range map[string]string{
+		"wrong base": `[{"url":"u","isDraft":false,"baseRefName":"release/1.0","isCrossRepository":false}]`,
+		"fork":       `[{"url":"u","isDraft":false,"baseRefName":"main","isCrossRepository":true}]`,
+	} {
+		bin := t.TempDir()
+		script := "#!/bin/sh\ncase \"$1 $2\" in\n\"pr list\") echo '" + listing + "' ;;\n*) echo \"unexpected: $*\" >&2; exit 1 ;;\nesac\n"
+		if err := os.WriteFile(filepath.Join(bin, "gh"), []byte(script), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+		if _, err := (ghLander{}).PushAndEnsureDraft(context.Background(), work, PRSpec{Title: "T", Base: "main"}); err == nil {
+			t.Errorf("%s: reused a PR that is not this order's", name)
+		}
+	}
+}
+
+func TestPRBodyOmitsOrderRationaleAndPlan(t *testing.T) {
+	spec := prSpecFor(Order{ID: "7", Title: "t", Rationale: "Student 12345 failed login", Plan: []string{"call Tan"}}, "")
+	if strings.Contains(spec.Body, "12345") || strings.Contains(spec.Body, "Tan") {
+		t.Fatalf("PR body leaks order text: %q", spec.Body)
+	}
+	if strings.Contains(strings.ToLower(spec.Body), "closes") || !strings.Contains(spec.Body, "Refs #7") {
+		t.Fatalf("PR body = %q, want Refs #7 and no closing keyword", spec.Body)
+	}
+}

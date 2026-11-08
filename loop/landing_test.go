@@ -130,12 +130,12 @@ func TestPRLandingPushesDraftAfterExecuteAndMergesAfterLastStage(t *testing.T) {
 		t.Fatalf("backlog done calls = %#v", h.ar.doneCalls)
 	}
 	if h.specs0Closes(t) == false {
-		t.Fatal("PR body should close the numeric issue")
+		t.Fatal("PR body should reference the numeric issue")
 	}
 }
 
 func (h *landingHarness) specs0Closes(t *testing.T) bool {
-	return len(h.ln.specs) > 0 && contains(h.ln.specs[0].Body, "Closes #42")
+	return len(h.ln.specs) > 0 && contains(h.ln.specs[0].Body, "Refs #42")
 }
 
 func contains(s, sub string) bool {

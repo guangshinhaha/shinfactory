@@ -63,7 +63,7 @@ func (g ghLander) PushAndEnsureDraft(ctx context.Context, dir string, spec PRSpe
 	if _, err := g.run(ctx, dir, "git", "push", "--set-upstream", "origin", branch); err != nil {
 		return PullRequest{}, err
 	}
-	if pr, ok, err := g.find(ctx, dir, branch); err != nil {
+	if pr, ok, err := g.find(ctx, dir, branch, spec.Base); err != nil {
 		return PullRequest{}, err
 	} else if ok {
 		return pr, nil
@@ -75,7 +75,7 @@ func (g ghLander) PushAndEnsureDraft(ctx context.Context, dir string, spec PRSpe
 	if _, err := g.run(ctx, dir, "gh", args...); err != nil {
 		return PullRequest{}, err
 	}
-	pr, ok, err := g.find(ctx, dir, branch)
+	pr, ok, err := g.find(ctx, dir, branch, spec.Base)
 	if err != nil {
 		return PullRequest{}, err
 	}
@@ -85,20 +85,28 @@ func (g ghLander) PushAndEnsureDraft(ctx context.Context, dir string, spec PRSpe
 	return pr, nil
 }
 
-func (g ghLander) find(ctx context.Context, dir, branch string) (PullRequest, bool, error) {
-	out, err := g.run(ctx, dir, "gh", "pr", "list", "--head", branch, "--state", "open", "--json", "url,isDraft", "--limit", "1")
+func (g ghLander) find(ctx context.Context, dir, branch, base string) (PullRequest, bool, error) {
+	out, err := g.run(ctx, dir, "gh", "pr", "list", "--head", branch, "--state", "open", "--json", "url,isDraft,baseRefName,isCrossRepository", "--limit", "1")
 	if err != nil {
 		return PullRequest{}, false, err
 	}
 	var prs []struct {
-		URL     string `json:"url"`
-		IsDraft bool   `json:"isDraft"`
+		URL               string `json:"url"`
+		IsDraft           bool   `json:"isDraft"`
+		BaseRefName       string `json:"baseRefName"`
+		IsCrossRepository bool   `json:"isCrossRepository"`
 	}
 	if err := json.Unmarshal([]byte(out), &prs); err != nil {
 		return PullRequest{}, false, fmt.Errorf("parse gh pr list output %q: %w", out, err)
 	}
 	if len(prs) == 0 {
 		return PullRequest{}, false, nil
+	}
+	if prs[0].IsCrossRepository {
+		return PullRequest{}, false, fmt.Errorf("open PR %s for branch %s comes from a fork, not this order; refusing to reuse it", prs[0].URL, branch)
+	}
+	if base != "" && prs[0].BaseRefName != base {
+		return PullRequest{}, false, fmt.Errorf("open PR %s for branch %s targets %s, not %s; close it or fix landing.base", prs[0].URL, branch, prs[0].BaseRefName, base)
 	}
 	return PullRequest{URL: prs[0].URL, Branch: branch, IsDraft: prs[0].IsDraft}, true, nil
 }
@@ -120,19 +128,11 @@ func prSpecFor(order Order, base string) PRSpec {
 	if title == "" {
 		title = "order " + order.ID
 	}
+	// The body deliberately omits the order's rationale and plan: they are
+	// model-written and may carry data that must not leave for GitHub.
 	var b strings.Builder
-	if r := strings.TrimSpace(order.Rationale); r != "" {
-		b.WriteString(r + "\n\n")
-	}
-	if len(order.Plan) > 0 {
-		b.WriteString("Plan:\n")
-		for _, step := range order.Plan {
-			b.WriteString("- " + strings.TrimSpace(step) + "\n")
-		}
-		b.WriteString("\n")
-	}
 	if isIssueNumber(order.ID) {
-		b.WriteString("Closes #" + order.ID + "\n\n")
+		b.WriteString("Refs #" + order.ID + "\n\n")
 	}
 	b.WriteString("Opened by the factory loop as a draft. It is marked ready and merged when the order's last stage completes.\n")
 	return PRSpec{Title: title, Body: b.String(), Base: base}
