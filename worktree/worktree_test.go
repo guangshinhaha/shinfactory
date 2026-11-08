@@ -781,7 +781,7 @@ func TestMergeLockWaitsForRelease(t *testing.T) {
 	skipWorktreeIntegrationShort(t)
 
 	dir := setupTestRepo(t)
-	app := &App{Root: dir, MergeLockTimeout: 5 * time.Second}
+	app := &App{Root: dir, MergeLockTimeout: 30 * time.Second}
 
 	if err := app.Create("wait-lock"); err != nil {
 		t.Fatalf("Create failed: %v", err)
@@ -800,29 +800,27 @@ func TestMergeLockWaitsForRelease(t *testing.T) {
 		mergeDone <- app.Merge("wait-lock")
 	}()
 
-	// Merge cannot finish while the lock is held, so this hold never flakes
-	// when locking works. It is long enough for an unblocked Merge to finish
-	// on an idle machine, so a lock that is ignored fails here.
+	// Merge cannot finish or land the commit while the lock is held. The hold
+	// is long enough for an unblocked Merge to get that far on an idle
+	// machine, so a lock that is ignored fails here.
 	select {
 	case err := <-mergeDone:
 		t.Fatalf("expected merge to wait for lock release, got early result: %v", err)
 	case <-time.After(time.Second):
+	}
+	if fileExists(filepath.Join(dir, "wait.txt")) {
+		t.Fatal("merge landed on main while the lock was held")
 	}
 
 	if err := os.Remove(app.mergeLockPath()); err != nil && !os.IsNotExist(err) {
 		t.Fatalf("remove merge lock: %v", err)
 	}
 
-	// A lock wait that misses the release fails Merge via MergeLockTimeout,
-	// so this deadline is only a hang guard. It must cover the rebase, merge
-	// and cleanup git calls, which take several seconds on a loaded machine.
-	select {
-	case err := <-mergeDone:
-		if err != nil {
-			t.Fatalf("expected merge to succeed after lock release: %v", err)
-		}
-	case <-time.After(30 * time.Second):
-		t.Fatal("timed out waiting for merge after lock release")
+	// No deadline here: a lock wait that misses the release fails Merge via
+	// MergeLockTimeout, and the git work after it slows without bound under
+	// load. A real hang trips go test -timeout with a goroutine dump.
+	if err := <-mergeDone; err != nil {
+		t.Fatalf("expected merge to succeed after lock release: %v", err)
 	}
 
 	if !fileExists(filepath.Join(dir, "wait.txt")) {
