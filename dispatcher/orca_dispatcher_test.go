@@ -123,13 +123,24 @@ func TestOrcaSessionTerminateStopsWorker(t *testing.T) {
 func TestIsUsageLimitText(t *testing.T) {
 	for text, want := range map[string]bool{
 		"Claude usage limit reached. Your limit will reset at 3pm": true,
-		"5-hour limit reached":            true,
-		"rate limit exceeded":             true,
-		"go build failed: undefined: foo": false,
-		"":                                false,
+		"5-hour limit reached":                                   true,
+		"Credit balance is too low":                              true,
+		"go test: TestRateLimiter FAIL: rate limit not enforced": false,
+		"max line length limit reached in golangci-lint":         false,
+		"error: I reached your context limit":                    false,
+		"go build failed: undefined: foo":                        false,
+		"":                                                       false,
 	} {
 		if got := IsUsageLimitText(text); got != want {
 			t.Errorf("IsUsageLimitText(%q) = %v, want %v", text, got, want)
 		}
+	}
+}
+
+func TestOrcaSpecQuotesProjectDir(t *testing.T) {
+	d := NewOrcaDispatcher(OrcaDispatcherConfig{ProjectDir: "/Users/a b/My Projects/x"})
+	spec := d.buildSpec("sess-1", DispatchRequest{Prompt: "p"}, "")
+	if !strings.Contains(spec, "NOODLE_PROJECT_DIR='/Users/a b/My Projects/x' shinfactory") {
+		t.Fatalf("spec does not shell-quote the project dir:\n%s", spec)
 	}
 }

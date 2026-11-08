@@ -16,7 +16,7 @@ const (
 	orcaPollFailureLimit = 12
 	// orcaTranscriptTail is how many trailing transcript messages are scanned
 	// for a usage-limit message.
-	orcaTranscriptTail = 5
+	orcaTranscriptTail = 2
 )
 
 type orcaSessionConfig struct {
@@ -87,6 +87,8 @@ func (s *orcaSession) poll(ctx context.Context) {
 		if err != nil {
 			failures++
 			if failures >= orcaPollFailureLimit {
+				// Fence the worker so a retry does not put two in one worktree.
+				_ = stopOrcaWorker(s.run, s.bin, s.dispatchID)
 				s.finish(SessionOutcome{Status: StatusFailed, Reason: "lost contact with orca: " + err.Error()})
 				return
 			}

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/guangshinhaha/shinfactory/event"
+	"github.com/guangshinhaha/shinfactory/internal/shellx"
 	"github.com/guangshinhaha/shinfactory/internal/stringx"
 	"github.com/guangshinhaha/shinfactory/skill"
 )
@@ -187,7 +188,7 @@ NOODLE_PROJECT_DIR=%s shinfactory event emit --session %s <event> --payload '<js
 `+"```"+`
 
 The factory reads `+"`stage_yield`"+` and `+"`stage_fail`"+` from that session; the Orca
-`+"`worker_done`"+` message alone does not tell it what happened.`, sessionID, d.projectDir, sessionID)
+`+"`worker_done`"+` message alone does not tell it what happened.`, sessionID, shellx.Quote(d.projectDir), sessionID)
 	return stringx.JoinNonEmpty("\n\n", buildSessionPreamble(), skillSystemPrompt, identity, req.Prompt)
 }
 

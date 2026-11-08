@@ -15,6 +15,7 @@ import (
 	"github.com/guangshinhaha/shinfactory/config"
 	"github.com/guangshinhaha/shinfactory/dispatcher"
 	"github.com/guangshinhaha/shinfactory/event"
+	"github.com/guangshinhaha/shinfactory/internal/shellx"
 	"github.com/guangshinhaha/shinfactory/internal/taskreg"
 	"github.com/guangshinhaha/shinfactory/internal/testutil/fakeorca"
 	"github.com/guangshinhaha/shinfactory/mise"
@@ -224,7 +225,7 @@ func TestOrcaRuntimeRunsOrderAcrossStages(t *testing.T) {
 		t.Fatalf("no stage worktree was merged; merged=%v", env.wt.merged)
 	}
 	spec := env.fake.Spec(t, 2)
-	if !strings.Contains(spec, "NOODLE_PROJECT_DIR="+env.projectDir) || !strings.Contains(spec, "--session ") {
+	if !strings.Contains(spec, "NOODLE_PROJECT_DIR="+shellx.Quote(env.projectDir)) || !strings.Contains(spec, "--session ") {
 		t.Fatalf("execute spec lacks the session identity the skills read:\n%s", spec)
 	}
 }
@@ -371,5 +372,26 @@ func TestStageRuntimeKeepsLegacyDefaultsForOtherRuntimes(t *testing.T) {
 		if got := l.stageRuntime("sprites"); got != "sprites" {
 			t.Errorf("default %q: explicit sprites stage = %q, want sprites", def, got)
 		}
+	}
+}
+
+// A worker that crashes with text that merely resembles a limit message is a
+// failed stage, not a held runtime.
+func TestOrcaRuntimeCrashMentioningLimitWordFailsTheStage(t *testing.T) {
+	orders := OrdersFile{Orders: []Order{{
+		ID: "42", Title: "crash", Status: OrderStatusActive,
+		Stages: []Stage{{TaskKey: "execute", Skill: "execute", Provider: "claude", Model: "claude-sonnet-5-5", Status: StageStatusPending}},
+	}}}
+	env := newOrcaEnv(t, orders)
+	env.cycleUntil(t, "execute started", func() bool { return len(env.fake.Starts()) == 1 })
+	id := env.fake.LastDispatch(t)
+	env.fake.SetTranscript(t, id, "Panic: TestRateLimiter failed, rate limit not enforced; limit reached check crashed")
+	env.fake.Settle(t, id, "failed")
+	env.cycleUntil(t, "stage failed", func() bool {
+		of := env.readOrders(t)
+		return len(of.Orders) == 1 && of.Orders[0].Status == OrderStatusFailed
+	})
+	if _, held := env.loop.limitHolds.heldUntil("orca", env.clock); held {
+		t.Fatal("runtime held after an ordinary crash")
 	}
 }

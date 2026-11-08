@@ -102,7 +102,7 @@ func applyDefaultsFromMetadata(config *Config, metadata toml.MetaData, diagnosti
 		config.Runtime.Cursor.MaxConcurrent = 10
 	}
 	if !metadata.IsDefined("runtime", "orca", "max_concurrent") {
-		config.Runtime.Orca.MaxConcurrent = 4
+		config.Runtime.Orca.MaxConcurrent = 0 // the global concurrency cap applies; a per-runtime cap would spill stages onto process
 	}
 
 	if !metadata.IsDefined("server", "port") {
@@ -305,7 +305,7 @@ func normalizeParsedValues(config *Config, metadata toml.MetaData, diagnostics *
 		"runtime.orca.max_concurrent",
 		metadata.IsDefined("runtime", "orca", "max_concurrent"),
 		&config.Runtime.Orca.MaxConcurrent,
-		4,
+		0,
 		diagnostics,
 	)
 
