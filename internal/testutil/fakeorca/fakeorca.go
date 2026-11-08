@@ -1,6 +1,6 @@
 // Package fakeorca provides a stand-in `orca` CLI for tests, so nothing
 // touches a real Orca. It speaks the slice of `orca orchestration` the orca
-// runtime uses: worker-start, worker-list, worker-read and worker-stop.
+// runtime uses: worker-start, worker-list, worker-show, worker-read and worker-stop.
 package fakeorca
 
 import (
@@ -25,6 +25,15 @@ const script = `#!/bin/sh
 D="$FAKE_ORCA_DIR"
 echo "$*" >> "$D/calls.log"
 cmd="$2"
+# row prints a worker the way real Orca reports it: a successful worker is
+# state "succeeded" with no outcome, a failed one is "stopped"/"failed".
+row() {
+  case "$2" in
+    succeeded) printf '{"dispatchId":"%s","state":"succeeded"}' "$1" ;;
+    in_progress) printf '{"dispatchId":"%s","state":"ready","outcome":"in_progress"}' "$1" ;;
+    *) printf '{"dispatchId":"%s","state":"stopped","outcome":"%s"}' "$1" "$2" ;;
+  esac
+}
 case "$cmd" in
 worker-start)
   if [ -f "$D/limit" ]; then
@@ -47,13 +56,20 @@ worker-list)
   for f in "$D"/w-ctx_fake*; do
     [ -e "$f" ] || continue
     id=$(basename "$f" | sed 's/^w-//')
-    outcome=$(cat "$f")
-    state=ready
-    [ "$outcome" != "in_progress" ] && state=stopped
-    printf '%s{"dispatchId":"%s","state":"%s","outcome":"%s"}' "$sep" "$id" "$state" "$outcome"
+    printf '%s%s' "$sep" "$(row "$id" "$(cat "$f")")"
     sep=","
   done
   printf ']}}\n'
+  ;;
+worker-show)
+  id=""
+  prev=""
+  for a in "$@"; do
+    [ "$prev" = "--dispatch" ] && id="$a"
+    prev="$a"
+  done
+  [ -f "$D/w-$id" ] || { echo "no such dispatch" >&2; exit 1; }
+  printf '{"ok":true,"result":%s}\n' "$(row "$id" "$(cat "$D/w-$id")")"
   ;;
 worker-read)
   id=""

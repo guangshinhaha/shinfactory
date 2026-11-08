@@ -144,3 +144,41 @@ func TestOrcaSpecQuotesProjectDir(t *testing.T) {
 		t.Fatalf("spec does not shell-quote the project dir:\n%s", spec)
 	}
 }
+
+// Real Orca lists a finished worker as state "succeeded" with no outcome field.
+func TestOrcaWorkerRowShapes(t *testing.T) {
+	for name, tc := range map[string]struct {
+		w       orcaWorker
+		settled bool
+		success bool
+	}{
+		"succeeded, no outcome": {orcaWorker{State: "succeeded"}, true, true},
+		"stopped, failed":       {orcaWorker{State: "stopped", Outcome: "failed"}, true, false},
+		"ready, in progress":    {orcaWorker{State: "ready", Outcome: "in_progress"}, false, false},
+		"stopped, no outcome":   {orcaWorker{State: "stopped"}, true, false},
+	} {
+		if tc.w.settled() != tc.settled || tc.w.succeeded() != tc.success {
+			t.Errorf("%s: settled=%v succeeded=%v, want %v %v", name, tc.w.settled(), tc.w.succeeded(), tc.settled, tc.success)
+		}
+	}
+}
+
+func TestOrcaSessionFindsWorkerBeyondFirstListPage(t *testing.T) {
+	fake := fakeorca.New(t)
+	d, dir := orcaTestDispatcher(t, fake)
+	real := d.run
+	d.run = func(ctx context.Context, bin string, args ...string) ([]byte, error) {
+		if len(args) > 1 && args[1] == "worker-list" {
+			return []byte(`{"ok":true,"result":{"workers":[]}}`), nil // worker is past the first page
+		}
+		return real(ctx, bin, args...)
+	}
+	s, err := d.Dispatch(context.Background(), orcaTestRequest(dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	fake.Settle(t, fake.LastDispatch(t), "succeeded")
+	if out := waitDone(t, s); out.Status != StatusCompleted {
+		t.Fatalf("outcome = %+v, want completed via worker-show", out)
+	}
+}

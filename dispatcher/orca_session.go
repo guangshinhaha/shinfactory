@@ -110,13 +110,34 @@ type orcaWorker struct {
 	Outcome    string `json:"outcome"`
 }
 
-// settled reports whether the worker has finished or been stopped.
+// succeeded reports whether Orca recorded the worker as finished successfully.
+// Real Orca reports a successful worker as state "succeeded" with no outcome;
+// a failed one is state "stopped" with outcome "failed".
+func (w orcaWorker) succeeded() bool {
+	if strings.ToLower(strings.TrimSpace(w.State)) == "succeeded" {
+		return true
+	}
+	switch strings.ToLower(strings.TrimSpace(w.Outcome)) {
+	case "succeeded", "success", "completed":
+		return true
+	}
+	return false
+}
+
+// settled reports whether the worker has finished, failed or been stopped.
 func (w orcaWorker) settled() bool {
+	if w.succeeded() {
+		return true
+	}
 	outcome := strings.ToLower(strings.TrimSpace(w.Outcome))
 	if outcome != "" && outcome != "in_progress" {
 		return true
 	}
-	return strings.ToLower(strings.TrimSpace(w.State)) == "stopped"
+	switch strings.ToLower(strings.TrimSpace(w.State)) {
+	case "stopped", "failed", "cancelled", "canceled":
+		return true
+	}
+	return false
 }
 
 func (s *orcaSession) fetchWorker(ctx context.Context) (orcaWorker, error) {
@@ -139,15 +160,26 @@ func (s *orcaSession) fetchWorker(ctx context.Context) (orcaWorker, error) {
 			return w, nil
 		}
 	}
-	return orcaWorker{}, fmt.Errorf("worker %s not in worker-list", s.dispatchID)
+	// Past the first 100 rows: ask for this worker directly. worker-show has
+	// the state but no outcome, which is enough to tell running from ended.
+	showOut, err := s.run(callCtx, s.bin, "orchestration", "worker-show", "--dispatch", s.dispatchID, "--json")
+	if err != nil {
+		return orcaWorker{}, fmt.Errorf("worker %s not in worker-list: %w", s.dispatchID, err)
+	}
+	var show struct {
+		Result orcaWorker `json:"result"`
+	}
+	if err := json.Unmarshal(showOut, &show); err != nil || show.Result.DispatchID != s.dispatchID {
+		return orcaWorker{}, fmt.Errorf("worker %s not in worker-list", s.dispatchID)
+	}
+	return show.Result, nil
 }
 
 func (s *orcaSession) outcomeFor(ctx context.Context, w orcaWorker) SessionOutcome {
-	switch strings.ToLower(strings.TrimSpace(w.Outcome)) {
-	case "succeeded", "success", "completed":
+	if w.succeeded() {
 		return SessionOutcome{Status: StatusCompleted, Reason: "orca worker finished", HasDeliverable: true}
 	}
-	outcome := SessionOutcome{Status: StatusFailed, Reason: "orca worker ended with outcome " + nonEmptyOr(w.Outcome, "unknown")}
+	outcome := SessionOutcome{Status: StatusFailed, Reason: "orca worker ended with outcome " + nonEmptyOr(nonEmptyOr(w.Outcome, w.State), "unknown")}
 	if tail := s.transcriptTail(ctx); IsUsageLimitText(tail) {
 		outcome.UsageLimit = true
 		outcome.Reason = "usage limit reached: " + limitLine(tail)
