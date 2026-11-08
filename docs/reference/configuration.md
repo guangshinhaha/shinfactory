@@ -9,7 +9,7 @@ Most projects only need routing defaults and a skills path:
 ```toml
 [routing.defaults]
 provider = "claude"
-model = "claude-opus-4-6"
+model = "claude-sonnet-5-5"
 
 [skills]
 paths = [".agents/skills"]
@@ -40,13 +40,17 @@ Controls which Agent provider and model are used for skill execution.
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `provider` | string | `"claude"` | Agent provider name (e.g. `"claude"`, `"codex"`) |
-| `model` | string | `"claude-opus-4-6"` | Model identifier passed to the provider |
+| `model` | string | `"claude-sonnet-5-5"` | Model identifier passed to the provider |
 
 ```toml
 [routing.defaults]
 provider = "claude"
-model = "claude-opus-4-6"
+model = "claude-sonnet-5-5"
 ```
+
+#### `[routing.roles]`
+
+Maps a role (`scheduler`, `planner`, `builder`, `explorer`, `reviewer`, `adversary`, `verifier`, `debrief`) to a provider and model. Omitted roles use the defaults: `claude-haiku-5-5` for scheduler and debrief, `claude-sonnet-5-5` for builder, explorer, reviewer and adversary, `claude-opus-5-5` for planner and verifier. A provider is used only when a role or `routing.defaults` names it. `[routing] sensitive = true` keeps every stage on `routing.defaults.provider`. See [Model Routing](/cookbook/model-routing).
 
 ### `[skills]`
 
@@ -213,7 +217,7 @@ mode = "supervised"
 
 [routing.defaults]
 provider = "claude"
-model = "claude-opus-4-6"
+model = "claude-sonnet-5-5"
 
 [skills]
 paths = [".agents/skills"]
@@ -232,7 +236,7 @@ Scale out with cloud sandboxes while keeping a local fallback:
 ```toml
 [routing.defaults]
 provider = "claude"
-model = "claude-opus-4-6"
+model = "claude-sonnet-5-5"
 
 [runtime]
 default = "sprites"
@@ -252,5 +256,5 @@ Set a single project-wide default provider and model:
 ```toml
 [routing.defaults]
 provider = "claude"
-model = "claude-opus-4-6"
+model = "claude-sonnet-5-5"
 ```

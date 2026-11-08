@@ -184,7 +184,7 @@ Run `shinfactory schema orders` for the canonical schema. Key structure:
           "task_key": "quality",
           "skill": "quality",
           "provider": "claude",
-          "model": "claude-opus-4-6",
+          "model": "claude-sonnet-5-5",
           "runtime": "process",
           "status": "pending"
         },
@@ -192,7 +192,7 @@ Run `shinfactory schema orders` for the canonical schema. Key structure:
           "task_key": "debrief",
           "skill": "debrief",
           "provider": "claude",
-          "model": "claude-opus-4-6",
+          "model": "claude-sonnet-5-5",
           "runtime": "process",
           "status": "pending"
         }
@@ -226,7 +226,7 @@ Run `shinfactory schema orders` for the canonical schema. Key structure:
           "task_key": "quality",
           "skill": "quality",
           "provider": "claude",
-          "model": "claude-opus-4-6",
+          "model": "claude-sonnet-5-5",
           "runtime": "process",
           "status": "pending"
         }
@@ -251,7 +251,7 @@ Run `shinfactory schema orders` for the canonical schema. Key structure:
           "task_key": "execute",
           "skill": "execute",
           "provider": "claude",
-          "model": "claude-opus-4-6",
+          "model": "claude-sonnet-5-5",
           "runtime": "process",
           "status": "pending",
           "extra_prompt": "This item needs a plan before implementation. Use /plan to break it down into phases, then execute the first phase."
@@ -286,7 +286,7 @@ Run `shinfactory schema orders` for the canonical schema. Key structure:
           "task_key": "quality",
           "skill": "quality",
           "provider": "claude",
-          "model": "claude-opus-4-6",
+          "model": "claude-sonnet-5-5",
           "runtime": "process",
           "status": "pending"
         }
@@ -311,7 +311,7 @@ Run `shinfactory schema orders` for the canonical schema. Key structure:
           "task_key": "meditate",
           "skill": "meditate",
           "provider": "claude",
-          "model": "claude-opus-4-6",
+          "model": "claude-sonnet-5-5",
           "runtime": "process",
           "status": "pending"
         }
@@ -357,7 +357,7 @@ Run `shinfactory schema orders` for the canonical schema. Key structure:
           "task_key": "quality",
           "skill": "quality",
           "provider": "claude",
-          "model": "claude-opus-4-6",
+          "model": "claude-sonnet-5-5",
           "runtime": "process",
           "status": "pending",
           "group": 1

@@ -36,14 +36,32 @@ Each phase file must include:
 - **Data structures** — name the key types/schemas before logic (per foundational-thinking), but a one-line sketch is enough — don't write full definitions
 - **Routing** — provider/model recommendation for this phase's execution:
 
-| Phase type | Provider | Model | When |
-|------------|----------|-------|------|
-| Planning | `claude` or `codex` | `claude-opus-4-6` or `gpt-5.4-xhigh` | Writing plans, breaking down tasks |
-| Review | `claude` or `codex` | `claude-opus-4-6` or `gpt-5.4-xhigh` | Code review, plan review, quality gates |
-| Implementation | `codex` | `gpt-5.4` | Coding against a clear spec |
-| Architecture / judgment | `claude` | `claude-opus-4-6` | Design decisions, complex refactoring |
-| Skill creation | `claude` | `claude-opus-4-6` | Writing skills, brain notes |
-| Scaffolding | `codex` | `gpt-5.4` | Boilerplate, mechanical transforms |
+| Phase type | Role | When |
+|------------|------|------|
+| Planning, verification | `planner`, `verifier` | Writing plans, breaking down tasks, checking results |
+| Implementation, scaffolding | `builder` | Coding against a clear spec |
+| Code review, quality gates | `reviewer`, `adversary` | Review and challenge |
+
+The provider and model come from `[routing.roles]` in `.noodle.toml`; don't name them here.
+
+- **Verification** — project-level verification commands (e.g. `go test ./...`)
+
+## Phase Files
+
+Each phase file must include:
+- Back-link: `Back to [[plans/42-mvp/overview]]`
+- **Goal** — what this phase accomplishes
+- **Changes** — which files are affected and what changes, described at a high level
+- **Data structures** — name the key types/schemas before logic (per foundational-thinking), but a one-line sketch is enough — don't write full definitions
+- **Routing** — provider/model recommendation for this phase's execution:
+
+| Phase type | Role | When |
+|------------|------|------|
+| Planning, verification | `planner`, `verifier` | Writing plans, breaking down tasks, checking results |
+| Implementation, scaffolding | `builder` | Coding against a clear spec |
+| Code review, quality gates | `reviewer`, `adversary` | Review and challenge |
+
+The provider and model come from `[routing.roles]` in `.noodle.toml`; don't name them here.
 
 - **Verification** — static and runtime checks for this phase (see verification section below)
 

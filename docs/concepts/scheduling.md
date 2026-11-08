@@ -45,7 +45,7 @@ An order is a unit of work with one or more stages. The scheduling agent writes 
       "do": "execute",
       "prompt": "Fix the login timeout bug described in issue #42",
       "with": "claude",
-      "model": "claude-opus-4-6"
+      "model": "claude-sonnet-5-5"
     }
   ]
 }
@@ -91,13 +91,13 @@ Stages run sequentially by default. The first stage finishes before the second s
     {
       "do": "quality",
       "with": "claude",
-      "model": "claude-opus-4-6",
+      "model": "claude-sonnet-5-5",
       "runtime": "process"
     },
     {
       "do": "reflect",
       "with": "claude",
-      "model": "claude-opus-4-6",
+      "model": "claude-sonnet-5-5",
       "runtime": "process"
     }
   ]
@@ -126,7 +126,7 @@ Groups are how the scheduling agent expresses a dependency graph. Stages with th
     {
       "do": "quality",
       "with": "claude",
-      "model": "claude-opus-4-6",
+      "model": "claude-sonnet-5-5",
       "group": 1
     }
   ]
@@ -148,7 +148,7 @@ Default routing comes from `.noodle.toml`:
 ```toml
 [routing.defaults]
 provider = "claude"
-model = "claude-opus-4-6"
+model = "claude-sonnet-5-5"
 ```
 
 The scheduling agent can override defaults per stage when writing orders. See [Runtimes](/concepts/runtimes) for where stages execute.
