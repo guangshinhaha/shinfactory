@@ -43,7 +43,7 @@ func TestIntegrationStagesDispatchWithRoleModel(t *testing.T) {
 }
 
 func TestScheduleOrderUsesSchedulerRole(t *testing.T) {
-	cfg := config.DefaultConfig()
+	cfg := localLandingConfig()
 	stage := scheduleOrder(cfg, "").Stages[0]
 	if stage.Provider != "claude" || stage.Model != "claude-haiku-5-5" {
 		t.Fatalf("scheduler stage = %s/%s, want claude/claude-haiku-5-5", stage.Provider, stage.Model)

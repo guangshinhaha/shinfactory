@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/guangshinhaha/shinfactory/config"
 	loopruntime "github.com/guangshinhaha/shinfactory/runtime"
 )
 
@@ -14,14 +13,14 @@ func TestStateIncludesBootstrapInFlightInActiveCooks(t *testing.T) {
 	runtimeDir := filepath.Join(projectDir, ".noodle")
 	now := time.Date(2026, 3, 3, 5, 35, 0, 0, time.UTC)
 
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
-		Runtimes: map[string]loopruntime.Runtime{"process": newMockRuntime()},
-		Worktree: &fakeWorktree{},
-		Adapter:  &fakeAdapterRunner{},
-		Mise:     &fakeMise{},
-		Monitor:  fakeMonitor{},
-		Registry: testLoopRegistry(),
-		Now:      func() time.Time { return now },
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
+		Runtimes:   map[string]loopruntime.Runtime{"process": newMockRuntime()},
+		Worktree:   &fakeWorktree{},
+		Adapter:    &fakeAdapterRunner{},
+		Mise:       &fakeMise{},
+		Monitor:    fakeMonitor{},
+		Registry:   testLoopRegistry(),
+		Now:        func() time.Time { return now },
 		OrdersFile: filepath.Join(runtimeDir, "orders.json"),
 	})
 
@@ -60,4 +59,3 @@ func TestStateIncludesBootstrapInFlightInActiveCooks(t *testing.T) {
 		t.Fatalf("task_key = %q, want %q", got.TaskKey, scheduleOrderID)
 	}
 }
-

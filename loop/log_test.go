@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/guangshinhaha/shinfactory/adapter"
-	"github.com/guangshinhaha/shinfactory/config"
 	"github.com/guangshinhaha/shinfactory/mise"
 	loopruntime "github.com/guangshinhaha/shinfactory/runtime"
 )
@@ -115,7 +114,7 @@ func newTestLoop(t *testing.T, logger *slog.Logger, opts ...func(*testLoopOpts))
 		fm.brief = *o.brief
 	}
 
-	cfg := config.DefaultConfig()
+	cfg := localLandingConfig()
 	if mode := strings.TrimSpace(o.mode); mode != "" {
 		cfg.Mode = mode
 	}

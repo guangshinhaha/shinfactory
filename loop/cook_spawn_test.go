@@ -5,7 +5,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/guangshinhaha/shinfactory/config"
 	"github.com/guangshinhaha/shinfactory/dispatcher"
 	"github.com/guangshinhaha/shinfactory/internal/failure"
 	loopruntime "github.com/guangshinhaha/shinfactory/runtime"
@@ -16,7 +15,7 @@ func TestDispatchSessionFallsBackToProcess(t *testing.T) {
 	tmuxRT.dispatchErr = errors.New("tmux runtime unavailable")
 	processRT := newMockRuntime()
 
-	cfg := config.DefaultConfig()
+	cfg := localLandingConfig()
 	cfg.Runtime.Default = "tmux"
 
 	l := New(t.TempDir(), "noodle", cfg, Dependencies{
@@ -75,7 +74,7 @@ func TestDispatchSessionFallsBackToProcess(t *testing.T) {
 }
 
 func TestDispatchSessionInvalidRuntimeIsUnrecoverable(t *testing.T) {
-	cfg := config.DefaultConfig()
+	cfg := localLandingConfig()
 	cfg.Runtime.Default = "tmux"
 	processRT := newMockRuntime()
 
@@ -123,7 +122,7 @@ func TestDispatchSessionProcessStartFailureIsUnrecoverable(t *testing.T) {
 	processRT := newMockRuntime()
 	processRT.dispatchErr = dispatcher.ProcessStartError{Cause: errors.New("binary missing")}
 
-	l := New(t.TempDir(), "noodle", config.DefaultConfig(), Dependencies{
+	l := New(t.TempDir(), "noodle", localLandingConfig(), Dependencies{
 		Runtimes: map[string]loopruntime.Runtime{"process": processRT},
 		Worktree: &fakeWorktree{},
 		Adapter:  &fakeAdapterRunner{},
