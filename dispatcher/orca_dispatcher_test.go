@@ -1,0 +1,135 @@
+package dispatcher
+
+import (
+	"context"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/guangshinhaha/shinfactory/internal/testutil/fakeorca"
+)
+
+func orcaTestDispatcher(t *testing.T, fake *fakeorca.Fake) (*OrcaDispatcher, string) {
+	t.Helper()
+	dir := t.TempDir()
+	d := NewOrcaDispatcher(OrcaDispatcherConfig{
+		ProjectDir:   dir,
+		RuntimeDir:   dir + "/.noodle",
+		Bin:          fake.Bin,
+		PollInterval: 5 * time.Millisecond,
+	})
+	return d, dir
+}
+
+func orcaTestRequest(dir string) DispatchRequest {
+	return DispatchRequest{
+		Name: "42-0-execute", Prompt: "do it", Provider: "claude", Model: "claude-sonnet-5-5",
+		WorktreePath: dir, AllowPrimaryCheckout: true, Runtime: "orca",
+	}
+}
+
+func waitDone(t *testing.T, s Session) SessionOutcome {
+	t.Helper()
+	select {
+	case <-s.Done():
+		return s.Outcome()
+	case <-time.After(5 * time.Second):
+		t.Fatal("session did not finish")
+		return SessionOutcome{}
+	}
+}
+
+func TestOrcaDispatchLaunchesWorkerWithChosenProviderAndModel(t *testing.T) {
+	fake := fakeorca.New(t)
+	d, dir := orcaTestDispatcher(t, fake)
+
+	s, err := d.Dispatch(context.Background(), orcaTestRequest(dir))
+	if err != nil {
+		t.Fatalf("dispatch: %v", err)
+	}
+	start := fake.Starts()
+	if len(start) != 1 {
+		t.Fatalf("worker-start calls = %v, want 1", start)
+	}
+	for _, frag := range []string{"--agent claude", "--model claude-sonnet-5-5", "--worktree path:" + dir, "--json"} {
+		if !strings.Contains(start[0], frag) {
+			t.Errorf("worker-start = %q, missing %q", start[0], frag)
+		}
+	}
+	fake.Settle(t, fake.LastDispatch(t), "succeeded")
+	if out := waitDone(t, s); out.Status != StatusCompleted {
+		t.Fatalf("outcome = %+v, want completed", out)
+	}
+}
+
+func TestOrcaDispatchReportsUsageLimitAtLaunch(t *testing.T) {
+	fake := fakeorca.New(t)
+	fake.SetLimit(t, true)
+	d, dir := orcaTestDispatcher(t, fake)
+
+	_, err := d.Dispatch(context.Background(), orcaTestRequest(dir))
+	if !IsUsageLimit(err) {
+		t.Fatalf("dispatch error = %v, want a usage-limit error", err)
+	}
+}
+
+func TestOrcaDispatchOtherLaunchFailureIsNotAUsageLimit(t *testing.T) {
+	fake := fakeorca.New(t)
+	d, dir := orcaTestDispatcher(t, fake)
+	req := orcaTestRequest(dir)
+	req.Provider = "gemini"
+
+	_, err := d.Dispatch(context.Background(), req)
+	if err == nil || IsUsageLimit(err) {
+		t.Fatalf("dispatch error = %v, want a plain provider error", err)
+	}
+}
+
+func TestOrcaSessionFailureWithoutLimitTextIsAPlainFailure(t *testing.T) {
+	fake := fakeorca.New(t)
+	d, dir := orcaTestDispatcher(t, fake)
+	s, err := d.Dispatch(context.Background(), orcaTestRequest(dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The fake's user message mentions limits; only the worker's own output counts.
+	id := fake.LastDispatch(t)
+	fake.SetTranscript(t, id, "go build failed: undefined: foo")
+	fake.Settle(t, id, "failed")
+	out := waitDone(t, s)
+	if out.Status != StatusFailed || out.UsageLimit {
+		t.Fatalf("outcome = %+v, want failed without UsageLimit", out)
+	}
+}
+
+func TestOrcaSessionTerminateStopsWorker(t *testing.T) {
+	fake := fakeorca.New(t)
+	d, dir := orcaTestDispatcher(t, fake)
+	s, err := d.Dispatch(context.Background(), orcaTestRequest(dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Terminate(); err != nil {
+		t.Fatalf("terminate: %v", err)
+	}
+	if out := waitDone(t, s); out.Status != StatusKilled {
+		t.Fatalf("outcome = %+v, want killed", out)
+	}
+	if !strings.Contains(strings.Join(fake.Calls(), "\n"), "worker-stop --dispatch "+fake.LastDispatch(t)) {
+		t.Fatalf("worker-stop not called: %v", fake.Calls())
+	}
+}
+
+func TestIsUsageLimitText(t *testing.T) {
+	for text, want := range map[string]bool{
+		"Claude usage limit reached. Your limit will reset at 3pm": true,
+		"5-hour limit reached":            true,
+		"rate limit exceeded":             true,
+		"go build failed: undefined: foo": false,
+		"":                                false,
+	} {
+		if got := IsUsageLimitText(text); got != want {
+			t.Errorf("IsUsageLimitText(%q) = %v, want %v", text, got, want)
+		}
+	}
+}

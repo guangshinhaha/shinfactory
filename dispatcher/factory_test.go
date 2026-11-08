@@ -151,3 +151,19 @@ func TestDispatcherFactoryNoFallbackWithoutProcess(t *testing.T) {
 		t.Fatal("expected sprites dispatch error with no process fallback")
 	}
 }
+
+func TestDispatcherFactoryDoesNotFallBackOnUsageLimit(t *testing.T) {
+	factory := NewDispatcherFactory()
+	processStub := &factoryDispatcherStub{session: &factorySessionStub{id: "fallback-1", status: "running"}}
+	orcaStub := &failingDispatcherStub{err: UsageLimitError{Runtime: "orca", Detail: "limit resets at 3pm"}}
+	_ = factory.Register("process", processStub)
+	_ = factory.Register("orca", orcaStub)
+
+	_, err := factory.Dispatch(context.Background(), DispatchRequest{Name: "cook", Runtime: "orca"})
+	if !IsUsageLimit(err) {
+		t.Fatalf("dispatch error = %v, want the usage-limit error", err)
+	}
+	if processStub.lastReq.Runtime != "" {
+		t.Fatalf("process was dispatched (%q) despite a usage limit", processStub.lastReq.Runtime)
+	}
+}

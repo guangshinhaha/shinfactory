@@ -89,10 +89,20 @@ func (l *Loop) requeueAfterUsageLimit(cook *cookHandle) error {
 	runtimeName := nonEmpty(cook.dispatchedRuntime, l.stageRuntime(cook.stage.Runtime))
 	reason := nonEmpty(cook.session.Outcome().Reason, "usage limit reached")
 	l.holdRuntime(runtimeName, reason)
+	if err := l.resetStageToPending(cook.orderID, cook.stageIndex, reason); err != nil {
+		return err
+	}
+	l.logger.Warn("stage requeued after usage limit",
+		"order", cook.orderID, "stage", cook.stageIndex, "session", cook.session.ID())
+	return nil
+}
 
+// resetStageToPending returns a dispatched stage to pending in both the
+// canonical state and orders.json, cancelling its in-flight attempt.
+func (l *Loop) resetStageToPending(orderID string, stageIndex int, reason string) error {
 	now := timeNowUTC(l.deps.Now)
-	if node, ok := l.canonical.Orders[cook.orderID]; ok && cook.stageIndex < len(node.Stages) {
-		stage := node.Stages[cook.stageIndex]
+	if node, ok := l.canonical.Orders[orderID]; ok && stageIndex < len(node.Stages) {
+		stage := node.Stages[stageIndex]
 		stage.Status = state.StagePending
 		if n := len(stage.Attempts); n > 0 {
 			last := &stage.Attempts[n-1]
@@ -102,28 +112,26 @@ func (l *Loop) requeueAfterUsageLimit(cook *cookHandle) error {
 				last.Error = reason
 			}
 		}
-		node.Stages[cook.stageIndex] = stage
+		node.Stages[stageIndex] = stage
 		node.Status = state.OrderPending
 		node.UpdatedAt = now
-		l.canonical.Orders[cook.orderID] = node
+		l.canonical.Orders[orderID] = node
 	}
 	if err := l.mutateOrdersState(func(orders *OrdersFile) (bool, error) {
 		for oi := range orders.Orders {
 			order := &orders.Orders[oi]
-			if order.ID != cook.orderID || cook.stageIndex >= len(order.Stages) {
+			if order.ID != orderID || stageIndex >= len(order.Stages) {
 				continue
 			}
-			if order.Stages[cook.stageIndex].Status != StageStatusActive {
+			if order.Stages[stageIndex].Status != StageStatusActive {
 				return false, nil
 			}
-			order.Stages[cook.stageIndex].Status = StageStatusPending
+			order.Stages[stageIndex].Status = StageStatusPending
 			return true, nil
 		}
 		return false, nil
 	}); err != nil {
 		return err
 	}
-	l.logger.Warn("stage requeued after usage limit",
-		"order", cook.orderID, "stage", cook.stageIndex, "session", cook.session.ID())
 	return l.persistCanonicalCheckpoint()
 }

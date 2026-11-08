@@ -217,7 +217,7 @@ func (l *Loop) handleCookDispatchFailure(cand dispatchCandidate, stage Stage, wo
 		// is held (see dispatchSession), so the next launch after the hold resumes it.
 		l.logger.Warn("dispatch paused by usage limit",
 			"order", cand.OrderID, "stage", cand.StageIndex, "error", err)
-		return nil
+		return l.resetStageToPending(cand.OrderID, cand.StageIndex, err.Error())
 	}
 	envelope, ok := asDispatchFailureEnvelope(err)
 	if !ok {
