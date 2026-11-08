@@ -815,12 +815,15 @@ func TestMergeLockWaitsForRelease(t *testing.T) {
 		t.Fatalf("remove merge lock: %v", err)
 	}
 
+	// A lock wait that misses the release fails Merge via MergeLockTimeout,
+	// so this deadline is only a hang guard. It must cover the rebase, merge
+	// and cleanup git calls, which take several seconds on a loaded machine.
 	select {
 	case err := <-mergeDone:
 		if err != nil {
 			t.Fatalf("expected merge to succeed after lock release: %v", err)
 		}
-	case <-time.After(2 * time.Second):
+	case <-time.After(30 * time.Second):
 		t.Fatal("timed out waiting for merge after lock release")
 	}
 
