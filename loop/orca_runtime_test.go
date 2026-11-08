@@ -356,3 +356,20 @@ func TestOrcaRuntimeAbsentFallsBackToProcess(t *testing.T) {
 		t.Fatalf("explicit process stage = %q, want process", got)
 	}
 }
+
+// The safety fact for "runs exactly as today": no config other than a default of
+// orca changes which runtime a stage gets. A sprites default still leaves a
+// stage without a runtime on process, as before.
+func TestStageRuntimeKeepsLegacyDefaultsForOtherRuntimes(t *testing.T) {
+	for _, def := range []string{"", "process", "sprites", "cursor"} {
+		cfg := config.DefaultConfig()
+		cfg.Runtime.Default = def
+		l := &Loop{config: cfg, deps: Dependencies{Runtimes: map[string]loopruntime.Runtime{"process": newMockRuntime()}}}
+		if got := l.stageRuntime(""); got != "process" {
+			t.Errorf("default %q: stage without runtime = %q, want process", def, got)
+		}
+		if got := l.stageRuntime("sprites"); got != "sprites" {
+			t.Errorf("default %q: explicit sprites stage = %q, want sprites", def, got)
+		}
+	}
+}

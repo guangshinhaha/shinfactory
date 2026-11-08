@@ -164,7 +164,7 @@ func (l *Loop) spawnCook(ctx context.Context, cand dispatchCandidate, order Orde
 }
 
 func (l *Loop) dispatchSession(ctx context.Context, req loopruntime.DispatchRequest) (loopruntime.SessionHandle, RuntimeFallbackOutcome, error) {
-	runtimeName := l.stageRuntime(req.Runtime)
+	runtimeName := l.dispatchRuntime(req.Runtime)
 
 	runtime := l.deps.Runtimes[runtimeName]
 	if runtime == nil {

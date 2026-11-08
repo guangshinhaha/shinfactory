@@ -44,11 +44,22 @@ func (h *usageLimitHolds) release(runtime string) bool {
 	return was
 }
 
-// stageRuntime resolves the runtime a stage launches on: its own, else the
-// configured default, else process. A runtime that is not wired (orca without
-// the orca CLI) resolves to process, so the factory runs as it does without it.
+// stageRuntime resolves the runtime an order stage launches on: its own, else
+// process, as before the orca runtime existed. Only a configured default of
+// "orca" is honoured for stages without a runtime, so no other config changes.
 func (l *Loop) stageRuntime(stageRuntime string) string {
 	name := stringx.Normalize(stageRuntime)
+	if name == "" && stringx.Normalize(l.config.Runtime.Default) != "orca" {
+		name = "process"
+	}
+	return l.dispatchRuntime(name)
+}
+
+// dispatchRuntime resolves a request's runtime: its own, else the configured
+// default, else process. A configured "orca" that is not wired (no orca CLI)
+// resolves to process, so the factory runs as it does without the orca runtime.
+func (l *Loop) dispatchRuntime(requested string) string {
+	name := stringx.Normalize(requested)
 	if name == "" {
 		name = stringx.Normalize(l.config.Runtime.Default)
 	}

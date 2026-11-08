@@ -142,7 +142,7 @@ func (l *Loop) spawnSchedule(ctx context.Context, order Order, attempt int, resu
 	}
 	stage := *stagePtr
 
-	if l.runtimeHeld(l.stageRuntime(stage.Runtime)) {
+	if l.runtimeHeld(l.dispatchRuntime("")) {
 		return nil // out of usage: schedule stays pending until a launch can succeed
 	}
 
