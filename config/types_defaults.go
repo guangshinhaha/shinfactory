@@ -183,7 +183,7 @@ func DefaultConfig() Config {
 				Provider: "claude",
 				Model:    defaultRoutingModel,
 			},
-			Roles: DefaultRoles(),
+			Roles: DefaultRoles(ModelPolicy{Provider: "claude", Model: defaultRoutingModel}),
 		},
 		Skills: SkillsConfig{
 			Paths: defaultSkillPaths(),

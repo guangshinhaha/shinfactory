@@ -84,6 +84,7 @@ func bootstrapScheduleOrder(cfg config.Config) OrdersFile {
 }
 
 func scheduleOrder(cfg config.Config, prompt string) Order {
+	schedulerPolicy := cfg.PolicyForRole(config.RoleScheduler)
 	order := Order{
 		ID:     scheduleOrderID,
 		Title:  "scheduling tasks based on your backlog",
@@ -92,8 +93,8 @@ func scheduleOrder(cfg config.Config, prompt string) Order {
 			{
 				TaskKey:  scheduleOrderID,
 				Skill:    "schedule",
-				Provider: cfg.PolicyForRole(config.RoleScheduler).Provider,
-				Model:    cfg.PolicyForRole(config.RoleScheduler).Model,
+				Provider: schedulerPolicy.Provider,
+				Model:    schedulerPolicy.Model,
 				Status:   StageStatusPending,
 			},
 		},
@@ -106,6 +107,7 @@ func scheduleOrder(cfg config.Config, prompt string) Order {
 }
 
 func scheduleBootstrapOopsOrder(cfg config.Config) Order {
+	oopsPolicy := cfg.PolicyForTask("oops")
 	return Order{
 		ID:        scheduleBootstrapOrderID,
 		Title:     "bootstrapping missing schedule skill",
@@ -115,8 +117,8 @@ func scheduleBootstrapOopsOrder(cfg config.Config) Order {
 			{
 				TaskKey:  "oops",
 				Skill:    "oops",
-				Provider: cfg.PolicyForTask("oops").Provider,
-				Model:    cfg.PolicyForTask("oops").Model,
+				Provider: oopsPolicy.Provider,
+				Model:    oopsPolicy.Model,
 				Status:   StageStatusPending,
 				Prompt: strings.Join([]string{
 					"Schedule skill is missing. Bootstrap it now so Noodle can recover scheduler dispatch.",
@@ -264,8 +266,8 @@ func (l *Loop) spawnBootstrapIfNeeded(ctx context.Context, order Order) error {
 		cookIdentity: cookIdentity{
 			orderID: order.ID,
 			stage: Stage{
-				TaskKey:  scheduleOrderID,
-				Skill:    "bootstrap",
+				TaskKey: scheduleOrderID,
+				Skill:   "bootstrap",
 				Provider: provider,
 				Model:    model,
 				Runtime:  "process",

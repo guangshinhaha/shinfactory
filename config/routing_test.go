@@ -111,3 +111,28 @@ func hasCode(result ValidationResult, code string) bool {
 	}
 	return false
 }
+
+func TestStageModelRules(t *testing.T) {
+	named := parseRouting(t, "[routing.roles]\nverifier = { provider = \"codex\", model = \"gpt-5.4\" }\n")
+	// A stage's own model is kept when it names no provider.
+	if _, model := named.ResolveStageRouting("execute", "", "claude-opus-5-5"); model != "claude-opus-5-5" {
+		t.Errorf("stage model dropped: %q", model)
+	}
+	// A named other provider without a model would get a foreign model name: ignored.
+	if provider, model := named.ResolveStageRouting("execute", "codex", ""); provider != "claude" || model != "claude-sonnet-5-5" {
+		t.Errorf("codex without model = %s/%s", provider, model)
+	}
+	if provider, model := named.ResolveStageRouting("execute", "codex", "gpt-5.4"); provider != "codex" || model != "gpt-5.4" {
+		t.Errorf("named codex with model = %s/%s", provider, model)
+	}
+}
+
+func TestNonClaudeDefaultsGetNoClaudeRoles(t *testing.T) {
+	cfg := parseRouting(t, "[routing]\nsensitive = true\n[routing.defaults]\nprovider = \"codex\"\nmodel = \"gpt-5.4\"\n")
+	if got := Validate(cfg); hasCode(got, DiagnosticCodeSensitiveProvider) {
+		t.Errorf("default roles flagged: %+v", got.Diagnostics)
+	}
+	if p, m := cfg.ResolveStageRouting("plan", "", ""); p != "codex" || m != "gpt-5.4" {
+		t.Errorf("planner = %s/%s", p, m)
+	}
+}

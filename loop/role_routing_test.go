@@ -18,7 +18,7 @@ func TestIntegrationStagesDispatchWithRoleModel(t *testing.T) {
 	}}
 	env := newIntegrationEnv(t, orders, func(ic *integrationCfg) {
 		ic.cfg.Mode = "auto"
-		ic.cfg.Routing.Roles = config.DefaultRoles()
+		ic.cfg.Routing.Roles = config.DefaultRoles(ic.cfg.Routing.Defaults)
 		ic.cfg.Routing.Roles["builder"] = config.ModelPolicy{Provider: "claude", Model: "claude-sonnet-5-5"}
 		ic.cfg.Routing.Roles["reviewer"] = config.ModelPolicy{Provider: "claude", Model: "claude-haiku-5-5"}
 		ic.cfg.Concurrency.MaxConcurrency = 4

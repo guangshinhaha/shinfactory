@@ -35,8 +35,17 @@ func AllRoles() []Role {
 }
 
 // DefaultRoles is the cost-aware role table used for any role the config omits:
-// light for scheduler and debrief, strong only for planner and verifier.
-func DefaultRoles() map[string]ModelPolicy {
+// light for scheduler and debrief, strong only for planner and verifier. A repo
+// whose routing.defaults is not claude has no tiers to offer, so every role
+// uses its defaults.
+func DefaultRoles(defaults ModelPolicy) map[string]ModelPolicy {
+	if stringx.Normalize(defaults.Provider) != "claude" {
+		out := map[string]ModelPolicy{}
+		for _, role := range AllRoles() {
+			out[string(role)] = defaults
+		}
+		return out
+	}
 	claude := func(model string) ModelPolicy { return ModelPolicy{Provider: "claude", Model: model} }
 	return map[string]ModelPolicy{
 		string(RoleScheduler): claude(modelLight),
@@ -88,9 +97,6 @@ func (c Config) PolicyForRole(role Role) ModelPolicy {
 	if policy, ok := c.Routing.Roles[string(role)]; ok {
 		return c.sensitiveGuard(policy)
 	}
-	if policy, ok := DefaultRoles()[string(role)]; ok {
-		return c.sensitiveGuard(policy)
-	}
 	return c.Routing.Defaults
 }
 
@@ -103,22 +109,21 @@ func (c Config) PolicyForTask(taskKey string) ModelPolicy {
 }
 
 // ResolveStageRouting returns the provider and model a stage runs on. A stage's
-// own provider is honoured only when the config names that provider (in
-// routing.defaults or a role); otherwise the role's policy wins. A stage model
-// is kept only when its provider matches the resolved one.
+// own model is honoured. A stage's own provider is honoured only when the config
+// names it and the stage also gives a model (a model name is provider-specific).
+// Otherwise the stage runs on its role's policy.
 func (c Config) ResolveStageRouting(taskKey, stageProvider, stageModel string) (provider, model string) {
 	policy := c.PolicyForTask(taskKey)
 	provider, model = policy.Provider, policy.Model
-	if sp := stringx.Normalize(stageProvider); sp != "" && c.providerAllowed(sp) {
-		if sp != stringx.Normalize(provider) {
-			provider, model = sp, ""
+	stageModel = strings.TrimSpace(stageModel)
+	sp := stringx.Normalize(stageProvider)
+	switch {
+	case sp == "" || sp == stringx.Normalize(provider):
+		if stageModel != "" {
+			model = stageModel
 		}
-		if m := strings.TrimSpace(stageModel); m != "" {
-			model = m
-		}
-	}
-	if model == "" {
-		model = c.Routing.Defaults.Model
+	case stageModel != "" && c.providerAllowed(sp):
+		provider, model = sp, stageModel
 	}
 	return provider, model
 }
@@ -162,7 +167,7 @@ func (c Config) sensitiveGuard(policy ModelPolicy) ModelPolicy {
 // normalizeRoles fills omitted roles from DefaultRoles and drops unknown ones
 // with a warning, so a partial [routing.roles] table is enough.
 func normalizeRoles(config *Config, diagnostics *[]ConfigDiagnostic) {
-	merged := DefaultRoles()
+	merged := DefaultRoles(config.Routing.Defaults)
 	for name, policy := range config.Routing.Roles {
 		key := stringx.Normalize(name)
 		if !isKnownRole(key) {
