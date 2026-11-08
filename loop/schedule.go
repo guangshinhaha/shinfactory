@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/guangshinhaha/shinfactory/config"
+	"github.com/guangshinhaha/shinfactory/dispatcher"
 	"github.com/guangshinhaha/shinfactory/internal/ingest"
 	"github.com/guangshinhaha/shinfactory/internal/schemadoc"
 	loopruntime "github.com/guangshinhaha/shinfactory/runtime"
@@ -141,6 +142,10 @@ func (l *Loop) spawnSchedule(ctx context.Context, order Order, attempt int, resu
 	}
 	stage := *stagePtr
 
+	if l.runtimeHeld(l.dispatchRuntime("")) {
+		return nil // out of usage: schedule stays pending until a launch can succeed
+	}
+
 	skillName := nonEmpty(stage.Skill, "schedule")
 	if _, ok := l.registry.ByKey(skillName); !ok && l.bootstrapInFlight != nil {
 		// Bootstrap session is already running; avoid belt-and-suspenders
@@ -254,6 +259,9 @@ func (l *Loop) spawnBootstrapIfNeeded(ctx context.Context, order Order) error {
 		Title:                "bootstrapping schedule skill",
 	}
 	session, _, err := l.dispatchSession(ctx, req)
+	if dispatcher.IsUsageLimit(err) {
+		return nil // paused, not failed: do not spend a bootstrap attempt
+	}
 	if err != nil {
 		l.logger.Warn("bootstrap dispatch failed", "error", err, "attempt", l.bootstrapAttempts+1)
 		l.bootstrapAttempts++

@@ -2,7 +2,9 @@ package config
 
 import (
 	"os"
+	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/guangshinhaha/shinfactory/internal/stringx"
 )
@@ -67,9 +69,11 @@ type RuntimeConfig struct {
 	Process ProcessConfig `toml:"process"`
 	Sprites SpritesConfig `toml:"sprites"`
 	Cursor  CursorConfig  `toml:"cursor"`
+	Orca    OrcaConfig    `toml:"orca"`
 
 	spritesDefined bool
 	cursorDefined  bool
+	orcaDefined    bool
 }
 
 // MaxConcurrentFor returns the per-runtime concurrency cap for a given runtime name.
@@ -82,6 +86,8 @@ func (c RuntimeConfig) MaxConcurrentFor(name string) int {
 		return c.Sprites.MaxConcurrent
 	case "cursor":
 		return c.Cursor.MaxConcurrent
+	case "orca":
+		return c.Orca.MaxConcurrent
 	default:
 		return 0
 	}
@@ -98,6 +104,40 @@ type SpritesConfig struct {
 	GitTokenEnv   string `toml:"git_token_env"`
 	MaxConcurrent int    `toml:"max_concurrent"`
 }
+
+// OrcaConfig configures the optional orca runtime, which runs stages as Orca
+// workers. It is available only when this table is set and the orca CLI exists.
+type OrcaConfig struct {
+	Bin               string `toml:"bin"`                 // orca CLI; empty = "orca" on PATH
+	MaxConcurrent     int    `toml:"max_concurrent"`      // 0 = unlimited
+	LimitRetrySeconds int    `toml:"limit_retry_seconds"` // pause after a usage-limit failure before the next launch attempt
+}
+
+// LimitRetry is how long the loop waits after a usage-limit failure before it
+// tries the next orca launch.
+func (c OrcaConfig) LimitRetry() time.Duration {
+	if c.LimitRetrySeconds <= 0 {
+		return defaultOrcaLimitRetry
+	}
+	return time.Duration(c.LimitRetrySeconds) * time.Second
+}
+
+// BinName is the orca CLI to run.
+func (c OrcaConfig) BinName() string {
+	if bin := strings.TrimSpace(c.Bin); bin != "" {
+		return bin
+	}
+	return "orca"
+}
+
+// available reports whether the orca CLI resolves. Without it the factory
+// runs exactly as it does without the orca runtime.
+func (c OrcaConfig) available() bool {
+	_, err := exec.LookPath(c.BinName())
+	return err == nil
+}
+
+const defaultOrcaLimitRetry = 5 * time.Minute
 
 type CursorConfig struct {
 	APIKeyEnv     string `toml:"api_key_env"`
@@ -230,6 +270,9 @@ func (c Config) AvailableRuntimes() []string {
 	}
 	if c.Runtime.cursorDefined && c.Runtime.Cursor.APIKey() != "" {
 		available = append(available, "cursor")
+	}
+	if c.Runtime.orcaDefined && c.Runtime.Orca.available() {
+		available = append(available, "orca")
 	}
 	return available
 }

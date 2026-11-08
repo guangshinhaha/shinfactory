@@ -37,6 +37,18 @@ var (
 			CapHeartbeat:  false,
 		},
 	}
+
+	// OrcaCaps: an Orca worker is followed by polling and cannot be steered
+	// mid-run through the factory.
+	OrcaCaps = RuntimeCapabilities{
+		Name: "orca",
+		Caps: map[Capability]bool{
+			CapSteerable:  false,
+			CapPolling:    true,
+			CapRemoteSync: false,
+			CapHeartbeat:  true,
+		},
+	}
 )
 
 // RuntimeRegistry maps runtime names to their capabilities.
@@ -53,6 +65,7 @@ func NewRegistry() *RuntimeRegistry {
 	r.runtimes[ProcessCaps.Name] = ProcessCaps
 	r.runtimes[SpritesCaps.Name] = SpritesCaps
 	r.runtimes[CursorCaps.Name] = CursorCaps
+	r.runtimes[OrcaCaps.Name] = OrcaCaps
 	return r
 }
 

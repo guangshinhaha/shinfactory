@@ -114,10 +114,17 @@ func (d *ProcessDispatcher) Dispatch(ctx context.Context, req DispatchRequest) (
 // dispatch request. Primary checkout is allowed when explicitly opted in;
 // otherwise we require a linked worktree.
 func (d *ProcessDispatcher) resolveWorktreeForDispatch(req DispatchRequest) (string, error) {
+	return resolveDispatchWorktree(d.projectDir, req)
+}
+
+// resolveDispatchWorktree validates or resolves the worktree path for a
+// dispatch request. The primary checkout is allowed only when the request opts
+// in; otherwise a linked worktree is required.
+func resolveDispatchWorktree(projectDir string, req DispatchRequest) (string, error) {
 	if req.AllowPrimaryCheckout {
 		path := strings.TrimSpace(req.WorktreePath)
 		if path == "" {
-			path = d.projectDir
+			path = projectDir
 		}
 		if strings.TrimSpace(path) == "" {
 			return "", fmt.Errorf("project directory not set")

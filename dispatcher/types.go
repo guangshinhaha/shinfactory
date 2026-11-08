@@ -110,6 +110,7 @@ type SessionOutcome struct {
 	Reason         string
 	HasDeliverable bool
 	ExitCode       int
+	UsageLimit     bool // the session died because its account ran out of usage
 }
 
 func sessionStatusFromString(status string) SessionStatus {

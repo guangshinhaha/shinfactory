@@ -88,6 +88,7 @@ func applyDefaultsFromMetadata(config *Config, metadata toml.MetaData, diagnosti
 
 	config.Runtime.spritesDefined = metadata.IsDefined("runtime", "sprites")
 	config.Runtime.cursorDefined = metadata.IsDefined("runtime", "cursor")
+	config.Runtime.orcaDefined = metadata.IsDefined("runtime", "orca")
 	if !metadata.IsDefined("runtime", "default") {
 		config.Runtime.Default = defaultRuntimeName
 	}
@@ -99,6 +100,9 @@ func applyDefaultsFromMetadata(config *Config, metadata toml.MetaData, diagnosti
 	}
 	if !metadata.IsDefined("runtime", "cursor", "max_concurrent") {
 		config.Runtime.Cursor.MaxConcurrent = 10
+	}
+	if !metadata.IsDefined("runtime", "orca", "max_concurrent") {
+		config.Runtime.Orca.MaxConcurrent = 0 // the global concurrency cap applies; a per-runtime cap would spill stages onto process
 	}
 
 	if !metadata.IsDefined("server", "port") {
@@ -267,7 +271,7 @@ func normalizeParsedValues(config *Config, metadata toml.MetaData, diagnostics *
 	} else {
 		config.Runtime.Default = stringx.Normalize(config.Runtime.Default)
 		switch config.Runtime.Default {
-		case "process", "sprites", "cursor":
+		case "process", "sprites", "cursor", "orca":
 		default:
 			appendNormalizedValueDiagnostic(diagnostics, "runtime.default",
 				fmt.Sprintf("runtime.default %q unsupported; using %q", config.Runtime.Default, defaultRuntimeName),
@@ -295,6 +299,13 @@ func normalizeParsedValues(config *Config, metadata toml.MetaData, diagnostics *
 		metadata.IsDefined("runtime", "cursor", "max_concurrent"),
 		&config.Runtime.Cursor.MaxConcurrent,
 		10,
+		diagnostics,
+	)
+	normalizeRuntimeMaxConcurrent(
+		"runtime.orca.max_concurrent",
+		metadata.IsDefined("runtime", "orca", "max_concurrent"),
+		&config.Runtime.Orca.MaxConcurrent,
+		0,
 		diagnostics,
 	)
 

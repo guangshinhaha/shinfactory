@@ -68,6 +68,18 @@ func defaultDependencies(projectDir, runtimeDir, noodleBin string, cfg config.Co
 			runtimes["sprites"] = r
 		}
 	}
+	if runtimeEnabled(cfg.AvailableRuntimes(), "orca") {
+		od := dispatcher.NewOrcaDispatcher(dispatcher.OrcaDispatcherConfig{
+			ProjectDir:    projectDir,
+			RuntimeDir:    runtimeDir,
+			Bin:           cfg.Runtime.Orca.BinName(),
+			SkillResolver: resolver,
+			Sink:          sink,
+		})
+		r := loopruntime.NewDispatcherRuntime("orca", od, runtimeDir)
+		r.SetMaxConcurrent(cfg.Runtime.Orca.MaxConcurrent)
+		runtimes["orca"] = r
+	}
 
 	wtApp, _ := worktree.NewApp()
 	var wt WorktreeManager
