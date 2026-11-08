@@ -257,6 +257,19 @@ func normalizeParsedValues(config *Config, metadata toml.MetaData, diagnostics *
 
 	normalizeRoles(config, diagnostics)
 
+	switch mode := stringx.Normalize(config.Landing.Mode); mode {
+	case "", LandingModeLocal:
+		config.Landing.Mode = LandingModeLocal
+	case LandingModePR:
+		config.Landing.Mode = LandingModePR
+	default:
+		appendNormalizedValueDiagnostic(diagnostics, "landing.mode",
+			fmt.Sprintf("landing.mode %q unsupported; using %q", config.Landing.Mode, LandingModeLocal),
+		)
+		config.Landing.Mode = LandingModeLocal
+	}
+	config.Landing.Base = strings.TrimSpace(config.Landing.Base)
+
 	if config.Concurrency.MaxConcurrency <= 0 {
 		if metadata.IsDefined("concurrency", "max_concurrency") {
 			appendNormalizedValueDiagnostic(diagnostics, "concurrency.max_concurrency",

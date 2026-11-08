@@ -37,6 +37,11 @@ func (l *Loop) recordStageFailure(cook *cookHandle, reason string, orderClass Or
 
 // cleanupCookWorktree removes the cook's worktree if it has a non-empty name.
 func (l *Loop) cleanupCookWorktree(cook *cookHandle) {
+	if l.config.Landing.PR() {
+		// The worktree belongs to the whole order and holds the pushed branch;
+		// a failed stage keeps it so a retry resumes there. Shipping removes it.
+		return
+	}
 	if strings.TrimSpace(cook.worktreeName) != "" {
 		_ = l.deps.Worktree.Cleanup(cook.worktreeName, worktree.CleanupOpts{Force: true})
 	}

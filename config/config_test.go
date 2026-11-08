@@ -691,3 +691,28 @@ func TestMaxConcurrentForLookup(t *testing.T) {
 		}
 	}
 }
+
+func TestParseLandingMode(t *testing.T) {
+	cases := map[string]string{
+		"":        LandingModeLocal,
+		"pr":      LandingModePR,
+		" PR ":    LandingModePR,
+		"local":   LandingModeLocal,
+		"nonsens": LandingModeLocal,
+	}
+	for in, want := range cases {
+		cfg, err := Parse([]byte("[landing]\nmode = \"" + in + "\"\nbase = \" develop \"\n"))
+		if err != nil {
+			t.Fatalf("Parse(%q): %v", in, err)
+		}
+		if cfg.Landing.Mode != want {
+			t.Errorf("landing.mode %q -> %q, want %q", in, cfg.Landing.Mode, want)
+		}
+		if cfg.Landing.Base != "develop" {
+			t.Errorf("landing.base = %q, want trimmed develop", cfg.Landing.Base)
+		}
+	}
+	if DefaultConfig().Landing.PR() {
+		t.Fatal("default landing mode must stay local")
+	}
+}

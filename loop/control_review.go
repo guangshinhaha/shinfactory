@@ -30,6 +30,9 @@ func (l *Loop) controlMerge(orderID string) error {
 		worktreePath: pending.worktreePath,
 		session:      &adoptedSession{id: pending.sessionID, status: "completed"},
 	}
+	if l.config.Landing.PR() {
+		return l.approvePRShip(cook)
+	}
 	canMerge, err := l.worktreeHasChanges(cook)
 	if err != nil {
 		return fmt.Errorf("merge check: %w", err)

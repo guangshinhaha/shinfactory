@@ -141,6 +141,9 @@ func (l *Loop) handleCompletion(ctx context.Context, cook *cookHandle, resultSta
 		if err != nil {
 			return l.failStage(ctx, cook, fmt.Sprintf("merge check: %v", err))
 		}
+		if l.config.Landing.PR() {
+			return l.completeWithPR(ctx, cook, canMerge, msg)
+		}
 		gate := mode.ModeGate{}
 		canAutoMerge := gate.CanAutoMerge(l.canonical.Mode)
 		if canMerge && !canAutoMerge {

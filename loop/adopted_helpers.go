@@ -44,7 +44,7 @@ func (l *Loop) buildAdoptedCook(targetID string, sessionID string, status string
 		if idx < 0 || stg == nil {
 			return nil, false, nil
 		}
-		name := cookBaseName(order.ID, idx, stg.TaskKey)
+		name := l.cookWorktreeName(order.ID, idx, stg.TaskKey)
 		worktreePath := l.worktreePath(name)
 		return &cookHandle{
 			cookIdentity: cookIdentity{

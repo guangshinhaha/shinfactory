@@ -23,7 +23,27 @@ type Config struct {
 	Agents      AgentsConfig             `toml:"agents"`
 	Runtime     RuntimeConfig            `toml:"runtime"`
 	Server      ServerConfig             `toml:"server"`
+	Landing     LandingConfig            `toml:"landing"`
 }
+
+// LandingConfig controls how finished work reaches the default branch.
+type LandingConfig struct {
+	// Mode is "local" (default: merge each stage's worktree into the local
+	// default branch) or "pr" (one branch per order; push and open a draft PR
+	// after the first stage with commits, mark it ready and merge it when the
+	// last stage completes).
+	Mode string `toml:"mode"`
+	// Base is the PR base branch; empty means the repository default.
+	Base string `toml:"base"`
+}
+
+// PR reports whether work lands through a pull request.
+func (c LandingConfig) PR() bool { return c.Mode == LandingModePR }
+
+const (
+	LandingModeLocal = "local"
+	LandingModePR    = "pr"
+)
 
 type AdapterConfig struct {
 	Skill   string            `toml:"skill"`

@@ -152,6 +152,7 @@ type Monitor interface {
 type Dependencies struct {
 	Runtimes       map[string]loopruntime.Runtime
 	Worktree       WorktreeManager
+	Lander         Lander // nil uses the git and gh CLIs; only read in landing mode "pr"
 	Adapter        AdapterRunner
 	Mise           MiseBuilder
 	Monitor        Monitor
