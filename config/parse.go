@@ -258,15 +258,15 @@ func normalizeParsedValues(config *Config, metadata toml.MetaData, diagnostics *
 	normalizeRoles(config, diagnostics)
 
 	switch mode := stringx.Normalize(config.Landing.Mode); mode {
-	case "", LandingModeLocal:
-		config.Landing.Mode = LandingModeLocal
-	case LandingModePR:
+	case "":
 		config.Landing.Mode = LandingModePR
+	case LandingModeLocal, LandingModePR:
+		config.Landing.Mode = mode
 	default:
 		appendNormalizedValueDiagnostic(diagnostics, "landing.mode",
-			fmt.Sprintf("landing.mode %q unsupported; using %q", config.Landing.Mode, LandingModeLocal),
+			fmt.Sprintf("landing.mode %q unsupported; using %q", config.Landing.Mode, LandingModePR),
 		)
-		config.Landing.Mode = LandingModeLocal
+		config.Landing.Mode = LandingModePR
 	}
 	config.Landing.Base = strings.TrimSpace(config.Landing.Base)
 

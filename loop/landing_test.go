@@ -64,6 +64,7 @@ func newLandingHarness(t *testing.T, runMode string, stages int) *landingHarness
 	cfg := config.DefaultConfig()
 	cfg.Mode = runMode
 	cfg.Landing.Mode = config.LandingModePR
+	cfg.Adapters["backlog"] = config.AdapterConfig{Scripts: map[string]string{"done": "defaults/adapters/github/backlog-done"}}
 	h.l = New(projectDir, "noodle", cfg, Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"process": h.rt},
 		Worktree:   h.wt,
@@ -130,12 +131,12 @@ func TestPRLandingPushesDraftAfterExecuteAndMergesAfterLastStage(t *testing.T) {
 		t.Fatalf("backlog done calls = %#v", h.ar.doneCalls)
 	}
 	if h.specs0Closes(t) == false {
-		t.Fatal("PR body should reference the numeric issue")
+		t.Fatal("PR body should close the numeric GitHub issue")
 	}
 }
 
 func (h *landingHarness) specs0Closes(t *testing.T) bool {
-	return len(h.ln.specs) > 0 && contains(h.ln.specs[0].Body, "Refs #42")
+	return len(h.ln.specs) > 0 && contains(h.ln.specs[0].Body, "Closes #42")
 }
 
 func contains(s, sub string) bool {
@@ -225,4 +226,12 @@ func TestPRLandingApprovingNonFinalStageDoesNotShip(t *testing.T) {
 	if len(h.ln.merged) != 0 || len(h.wt.cleaned) != 0 {
 		t.Fatalf("non-final approval shipped: merged=%d cleaned=%v", len(h.ln.merged), h.wt.cleaned)
 	}
+}
+
+// localLandingConfig is the default config with landing mode "local". Most
+// loop tests exercise the local merge pipeline; PR landing tests set "pr".
+func localLandingConfig() config.Config {
+	cfg := config.DefaultConfig()
+	cfg.Landing.Mode = config.LandingModeLocal
+	return cfg
 }

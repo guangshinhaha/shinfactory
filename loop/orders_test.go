@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/guangshinhaha/shinfactory/config"
 	"github.com/guangshinhaha/shinfactory/internal/orderx"
 	"github.com/guangshinhaha/shinfactory/internal/taskreg"
 	"github.com/guangshinhaha/shinfactory/skill"
@@ -567,7 +566,7 @@ func TestNormalizeAndValidateOrdersDropsOrderWithMissingID(t *testing.T) {
 		},
 	}
 
-	got, changed, err := NormalizeAndValidateOrders(input, testLoopRegistry(), config.DefaultConfig())
+	got, changed, err := NormalizeAndValidateOrders(input, testLoopRegistry(), localLandingConfig())
 	if err != nil {
 		t.Fatalf("NormalizeAndValidateOrders: %v", err)
 	}
@@ -609,7 +608,7 @@ func TestNormalizeAndValidateOrdersPreservesScheduleOrderWithoutTaskType(t *test
 		},
 	}
 
-	got, changed, err := NormalizeAndValidateOrders(input, reg, config.DefaultConfig())
+	got, changed, err := NormalizeAndValidateOrders(input, reg, localLandingConfig())
 	if err != nil {
 		t.Fatalf("NormalizeAndValidateOrders: %v", err)
 	}

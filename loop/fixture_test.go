@@ -175,7 +175,7 @@ func TestLoopDirectoryFixtures(t *testing.T) {
 				}
 			}
 
-			baseCfg := config.DefaultConfig()
+			baseCfg := localLandingConfig()
 			applySetupConfig(&baseCfg, setup)
 			if path := strings.TrimSpace(fixtureCase.Layout.BaseConfigPath); path != "" {
 				applyConfigOverride(t, &baseCfg, path)

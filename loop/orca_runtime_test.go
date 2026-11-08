@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/guangshinhaha/shinfactory/adapter"
-	"github.com/guangshinhaha/shinfactory/config"
 	"github.com/guangshinhaha/shinfactory/dispatcher"
 	"github.com/guangshinhaha/shinfactory/event"
 	"github.com/guangshinhaha/shinfactory/internal/shellx"
@@ -85,7 +84,7 @@ func newOrcaEnv(t *testing.T, orders OrdersFile) *orcaEnv {
 		t.Fatal(err)
 	}
 
-	cfg := config.DefaultConfig()
+	cfg := localLandingConfig()
 	cfg.Mode = "auto"
 	cfg.Runtime.Default = "orca"
 	cfg.Runtime.Orca.LimitRetrySeconds = 60
@@ -199,7 +198,7 @@ func (e *orcaEnv) emitSessionEvent(t *testing.T, sessionID string, typ event.Eve
 }
 
 func scheduleOnlyOrders() OrdersFile {
-	return OrdersFile{Orders: []Order{scheduleOrder(config.DefaultConfig(), "")}}
+	return OrdersFile{Orders: []Order{scheduleOrder(localLandingConfig(), "")}}
 }
 
 // settleLatest ends the most recently launched fake worker.
@@ -361,7 +360,7 @@ func wtOf(startCall string) string {
 // defaults to orca resolves to process and orca is not offered.
 func TestOrcaRuntimeAbsentFallsBackToProcess(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
-	cfg := config.DefaultConfig()
+	cfg := localLandingConfig()
 	cfg.Runtime.Default = "orca"
 	for _, name := range cfg.AvailableRuntimes() {
 		if name == "orca" {
@@ -382,7 +381,7 @@ func TestOrcaRuntimeAbsentFallsBackToProcess(t *testing.T) {
 // stage without a runtime on process, as before.
 func TestStageRuntimeKeepsLegacyDefaultsForOtherRuntimes(t *testing.T) {
 	for _, def := range []string{"", "process", "sprites", "cursor"} {
-		cfg := config.DefaultConfig()
+		cfg := localLandingConfig()
 		cfg.Runtime.Default = def
 		l := &Loop{config: cfg, deps: Dependencies{Runtimes: map[string]loopruntime.Runtime{"process": newMockRuntime()}}}
 		if got := l.stageRuntime(""); got != "process" {

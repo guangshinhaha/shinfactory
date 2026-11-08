@@ -173,12 +173,12 @@ How finished work reaches the default branch.
 
 ```toml
 [landing]
-mode = "pr"      # "local" (default) or "pr"
+mode = "pr"      # "pr" (default) or "local"
 base = "main"    # optional PR base; empty means the repository default
 ```
 
-- `local`: each stage's worktree is merged into the local default branch.
-- `pr`: one branch and worktree per order, created at the first stage. After a stage leaves commits, the loop pushes the branch and opens a draft PR, so CI runs during review and verify. Later stages push to the same PR. When the order's last stage completes, the loop marks the PR ready and merges it (`gh pr merge --squash --auto`, never `--admin`), so the repository's checks and ruleset decide. In `auto` mode this happens unasked; in `supervised` the draft PR stays up and the order parks until you approve the merge. Needs `git` and a signed-in `gh` on PATH.
+- `local`: for projects with no GitHub remote. Each stage's worktree is merged into the local default branch.
+- `pr` (default): one branch and worktree per order, created at the first stage. After a stage leaves commits, the loop pushes the branch and opens a draft PR, so CI runs during review and verify. Later stages push to the same PR. When the order's last stage completes, the loop marks the PR ready and merges it (`gh pr merge --squash`, never `--admin` or `--auto`), so the repository's checks and ruleset decide: a merge GitHub refuses (a required check still pending or failing) fails the stage with that reason and the order is not marked done. In `auto` mode this happens unasked; in `supervised` the draft PR stays up and the order parks until you approve the merge. Needs `git` and a signed-in `gh` on PATH.
 
 ### `[server]`
 

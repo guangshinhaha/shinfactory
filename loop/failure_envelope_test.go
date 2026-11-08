@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/guangshinhaha/shinfactory/config"
 	"github.com/guangshinhaha/shinfactory/internal/failure"
 	"github.com/guangshinhaha/shinfactory/internal/orderx"
 	"github.com/guangshinhaha/shinfactory/mise"
@@ -31,7 +30,7 @@ func TestCycleClassifiesOrdersNextPromotionFailureAsDegrade(t *testing.T) {
 		t.Fatalf("write orders-next: %v", err)
 	}
 
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes: map[string]loopruntime.Runtime{"process": newMockRuntime()},
 		Worktree: &fakeWorktree{},
 		Adapter:  &fakeAdapterRunner{},
@@ -115,7 +114,7 @@ func TestCycleDoesNotClassifyBackendPromotionFailureAsSchedulerMistake(t *testin
 		t.Fatalf("write orders-next: %v", err)
 	}
 
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes: map[string]loopruntime.Runtime{"process": newMockRuntime()},
 		Worktree: &fakeWorktree{},
 		Adapter:  &fakeAdapterRunner{},
@@ -201,7 +200,7 @@ func TestCycleRepairsMissingLifecycleStatusesWithoutCrashing(t *testing.T) {
 		t.Fatalf("write orders: %v", err)
 	}
 
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes: map[string]loopruntime.Runtime{"process": newMockRuntime()},
 		Worktree: &fakeWorktree{},
 		Adapter:  &fakeAdapterRunner{},
@@ -262,7 +261,7 @@ func TestRecoverFromOrdersValidationErrorSchedulesRepair(t *testing.T) {
 		t.Fatalf("write orders: %v", err)
 	}
 
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes: map[string]loopruntime.Runtime{"process": newMockRuntime()},
 		Worktree: &fakeWorktree{},
 		Adapter:  &fakeAdapterRunner{},
@@ -322,7 +321,7 @@ func TestCycleClassifiesDispatchFailureAsOrderHard(t *testing.T) {
 	rt := newMockRuntime()
 	rt.dispatchErr = stderrors.New("dispatch failed")
 
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes: map[string]loopruntime.Runtime{"process": rt},
 		Worktree: &fakeWorktree{},
 		Adapter:  &fakeAdapterRunner{},
@@ -364,7 +363,7 @@ func TestCycleClassifiesFlushFailureAsSystemHard(t *testing.T) {
 		t.Fatalf("write orders: %v", err)
 	}
 
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes: map[string]loopruntime.Runtime{"process": newMockRuntime()},
 		Worktree: &fakeWorktree{},
 		Adapter:  &fakeAdapterRunner{},

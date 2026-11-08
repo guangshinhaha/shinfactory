@@ -261,7 +261,7 @@ type integrationCfg struct {
 
 func newIntegrationEnv(t *testing.T, orders OrdersFile, opts ...integrationOpt) *integrationEnv {
 	t.Helper()
-	ic := &integrationCfg{cfg: config.DefaultConfig()}
+	ic := &integrationCfg{cfg: localLandingConfig()}
 	for _, fn := range opts {
 		fn(ic)
 	}

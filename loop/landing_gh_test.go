@@ -103,6 +103,9 @@ func TestGHLanderPushesBranchOpensDraftOnceAndMergesWithoutAdmin(t *testing.T) {
 	if strings.Index(log, "pr ready") < 0 || strings.Index(log, "pr ready") > strings.Index(log, "pr merge") {
 		t.Fatalf("PR must be marked ready before it is merged:\n%s", log)
 	}
+	if strings.Contains(log, "--auto") {
+		t.Fatalf("merge must not queue with --auto, or the order is done before it merges:\n%s", log)
+	}
 	if strings.Contains(log, "--admin") {
 		t.Fatalf("merge must never use --admin:\n%s", log)
 	}
@@ -137,11 +140,14 @@ func TestGHLanderRefusesToReuseAPRWithTheWrongBaseOrFromAFork(t *testing.T) {
 }
 
 func TestPRBodyOmitsOrderRationaleAndPlan(t *testing.T) {
-	spec := prSpecFor(Order{ID: "7", Title: "t", Rationale: "Student 12345 failed login", Plan: []string{"call Tan"}}, "")
+	spec := prSpecFor(Order{ID: "7", Title: "t", Rationale: "Student 12345 failed login", Plan: []string{"call Tan"}}, "", false)
 	if strings.Contains(spec.Body, "12345") || strings.Contains(spec.Body, "Tan") {
 		t.Fatalf("PR body leaks order text: %q", spec.Body)
 	}
 	if strings.Contains(strings.ToLower(spec.Body), "closes") || !strings.Contains(spec.Body, "Refs #7") {
-		t.Fatalf("PR body = %q, want Refs #7 and no closing keyword", spec.Body)
+		t.Fatalf("PR body = %q, want Refs #7 and no closing keyword for a non-GitHub backlog", spec.Body)
+	}
+	if !strings.Contains(prSpecFor(Order{ID: "7"}, "", true).Body, "Closes #7") {
+		t.Fatal("a GitHub backlog order should close its issue")
 	}
 }

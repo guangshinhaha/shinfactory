@@ -117,13 +117,15 @@ func (g ghLander) MarkReadyAndMerge(ctx context.Context, dir string, pr PullRequ
 			return err
 		}
 	}
-	// --auto merges at once when the ruleset is satisfied and otherwise waits
-	// for the required checks. There is deliberately no --admin.
-	_, err := g.run(ctx, dir, "gh", "pr", "merge", pr.URL, "--squash", "--auto")
+	// A plain merge: GitHub refuses it while a required check is pending or
+	// failing, and the stage then fails with that reason. --auto would return
+	// success while only queueing the merge, and the order would be marked
+	// done unmerged. There is deliberately no --admin.
+	_, err := g.run(ctx, dir, "gh", "pr", "merge", pr.URL, "--squash")
 	return err
 }
 
-func prSpecFor(order Order, base string) PRSpec {
+func prSpecFor(order Order, base string, closeIssue bool) PRSpec {
 	title := strings.TrimSpace(order.Title)
 	if title == "" {
 		title = "order " + order.ID
@@ -132,7 +134,13 @@ func prSpecFor(order Order, base string) PRSpec {
 	// model-written and may carry data that must not leave for GitHub.
 	var b strings.Builder
 	if isIssueNumber(order.ID) {
-		b.WriteString("Refs #" + order.ID + "\n\n")
+		// Only a GitHub backlog numbers orders by issue; any other backlog's
+		// numeric IDs must not close an unrelated issue.
+		keyword := "Refs"
+		if closeIssue {
+			keyword = "Closes"
+		}
+		b.WriteString(keyword + " #" + order.ID + "\n\n")
 	}
 	b.WriteString("Opened by the factory loop as a draft. It is marked ready and merged when the order's last stage completes.\n")
 	return PRSpec{Title: title, Body: b.String(), Base: base}
@@ -198,7 +206,7 @@ func (l *Loop) completeWithPR(ctx context.Context, cook *cookHandle, hasCommits 
 	pushed := false
 	if hasCommits {
 		var err error
-		pr, err = l.lander().PushAndEnsureDraft(ctx, cook.worktreePath, prSpecFor(order, l.config.Landing.Base))
+		pr, err = l.lander().PushAndEnsureDraft(ctx, cook.worktreePath, prSpecFor(order, l.config.Landing.Base, l.backlogIsGitHub()))
 		if err != nil {
 			return l.failStage(ctx, cook, "push and open draft PR: "+err.Error())
 		}
@@ -267,7 +275,7 @@ func (l *Loop) approvePRShip(cook *cookHandle) error {
 		return l.syncPendingReviewProjection()
 	}
 	order, _ := l.orderByID(cook.orderID)
-	pr, err := l.lander().PushAndEnsureDraft(ctx, cook.worktreePath, prSpecFor(order, l.config.Landing.Base))
+	pr, err := l.lander().PushAndEnsureDraft(ctx, cook.worktreePath, prSpecFor(order, l.config.Landing.Base, l.backlogIsGitHub()))
 	if err != nil {
 		return fmt.Errorf("find order PR: %w", err)
 	}
@@ -294,4 +302,15 @@ func (l *Loop) approvePRShip(cook *cookHandle) error {
 		return err
 	}
 	return l.syncPendingReviewProjection()
+}
+
+// backlogIsGitHub reports whether the backlog adapter is the bundled GitHub
+// issues one, so that an order ID is an issue number in this repository.
+func (l *Loop) backlogIsGitHub() bool {
+	for _, script := range l.config.Adapters["backlog"].Scripts {
+		if strings.Contains(script, "adapters/github/") {
+			return true
+		}
+	}
+	return false
 }

@@ -276,6 +276,6 @@ func TestEventIntegrationExternalEvent(t *testing.T) {
 }
 
 func testDefaultConfig() config.Config {
-	cfg := config.DefaultConfig()
+	cfg := localLandingConfig()
 	return cfg
 }

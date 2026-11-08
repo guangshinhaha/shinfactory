@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/guangshinhaha/shinfactory/config"
 	loopruntime "github.com/guangshinhaha/shinfactory/runtime"
 )
 
@@ -76,7 +75,7 @@ func TestEnqueueTerminalActiveCompletionsFromMeta(t *testing.T) {
 	}
 
 	rt := newMockRuntime()
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"process": rt},
 		Worktree:   &fakeWorktree{},
 		Adapter:    &fakeAdapterRunner{},
@@ -144,7 +143,7 @@ func TestEnqueueTerminalBootstrapCompletionFromMeta(t *testing.T) {
 	}
 
 	rt := newMockRuntime()
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes: map[string]loopruntime.Runtime{"process": rt},
 		Worktree: &fakeWorktree{},
 		Adapter:  &fakeAdapterRunner{},
