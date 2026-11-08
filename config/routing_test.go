@@ -136,3 +136,10 @@ func TestNonClaudeDefaultsGetNoClaudeRoles(t *testing.T) {
 		t.Errorf("planner = %s/%s", p, m)
 	}
 }
+
+func TestRoleWithProviderButNoModelIsFatal(t *testing.T) {
+	cfg := parseRouting(t, "[routing.roles]\nbuilder = { provider = \"codex\" }\n")
+	if got := Validate(cfg); !hasCode(got, DiagnosticCodeRoutingDefaultsMissing) {
+		t.Errorf("expected fatal for role without model: %+v", got.Diagnostics)
+	}
+}

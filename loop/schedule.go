@@ -238,7 +238,7 @@ func (l *Loop) spawnBootstrapIfNeeded(ctx context.Context, order Order) error {
 	}
 
 	stage := order.Stages[0]
-	provider, model := l.config.ResolveStageRouting("bootstrap", stage.Provider, stage.Model)
+	provider, model := l.config.ResolveStageRouting("oops", stage.Provider, stage.Model)
 
 	prompt := buildBootstrapPrompt(provider)
 

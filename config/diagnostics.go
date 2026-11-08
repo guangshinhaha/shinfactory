@@ -46,6 +46,14 @@ func Validate(config Config) ValidationResult {
 		policy := config.Routing.Roles[name]
 		field := "routing.roles." + name + ".provider"
 		switch {
+		case strings.TrimSpace(policy.Model) == "":
+			result.Diagnostics = append(result.Diagnostics, ConfigDiagnostic{
+				FieldPath: "routing.roles." + name + ".model",
+				Message:   fmt.Sprintf("role names provider %q but no model", policy.Provider),
+				Severity:  DiagnosticSeverityFatal,
+				Fix:       "Set the role's model in .noodle.toml.",
+				Code:      DiagnosticCodeRoutingDefaultsMissing,
+			})
 		case !isKnownProvider(policy.Provider):
 			result.Diagnostics = append(result.Diagnostics, ConfigDiagnostic{
 				FieldPath: field,

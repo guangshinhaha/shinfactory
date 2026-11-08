@@ -72,7 +72,7 @@ func isKnownRole(name string) bool {
 // keys return false and fall back to routing.defaults.
 func RoleForTask(taskKey string) (Role, bool) {
 	switch stringx.Normalize(taskKey) {
-	case "schedule", "bootstrap":
+	case "schedule":
 		return RoleScheduler, true
 	case "plan":
 		return RolePlanner, true
@@ -180,7 +180,7 @@ func normalizeRoles(config *Config, diagnostics *[]ConfigDiagnostic) {
 		if policy.Provider == "" {
 			policy.Provider = merged[key].Provider
 		}
-		if policy.Model == "" {
+		if policy.Model == "" && policy.Provider == merged[key].Provider {
 			policy.Model = merged[key].Model
 		}
 		merged[key] = policy
