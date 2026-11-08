@@ -781,7 +781,7 @@ func TestMergeLockWaitsForRelease(t *testing.T) {
 	skipWorktreeIntegrationShort(t)
 
 	dir := setupTestRepo(t)
-	app := &App{Root: dir, MergeLockTimeout: 1500 * time.Millisecond}
+	app := &App{Root: dir, MergeLockTimeout: 5 * time.Second}
 
 	if err := app.Create("wait-lock"); err != nil {
 		t.Fatalf("Create failed: %v", err)
@@ -796,19 +796,17 @@ func TestMergeLockWaitsForRelease(t *testing.T) {
 	writeFile(t, app.mergeLockPath(), fmt.Sprintf("%d\n%d", os.Getpid(), time.Now().Unix()))
 
 	mergeDone := make(chan error, 1)
-	mergeStarted := make(chan struct{})
 	go func() {
-		close(mergeStarted)
 		mergeDone <- app.Merge("wait-lock")
 	}()
 
-	<-mergeStarted
-
-	// Merge should be blocked until the lock is removed.
+	// Merge cannot finish while the lock is held, so this hold never flakes
+	// when locking works. It is long enough for an unblocked Merge to finish
+	// on an idle machine, so a lock that is ignored fails here.
 	select {
 	case err := <-mergeDone:
 		t.Fatalf("expected merge to wait for lock release, got early result: %v", err)
-	default:
+	case <-time.After(time.Second):
 	}
 
 	if err := os.Remove(app.mergeLockPath()); err != nil && !os.IsNotExist(err) {
