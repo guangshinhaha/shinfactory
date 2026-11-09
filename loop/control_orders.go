@@ -144,14 +144,20 @@ func (l *Loop) controlSkip(orderID string) error {
 	if orderID == "" {
 		return fmt.Errorf("skip requires order_id")
 	}
-	return l.mutateOrdersState(func(orders *OrdersFile) (bool, error) {
+	if err := l.mutateOrdersState(func(orders *OrdersFile) (bool, error) {
 		updated, err := cancelOrder(*orders, orderID)
 		if err != nil {
 			return false, err
 		}
 		*orders = updated
 		return true, nil
-	})
+	}); err != nil {
+		return err
+	}
+	// A skipped order is abandoned, not retried: its spend goes with it.
+	l.clearFailedRounds(orderID)
+	l.clearOrderSpend(orderID)
+	return nil
 }
 
 func (l *Loop) controlRequeue(orderID string) error {

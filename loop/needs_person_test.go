@@ -281,12 +281,12 @@ func assertSpendStop(t *testing.T, env *integrationEnv, logPath, wantReason stri
 func TestOrderStopsAtTheAttemptCap(t *testing.T) {
 	env, logPath := spendCapEnv(t, func(s *config.SpendConfig) { s.MaxAttempts = 3; s.MaxCostUSD = 1000 })
 	for i := 0; i < 3; i++ {
-		env.loop.recordStageLaunch("7", "execute")
+		env.loop.recordStageLaunch("7", "execute", 0)
 	}
 	if err := env.loop.Cycle(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	assertSpendStop(t, env, logPath, `it already ran the "execute" stage 3 times (cap 3)`)
+	assertSpendStop(t, env, logPath, `it already ran the "execute" stage 3 times this round (cap 3)`)
 	if !strings.Contains(ghLog(t, logPath), "the cost cap did not apply") {
 		t.Fatal("a stop with no reported cost must say the cost cap did not apply")
 	}
@@ -295,6 +295,7 @@ func TestOrderStopsAtTheAttemptCap(t *testing.T) {
 // Cap 2: an order whose finished stages cost the ceiling stops.
 func TestOrderStopsAtTheCostCap(t *testing.T) {
 	env, logPath := spendCapEnv(t, func(s *config.SpendConfig) { s.MaxAttempts = 10; s.MaxCostUSD = 5 })
+	env.loop.recordStageLaunch("7", "execute", 0)
 	env.loop.recordStageCost("7", 3.25)
 	env.loop.recordStageCost("7", 2)
 	if err := env.loop.Cycle(context.Background()); err != nil {
@@ -306,7 +307,7 @@ func TestOrderStopsAtTheCostCap(t *testing.T) {
 // Under both caps the stage launches and the ledger counts the attempt.
 func TestOrderUnderTheCapsLaunches(t *testing.T) {
 	env, logPath := spendCapEnv(t, func(s *config.SpendConfig) { s.MaxAttempts = 3; s.MaxCostUSD = 5 })
-	env.loop.recordStageLaunch("7", "execute")
+	env.loop.recordStageLaunch("7", "execute", 0)
 	env.loop.recordStageCost("7", 1)
 	if err := env.loop.Cycle(context.Background()); err != nil {
 		t.Fatal(err)
@@ -316,5 +317,87 @@ func TestOrderUnderTheCapsLaunches(t *testing.T) {
 	}
 	if got := env.loop.orderSpendOf("7").Attempts["execute"]; got != 2 {
 		t.Fatalf("execute attempts = %d, want 2 after the launch", got)
+	}
+}
+
+// A quality-reject fix round starts the attempt count over; cost carries on.
+func TestFixRoundResetsAttemptsKeepsCost(t *testing.T) {
+	env, _ := spendCapEnv(t, func(s *config.SpendConfig) { s.MaxAttempts = 3; s.MaxCostUSD = 1000 })
+	for i := 0; i < 3; i++ {
+		env.loop.recordStageLaunch("7", "execute", 0)
+	}
+	env.loop.recordStageCost("7", 2)
+	if why := env.loop.overSpendCap("7", "execute", 0); why == "" {
+		t.Fatal("round 0 at 3 attempts must be over the cap")
+	}
+	if why := env.loop.overSpendCap("7", "execute", 1); why != "" {
+		t.Fatalf("a new fix round must not inherit the old round's attempts: %s", why)
+	}
+	env.loop.recordStageLaunch("7", "execute", 1)
+	spend := env.loop.orderSpendOf("7")
+	if spend.Attempts["execute"] != 1 || spend.CostUSD != 2 {
+		t.Fatalf("after a new round: attempts=%d cost=%v, want 1 and 2", spend.Attempts["execute"], spend.CostUSD)
+	}
+}
+
+// The ledger is written through a temp file and rename, so a crash mid-write
+// cannot leave a truncated file that resets every count.
+func TestOrderSpendWriteLeavesNoTempFiles(t *testing.T) {
+	env, _ := spendCapEnv(t, func(s *config.SpendConfig) {})
+	env.loop.recordStageLaunch("7", "execute", 0)
+	entries, err := os.ReadDir(env.loop.runtimeDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if strings.Contains(e.Name(), ".tmp.") {
+			t.Fatalf("leftover temp file %s", e.Name())
+		}
+	}
+	if got := env.loop.orderSpendOf("7").Attempts["execute"]; got != 1 {
+		t.Fatalf("attempts = %d, want 1", got)
+	}
+}
+
+// A skipped order is abandoned; its ledger entry goes with it.
+func TestSkipClearsOrderSpend(t *testing.T) {
+	env, _ := spendCapEnv(t, func(s *config.SpendConfig) {})
+	env.loop.recordStageLaunch("7", "execute", 0)
+	env.loop.recordStageCost("7", 1)
+	if err := env.loop.controlSkip("7"); err != nil {
+		t.Fatal(err)
+	}
+	if spend := env.loop.orderSpendOf("7"); spend.CostUSD != 0 || spend.totalAttempts() != 0 {
+		t.Fatalf("spend after skip = %+v, want empty", spend)
+	}
+}
+
+// A stage killed before it finishes still charges what it spent.
+func TestKilledStageCostReachesTheLedger(t *testing.T) {
+	env, _ := spendCapEnv(t, func(s *config.SpendConfig) {})
+	cook := &cookHandle{
+		cookIdentity: cookIdentity{orderID: "7", stage: Stage{TaskKey: "execute", Skill: "execute"}},
+		session:      &mockSession{id: "s1", done: make(chan struct{}), cost: 4.5},
+	}
+	env.loop.recordStageLaunch("7", "execute", 0)
+	env.loop.trackCookCompleted(cook, StageResult{Status: StageResultCancelled})
+	if got := env.loop.orderSpendOf("7").CostUSD; got != 4.5 {
+		t.Fatalf("cost = %v, want 4.5", got)
+	}
+}
+
+// A retry back at round 0 must not wipe attempts already used in a later round,
+// and a cleared order must not be recreated by a late cost.
+func TestSpendLedgerIgnoresLowerRoundsAndClearedOrders(t *testing.T) {
+	env, _ := spendCapEnv(t, func(s *config.SpendConfig) { s.MaxAttempts = 2 })
+	env.loop.recordStageLaunch("7", "execute", 2)
+	env.loop.recordStageLaunch("7", "execute", 2)
+	if why := env.loop.overSpendCap("7", "execute", 0); why == "" {
+		t.Fatal("a round-0 retry must still see the round-2 attempts")
+	}
+	env.loop.clearOrderSpend("7")
+	env.loop.recordStageCost("7", 3)
+	if spend := env.loop.orderSpendOf("7"); spend.CostUSD != 0 {
+		t.Fatalf("cost after clear = %v, want 0", spend.CostUSD)
 	}
 }
