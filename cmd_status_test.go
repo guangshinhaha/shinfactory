@@ -164,3 +164,23 @@ func TestRunStatusJSONListsNeedsShinIssues(t *testing.T) {
 		t.Fatalf("needs_shin = %+v, want only issue 16", got.NeedsShin)
 	}
 }
+
+// With no `stopped` script the loop's own record is all there is, and it stands.
+func TestRunStatusJSONKeepsRecordedStopsWithoutStoppedScript(t *testing.T) {
+	projectDir := t.TempDir()
+	runtimeDir := filepath.Join(projectDir, ".noodle")
+	if err := os.MkdirAll(runtimeDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(runtimeDir, "needs-shin.json"),
+		[]byte(`[{"order":"7","reason":"two rounds failed"}]`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	if err := runStatusJSON(&App{projectDir: projectDir}, &out); err != nil {
+		t.Fatalf("runStatusJSON: %v", err)
+	}
+	if !strings.Contains(out.String(), `"order": "7"`) {
+		t.Fatalf("recorded stop dropped:\n%s", out.String())
+	}
+}

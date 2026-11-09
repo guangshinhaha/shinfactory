@@ -54,11 +54,13 @@ func runStatusJSON(app *App, w io.Writer) error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), stoppedTimeout)
 	defer cancel()
-	stopped, err := app.backlogStopped(ctx)
+	stopped, listed, err := app.backlogStopped(ctx)
 	if err != nil {
 		return err
 	}
-	report.MergeNeedsShin(stopped)
+	if listed {
+		report.MergeNeedsShin(stopped)
+	}
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	return enc.Encode(report)
@@ -68,21 +70,20 @@ func runStatusJSON(app *App, w io.Writer) error {
 const stoppedTimeout = 30 * time.Second
 
 // backlogStopped asks the backlog adapter which items wait on a person. A
-// backlog with no `stopped` script has nothing to add; a script that fails is
+// backlog with no `stopped` script reports listed=false and the recorded stops stand; a script that fails is
 // an error, because an empty needs_shin would read as "nobody is waiting".
-func (a *App) backlogStopped(ctx context.Context) ([]linestatus.NeedsShin, error) {
+func (a *App) backlogStopped(ctx context.Context) (items []linestatus.NeedsShin, listed bool, _ error) {
 	projectDir, err := a.ProjectDir()
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	if strings.TrimSpace(a.Config.Adapters["backlog"].Scripts["stopped"]) == "" {
-		return nil, nil
+		return nil, false, nil
 	}
 	out, err := adapter.NewRunner(projectDir, a.Config).Run(ctx, "backlog", "stopped", adapter.RunOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("list stopped backlog items: %w", err)
+		return nil, false, fmt.Errorf("list stopped backlog items: %w", err)
 	}
-	var items []linestatus.NeedsShin
 	dec := json.NewDecoder(strings.NewReader(out))
 	for dec.More() {
 		var row struct {
@@ -91,11 +92,11 @@ func (a *App) backlogStopped(ctx context.Context) ([]linestatus.NeedsShin, error
 			URL   string `json:"url"`
 		}
 		if err := dec.Decode(&row); err != nil {
-			return nil, fmt.Errorf("parse stopped backlog items: %w", err)
+			return nil, false, fmt.Errorf("parse stopped backlog items: %w", err)
 		}
 		items = append(items, linestatus.NeedsShin{Order: row.ID, Title: row.Title, URL: row.URL})
 	}
-	return items, nil
+	return items, true, nil
 }
 
 func runStatus(app *App) error {
