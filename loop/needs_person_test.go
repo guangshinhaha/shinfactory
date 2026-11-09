@@ -3,6 +3,7 @@ package loop
 import (
 	"context"
 	"encoding/json"
+	"github.com/guangshinhaha/shinfactory/internal/linestatus"
 	"os"
 	"path/filepath"
 	"strings"
@@ -142,6 +143,11 @@ func TestStopForPersonWhenTheIssueIsUnbuildable(t *testing.T) {
 	}
 	if !strings.Contains(log, "issue edit 7 --remove-label ready --add-label needs-shin") {
 		t.Fatalf("issue 7 not labelled needs-shin:\n%s", log)
+	}
+	// `shinfactory status` lists the stop from this record: the backlog no longer sees the issue.
+	rep, err := linestatus.Read(env.runtimeDir)
+	if err != nil || len(rep.NeedsShin) != 1 || rep.NeedsShin[0].Order == "" {
+		t.Fatalf("status needs_shin = %+v, err = %v", rep.NeedsShin, err)
 	}
 }
 

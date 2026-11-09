@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/guangshinhaha/shinfactory/adapter"
+	"github.com/guangshinhaha/shinfactory/internal/linestatus"
 )
 
 const (
@@ -49,6 +50,9 @@ func (l *Loop) stopForPerson(ctx context.Context, orderID, summary, detail strin
 	switch {
 	case err == nil:
 		l.logger.Info("order stopped for a person", "order", orderID)
+		if err := linestatus.RecordNeedsShin(l.runtimeDir, linestatus.NeedsShin{Order: orderID, Reason: message, At: l.deps.Now().UTC()}); err != nil {
+			l.logger.Warn("could not record needs-shin for status", "order", orderID, "error", err)
+		}
 		l.clearFailedRounds(orderID)
 	case strings.Contains(err.Error(), `action "stop" script is not configured`):
 		l.logger.Info("backlog has no stop action; nobody to tell", "order", orderID, "reason", summary)

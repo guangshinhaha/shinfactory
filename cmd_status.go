@@ -1,11 +1,14 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
 	"github.com/guangshinhaha/shinfactory/cmdmeta"
+	"github.com/guangshinhaha/shinfactory/internal/linestatus"
 	"github.com/guangshinhaha/shinfactory/internal/orderx"
 	"github.com/guangshinhaha/shinfactory/internal/snapshot"
 	"github.com/guangshinhaha/shinfactory/internal/statusfile"
@@ -19,14 +22,35 @@ type statusSummary struct {
 }
 
 func newStatusCmd(app *App) *cobra.Command {
-	return &cobra.Command{
+	var asJSON bool
+	cmd := &cobra.Command{
 		Use:   "status",
 		Short: cmdmeta.Short("status"),
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if asJSON {
+				return runStatusJSON(app, cmd.OutOrStdout())
+			}
 			return runStatus(app)
 		},
 	}
+	cmd.Flags().BoolVar(&asJSON, "json", false, "print the line's full state as JSON: mode, concurrency, running, queued and parked orders, needs-shin")
+	return cmd
+}
+
+// runStatusJSON prints the line's state for a coordinator to parse.
+func runStatusJSON(app *App, w io.Writer) error {
+	runtimeDir, err := app.RuntimeDir()
+	if err != nil {
+		return err
+	}
+	report, err := linestatus.Read(runtimeDir)
+	if err != nil {
+		return err
+	}
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	return enc.Encode(report)
 }
 
 func runStatus(app *App) error {

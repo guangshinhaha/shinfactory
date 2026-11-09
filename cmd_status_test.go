@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -81,5 +83,39 @@ func TestRunStatusReadsSessionsAndOrders(t *testing.T) {
 	}
 	if !strings.Contains(output, "loop=draining") {
 		t.Fatalf("expected loop state, got: %q", output)
+	}
+}
+
+func TestRunStatusJSONPrintsTheLine(t *testing.T) {
+	projectDir := t.TempDir()
+	runtimeDir := filepath.Join(projectDir, ".noodle")
+	if err := os.MkdirAll(runtimeDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(runtimeDir, "status.json"),
+		[]byte(`{"loop_state":"paused","mode":"supervised","max_concurrency":2}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	originalDir, _ := os.Getwd()
+	if err := os.Chdir(projectDir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(originalDir) })
+
+	var out bytes.Buffer
+	if err := runStatusJSON(&App{}, &out); err != nil {
+		t.Fatalf("runStatusJSON: %v", err)
+	}
+	var got map[string]any
+	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
+		t.Fatalf("output is not JSON: %v\n%s", err, out.String())
+	}
+	if got["mode"] != "supervised" || got["concurrency"] != float64(2) || got["loop_state"] != "paused" {
+		t.Fatalf("header = %v", got)
+	}
+	for _, key := range []string{"running", "queued", "parked", "needs_shin"} {
+		if list, ok := got[key].([]any); !ok || len(list) != 0 {
+			t.Fatalf("%s = %v, want []", key, got[key])
+		}
 	}
 }
