@@ -147,6 +147,9 @@ func (l *Loop) stopOverCap(ctx context.Context, cand dispatchCandidate, stage St
 
 	summary := fmt.Sprintf("Spending cap reached: %s. So far it spent $%.2f over %d stage attempts. Raise [spend] in .noodle.toml or reshape the issue, then put ready back.",
 		why, spend.CostUSD, spend.totalAttempts())
+	if spend.CostUSD == 0 {
+		summary += " No stage reported a cost (the Orca runtime reports none), so the cost cap did not apply; the attempt cap did."
+	}
 	l.stopForPerson(ctx, cand.OrderID, summary, "")
 	return nil
 }

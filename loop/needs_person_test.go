@@ -287,6 +287,9 @@ func TestOrderStopsAtTheAttemptCap(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertSpendStop(t, env, logPath, `it already ran the "execute" stage 3 times (cap 3)`)
+	if !strings.Contains(ghLog(t, logPath), "the cost cap did not apply") {
+		t.Fatal("a stop with no reported cost must say the cost cap did not apply")
+	}
 }
 
 // Cap 2: an order whose finished stages cost the ceiling stops.

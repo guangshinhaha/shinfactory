@@ -103,6 +103,8 @@ max_attempts = 3
 max_cost_usd = 20
 ```
 
+The cost cap does not apply where the runtime reports no cost: the Orca runtime reports none, so on Orca only `max_attempts` stops a runaway order. The stop comment says so when the order's recorded cost is zero.
+
 The cost check runs between stages, so one stage can finish past the ceiling before the order stops. There is no cap across orders.
 
 ---
