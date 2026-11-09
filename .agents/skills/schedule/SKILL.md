@@ -50,7 +50,7 @@ Backlog items always have `id` and `title`. Other fields are adapter-defined and
 
 An item that fails gets no order. Listing it in `action_needed` isn't enough, because only the loop reads that. Send it back yourself in this session, naming what's missing, so the person sees why. Find the backlog in `.noodle.toml` under `[adapters.backlog]`:
 
-- **GitHub Issues** (the `sync` script is the ready-made `defaults/adapters/github` one, or calls `gh`): run `gh issue comment <id> --body "shinfactory: not built. <what's missing>. Fix the issue, then add the ${NOODLE_GH_LABEL:-ready} label again."`, then `gh issue edit <id> --remove-label "${NOODLE_GH_LABEL:-ready}"`. Run them from the project root without `--repo`, so `gh` uses the project's own remote; if it has none, don't send back.
+- **GitHub Issues** (the `sync` script is the ready-made `defaults/adapters/github` one, or calls `gh`): run the backlog `stop` script (`stop` under `[adapters.backlog.scripts]`, normally `defaults/adapters/github/backlog-stop`) from the project root, with the issue number as the argument and what's missing on stdin: `printf '%s' "<what's missing>. Fix the issue, then add the ${NOODLE_GH_LABEL:-ready} label again." | <stop script> <id>`. It comments once ("shinfactory: stopped. ..."), removes `ready` and adds `needs-shin`, the same handoff the loop uses. Never remove `ready` with `gh issue edit` yourself: the issue would show no `needs-shin`. If the backlog has no `stop` script, or the project has no remote, don't send back.
 - **todos.md** (no `scripts`): add `#not_ready` and the reason to the item's line, for example `3. [ ] Make it faster #not_ready (shinfactory: not built, no observable Done when)`.
 - **Any other backlog**: follow the `todo` skill's Send back.
 
