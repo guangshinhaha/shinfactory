@@ -4,7 +4,7 @@ description: >-
   Audit and evolve the brain vault — prune outdated content, discover cross-cutting principles,
   review skills for structural encoding opportunities. Triggers: "meditate", "audit the brain",
   "prune brain", "review skills", "consolidate notes", "prune notes".
-schedule: "Standalone single-stage order after several debrief cycles have accumulated. Expensive — don't over-schedule."
+schedule: "Never scheduled by the factory: a standalone order names no ready issue, so the loop drops it. A person runs it."
 ---
 
 # Meditate

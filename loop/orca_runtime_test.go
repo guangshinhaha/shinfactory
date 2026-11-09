@@ -114,7 +114,7 @@ func (e *orcaEnv) newLoop() *Loop {
 		},
 		Worktree:       e.wts,
 		Adapter:        &fakeAdapterRunner{},
-		Mise:           &fakeMise{brief: mise.Brief{Backlog: []adapter.BacklogItem{{ID: "1", Title: "t", Status: "open"}}}},
+		Mise:           &fakeMise{brief: mise.Brief{Backlog: []adapter.BacklogItem{{ID: "42", Title: "t", Status: "open"}}}},
 		Monitor:        fakeMonitor{},
 		Registry:       orcaRegistry(),
 		Now:            func() time.Time { return e.clock },
