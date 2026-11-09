@@ -299,6 +299,8 @@ func eventSummary(eventType string, payload json.RawMessage) string {
 			return prefix + "orders-next rejected: " + reason
 		}
 		return prefix + "orders-next rejected"
+	case "orders.unready":
+		return "dropped orders naming no ready issue"
 	case "order.dropped":
 		return "order " + orderID + " dropped"
 	case "order.requeued":

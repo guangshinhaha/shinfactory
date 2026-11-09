@@ -332,7 +332,11 @@ func consumeOrdersNext(nextPath string, existing OrdersFile, backlog []adapter.B
 	buildable, unbuildable := splitBuildableOrders(incoming.Orders, backlog)
 	incoming.Orders = buildable
 
-	emptyPromotion := len(incoming.Orders) == 0
+	// A proposal left with only the schedule order after drops is as empty as
+	// one left with nothing: both must hit the cooldown, or the loop respawns
+	// the scheduler every cycle.
+	emptyPromotion := len(incoming.Orders) == 0 ||
+		(len(unbuildable) > 0 && onlyScheduleOrders(incoming.Orders))
 
 	// Build index of existing order IDs for dedup/replacement decisions.
 	existingIndex := make(map[string]int, len(existing.Orders))
@@ -372,6 +376,15 @@ func consumeOrdersNext(nextPath string, existing OrdersFile, backlog []adapter.B
 		EmptyPromotion: emptyPromotion,
 		Unbuildable:    unbuildable,
 	}, nil
+}
+
+func onlyScheduleOrders(orders []Order) bool {
+	for _, order := range orders {
+		if !isScheduleOrder(order) {
+			return false
+		}
+	}
+	return true
 }
 
 // splitBuildableOrders keeps orders whose ID is a backlog item ID, plus the
