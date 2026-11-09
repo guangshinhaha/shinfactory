@@ -488,17 +488,10 @@ func TestOopsBootstrapCompletionInjectsScheduleOrder(t *testing.T) {
 	// Simulate the oops agent having created and merged a schedule skill.
 	writeTaskTypeSkill(t, projectDir, "schedule", "When orders are empty")
 	rt.sessions[0].complete("completed")
-	time.Sleep(20 * time.Millisecond)
 
-	for i := 0; i < 5; i++ {
-		if err := l.Cycle(context.Background()); err != nil {
-			t.Fatalf("completion cycle %d: %v", i+1, err)
-		}
-		if len(rt.calls) >= 2 && rt.calls[1].Skill == "schedule" {
-			return
-		}
-	}
-	t.Fatalf("expected schedule dispatch after bootstrap completion, calls=%#v", rt.calls)
+	cycleUntil(t, l, "schedule dispatch after bootstrap completion", func() bool {
+		return len(rt.calls) >= 2 && rt.calls[1].Skill == "schedule"
+	})
 }
 
 func TestReconcileAndCycleDispatchBootstrapWhenNoScheduleOrOopsTaskType(t *testing.T) {
