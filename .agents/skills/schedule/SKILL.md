@@ -26,6 +26,16 @@ Each stage has a `do` field (task key, must match a registered task type) and ru
 
 A typical order pipeline: execute, then quality, then debrief — all as stages of one order.
 
+### Tier and the review gate
+
+Set `"tier"` on every order that builds a backlog item: `none` (docs or inert config), `low`, `medium`, or `high`. Take it from the item's `risk:` label if it has one; if the tier is unclear, take the higher one. A missing tier counts as `medium`. The loop refuses to ship an order whose stages don't fit its tier:
+
+- `none`: any stages.
+- `low`, `medium`: `execute`, then `quality` (after the last `execute`).
+- `high`: `execute`, then `quality`, then `verify` (a fresh verifier that writes a verdict at the branch head).
+
+Nothing merges before the order's last stage. Findings from `quality` or a `FAIL` from `verify` send the order back to `execute` on the same branch, at most 2 times, then the order stops and lands in `action_needed`. Don't add stages to answer a rejection yourself.
+
 ## Task Types
 
 Read `task_types` from mise to discover every schedulable task type and its `schedule` hint. Any registered task type can be a stage within an order. Use `do` on each stage to bind it to a task type.

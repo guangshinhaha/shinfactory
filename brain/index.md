@@ -21,6 +21,7 @@
 - [[codebase/orders-lifecycle-defaults-on-promotion]]
 - [[codebase/orders-must-name-a-ready-issue]]
 - [[codebase/pr-landing-mode]]
+- [[codebase/review-gate]]
 - [[codebase/provider-routing-must-fail-loudly]]
 - [[codebase/projection-owns-snapshot-active-order-ids]]
 - [[codebase/routing-resolves-at-dispatch-only]]
