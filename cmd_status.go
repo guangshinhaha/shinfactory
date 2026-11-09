@@ -1,12 +1,15 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
+	"github.com/guangshinhaha/shinfactory/adapter"
 	"github.com/guangshinhaha/shinfactory/cmdmeta"
 	"github.com/guangshinhaha/shinfactory/internal/linestatus"
 	"github.com/guangshinhaha/shinfactory/internal/orderx"
@@ -48,9 +51,45 @@ func runStatusJSON(app *App, w io.Writer) error {
 	if err != nil {
 		return err
 	}
+	stopped, err := app.backlogStopped(context.Background())
+	if err != nil {
+		return err
+	}
+	report.MergeNeedsShin(stopped)
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	return enc.Encode(report)
+}
+
+// backlogStopped asks the backlog adapter which items wait on a person. A
+// backlog with no `stopped` script has nothing to add; a script that fails is
+// an error, because an empty needs_shin would read as "nobody is waiting".
+func (a *App) backlogStopped(ctx context.Context) ([]linestatus.NeedsShin, error) {
+	projectDir, err := a.ProjectDir()
+	if err != nil {
+		return nil, err
+	}
+	if a.Config.Adapters["backlog"].Scripts["stopped"] == "" {
+		return nil, nil
+	}
+	out, err := adapter.NewRunner(projectDir, a.Config).Run(ctx, "backlog", "stopped", adapter.RunOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("list stopped backlog items: %w", err)
+	}
+	var items []linestatus.NeedsShin
+	dec := json.NewDecoder(strings.NewReader(out))
+	for dec.More() {
+		var row struct {
+			ID    string `json:"id"`
+			Title string `json:"title"`
+			URL   string `json:"url"`
+		}
+		if err := dec.Decode(&row); err != nil {
+			return nil, fmt.Errorf("parse stopped backlog items: %w", err)
+		}
+		items = append(items, linestatus.NeedsShin{Order: row.ID, Title: row.Title, URL: row.URL})
+	}
+	return items, nil
 }
 
 func runStatus(app *App) error {

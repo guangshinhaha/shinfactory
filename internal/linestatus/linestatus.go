@@ -54,7 +54,26 @@ type Stage struct {
 type NeedsShin struct {
 	Order  string    `json:"order"`
 	Reason string    `json:"reason,omitempty"`
+	Title  string    `json:"title,omitempty"`
+	URL    string    `json:"url,omitempty"`
 	At     time.Time `json:"at,omitempty"`
+}
+
+// MergeNeedsShin adds the backlog's stopped items to the report. An order the
+// loop already recorded keeps its entry, which carries the reason; a stopped
+// issue the loop never recorded (a scheduler refusal, a hand-applied label)
+// is added after them.
+func (r *Report) MergeNeedsShin(stopped []NeedsShin) {
+	have := map[string]bool{}
+	for _, it := range r.NeedsShin {
+		have[it.Order] = true
+	}
+	for _, it := range stopped {
+		if !have[it.Order] {
+			have[it.Order] = true
+			r.NeedsShin = append(r.NeedsShin, it)
+		}
+	}
 }
 
 const needsShinFile = "needs-shin.json"

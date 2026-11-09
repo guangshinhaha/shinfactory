@@ -1,0 +1,10 @@
+#!/bin/sh
+# Lists the open issues waiting on a person: every open issue labelled needs-shin, one JSON
+# object per line ({"id", "title", "url"}). `shinfactory status --json` reads it, so an issue
+# labelled needs-shin counts however it got the label.
+#
+# Env: NOODLE_GH_STOP_LABEL renames needs-shin; NOODLE_GH_LIMIT caps the issues read (default 200).
+set -eu
+
+gh issue list --state open --limit "${NOODLE_GH_LIMIT:-200}" --label "${NOODLE_GH_STOP_LABEL:-needs-shin}" \
+  --json number,title,url --jq '.[] | {id: (.number | tostring), title: .title, url: .url}'

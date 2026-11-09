@@ -101,6 +101,13 @@ func (l *Loop) processControlCommands() error {
 	}
 
 	acks := l.processControlLines(data)
+	if len(acks) > 0 {
+		// A caller reads status.json the moment it sees the ack, so the file
+		// must already show what the commands changed.
+		if err := l.stampStatus(); err != nil {
+			return fmt.Errorf("stamp status after control commands: %w", err)
+		}
+	}
 	if l.TestControlAckBarrier != nil {
 		l.TestControlAckBarrier()
 	}
