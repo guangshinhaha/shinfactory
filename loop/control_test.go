@@ -985,3 +985,83 @@ func TestControlStampsStatusBeforeAck(t *testing.T) {
 		}
 	}
 }
+
+func TestControlRejectsStageProviderWithoutModel(t *testing.T) {
+	projectDir := t.TempDir()
+	ordersPath := filepath.Join(projectDir, ".noodle", "orders.json")
+	seed := OrdersFile{Orders: []Order{{
+		ID: "42", Status: OrderStatusActive,
+		Stages: []Stage{{TaskKey: "execute", Prompt: "p", Status: StageStatusPending}},
+	}}}
+	if err := writeOrdersAtomic(ordersPath, seed); err != nil {
+		t.Fatalf("write orders: %v", err)
+	}
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
+		Runtimes:   map[string]loopruntime.Runtime{"process": newMockRuntime()},
+		Worktree:   &fakeWorktree{},
+		Adapter:    &fakeAdapterRunner{},
+		Mise:       &fakeMise{},
+		Monitor:    fakeMonitor{},
+		Registry:   testLoopRegistry(),
+		Now:        time.Now,
+		OrdersFile: ordersPath,
+	})
+	cases := []struct {
+		name string
+		run  func() error
+	}{
+		{"enqueue", func() error {
+			return l.controlEnqueue(ControlCommand{Action: "enqueue", OrderID: "new", TaskKey: "execute", Provider: "codex"})
+		}},
+		{"edit-item", func() error {
+			return l.controlEditItem(ControlCommand{Action: "edit-item", OrderID: "42", Provider: "codex"})
+		}},
+		{"add-stage", func() error {
+			return l.controlAddStage(ControlCommand{Action: "add-stage", OrderID: "42", TaskKey: "oops", Provider: "codex"})
+		}},
+	}
+	for _, tc := range cases {
+		if err := tc.run(); err == nil || !strings.Contains(err.Error(), "has no model") {
+			t.Errorf("%s err = %v, want provider-without-model rejection", tc.name, err)
+		}
+	}
+	got, _ := readOrders(ordersPath)
+	if len(got.Orders) != 1 || len(got.Orders[0].Stages) != 1 || got.Orders[0].Stages[0].Provider != "" {
+		t.Errorf("rejected commands changed orders: %+v", got)
+	}
+	// A model alone, or provider with model, stays valid.
+	if err := l.controlEditItem(ControlCommand{Action: "edit-item", OrderID: "42", Provider: "codex", Model: "gpt-5.4"}); err != nil {
+		t.Errorf("edit-item with provider and model: %v", err)
+	}
+}
+
+func TestControlEditItemRoutingValidationOnlyWhenRoutingEdited(t *testing.T) {
+	projectDir := t.TempDir()
+	ordersPath := filepath.Join(projectDir, ".noodle", "orders.json")
+	seed := OrdersFile{Orders: []Order{
+		{ID: "pinned", Status: OrderStatusActive, Stages: []Stage{{TaskKey: "execute", Provider: "claude", Model: "claude-opus-5-5", Status: StageStatusPending}}},
+		{ID: "legacy", Status: OrderStatusActive, Stages: []Stage{{TaskKey: "execute", Provider: "codex", Status: StageStatusPending}}},
+	}}
+	if err := writeOrdersAtomic(ordersPath, seed); err != nil {
+		t.Fatalf("write orders: %v", err)
+	}
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
+		Runtimes:   map[string]loopruntime.Runtime{"process": newMockRuntime()},
+		Worktree:   &fakeWorktree{},
+		Adapter:    &fakeAdapterRunner{},
+		Mise:       &fakeMise{},
+		Monitor:    fakeMonitor{},
+		Registry:   testLoopRegistry(),
+		Now:        time.Now,
+		OrdersFile: ordersPath,
+	})
+	// Switching provider must not keep the old provider's model.
+	err := l.controlEditItem(ControlCommand{Action: "edit-item", OrderID: "pinned", Provider: "codex"})
+	if err == nil || !strings.Contains(err.Error(), "has no model") {
+		t.Errorf("provider-only switch err = %v, want provider-without-model rejection", err)
+	}
+	// A prompt-only edit leaves a stage that predates the rule editable.
+	if err := l.controlEditItem(ControlCommand{Action: "edit-item", OrderID: "legacy", Prompt: "new prompt"}); err != nil {
+		t.Errorf("prompt-only edit: %v", err)
+	}
+}

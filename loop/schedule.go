@@ -7,7 +7,6 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/guangshinhaha/shinfactory/config"
 	"github.com/guangshinhaha/shinfactory/dispatcher"
 	"github.com/guangshinhaha/shinfactory/internal/ingest"
 	"github.com/guangshinhaha/shinfactory/internal/schemadoc"
@@ -76,26 +75,26 @@ func (l *Loop) hasActiveScheduleCook() bool {
 	return false
 }
 
-func bootstrapScheduleOrder(cfg config.Config) OrdersFile {
+func bootstrapScheduleOrder() OrdersFile {
 	return OrdersFile{
 		Orders: []Order{
-			scheduleOrder(cfg, ""),
+			scheduleOrder(""),
 		},
 	}
 }
 
 // scheduleOrder builds the scheduler order. Its stage names no provider or
 // model: dispatch resolves them from the scheduler role.
-func scheduleOrder(_ config.Config, prompt string) Order {
+func scheduleOrder(prompt string) Order {
 	order := Order{
 		ID:     scheduleOrderID,
 		Title:  "scheduling tasks based on your backlog",
 		Status: OrderStatusActive,
 		Stages: []Stage{
 			{
-				TaskKey:  scheduleOrderID,
-				Skill:    "schedule",
-				Status:   StageStatusPending,
+				TaskKey: scheduleOrderID,
+				Skill:   "schedule",
+				Status:  StageStatusPending,
 			},
 		},
 	}
@@ -106,7 +105,7 @@ func scheduleOrder(_ config.Config, prompt string) Order {
 	return order
 }
 
-func scheduleBootstrapOopsOrder(cfg config.Config) Order {
+func scheduleBootstrapOopsOrder() Order {
 	return Order{
 		ID:        scheduleBootstrapOrderID,
 		Title:     "bootstrapping missing schedule skill",
@@ -114,9 +113,9 @@ func scheduleBootstrapOopsOrder(cfg config.Config) Order {
 		Status:    OrderStatusActive,
 		Stages: []Stage{
 			{
-				TaskKey:  "oops",
-				Skill:    "oops",
-				Status:   StageStatusPending,
+				TaskKey: "oops",
+				Skill:   "oops",
+				Status:  StageStatusPending,
 				Prompt: strings.Join([]string{
 					"Schedule skill is missing. Bootstrap it now so Noodle can recover scheduler dispatch.",
 					"Create `.agents/skills/schedule/SKILL.md` with proper frontmatter including `schedule:`.",
@@ -158,7 +157,7 @@ func (l *Loop) spawnSchedule(ctx context.Context, order Order, attempt int, resu
 	l.lastPromotionError = ""
 	droppedOrders := l.droppedOrderIDs
 	failures := l.reconciledFailures
-	stageProvider, stageModel := l.config.ResolveStageRouting("schedule", stage.Provider, stage.Model)
+	stageProvider, stageModel := l.stageRouting(stage)
 	req := loopruntime.DispatchRequest{
 		Name:                 name,
 		Prompt:               buildSchedulePrompt(skillName, taskTypesPrompt, order, resumePrompt, l.runtimeDir, promotionError, droppedOrders, failures, l.lastMiseWarnings),
@@ -241,7 +240,9 @@ func (l *Loop) spawnBootstrapIfNeeded(ctx context.Context, order Order) error {
 	}
 
 	stage := order.Stages[0]
-	provider, model := l.config.ResolveStageRouting("oops", stage.Provider, stage.Model)
+	// The bootstrap agent writes a skill: builder work, not the scheduler role of
+	// the schedule stage it replaces.
+	provider, model := l.stageRouting(Stage{TaskKey: "oops", Provider: stage.Provider, Model: stage.Model})
 
 	prompt := buildBootstrapPrompt(provider)
 
@@ -272,8 +273,8 @@ func (l *Loop) spawnBootstrapIfNeeded(ctx context.Context, order Order) error {
 		cookIdentity: cookIdentity{
 			orderID: order.ID,
 			stage: Stage{
-				TaskKey: scheduleOrderID,
-				Skill:   "bootstrap",
+				TaskKey:  scheduleOrderID,
+				Skill:    "bootstrap",
 				Provider: provider,
 				Model:    model,
 				Runtime:  "process",
@@ -374,7 +375,7 @@ func buildOrderTaskTypesPrompt(taskTypes []TaskType) string {
 func (l *Loop) rescheduleForChefPrompt(prompt string) error {
 	next := OrdersFile{
 		Orders: []Order{
-			scheduleOrder(l.config, prompt),
+			scheduleOrder(prompt),
 		},
 	}
 	return l.mutateOrdersState(func(orders *OrdersFile) (bool, error) {

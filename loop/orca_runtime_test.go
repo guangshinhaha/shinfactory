@@ -199,7 +199,7 @@ func (e *orcaEnv) emitSessionEvent(t *testing.T, sessionID string, typ event.Eve
 }
 
 func scheduleOnlyOrders() OrdersFile {
-	return OrdersFile{Orders: []Order{scheduleOrder(localLandingConfig(), "")}}
+	return OrdersFile{Orders: []Order{scheduleOrder("")}}
 }
 
 // settleLatest ends the most recently launched fake worker.

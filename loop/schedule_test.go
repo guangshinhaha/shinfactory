@@ -69,7 +69,7 @@ func TestBootstrapScheduleOrderCreatesSingleStageOrder(t *testing.T) {
 	cfg.Routing.Defaults.Provider = "claude"
 	cfg.Routing.Defaults.Model = "claude-haiku-5-5"
 
-	of := bootstrapScheduleOrder(cfg)
+	of := bootstrapScheduleOrder()
 	if len(of.Orders) != 1 {
 		t.Fatalf("orders count = %d, want 1", len(of.Orders))
 	}
@@ -189,8 +189,7 @@ func TestBuildSchedulePromptIncludesReconciledFailures(t *testing.T) {
 }
 
 func TestScheduleOrderWithChefGuidance(t *testing.T) {
-	cfg := localLandingConfig()
-	order := scheduleOrder(cfg, "focus on auth refactor")
+	order := scheduleOrder("focus on auth refactor")
 	if order.Rationale != "Chef steer: focus on auth refactor" {
 		t.Fatalf("rationale = %q, want Chef steer prefix", order.Rationale)
 	}
@@ -205,7 +204,7 @@ func TestSpawnSchedulePersistsActiveStageStatus(t *testing.T) {
 	ordersPath := filepath.Join(runtimeDir, "orders.json")
 
 	cfg := localLandingConfig()
-	order := scheduleOrder(cfg, "")
+	order := scheduleOrder("")
 	if err := writeOrdersAtomic(ordersPath, OrdersFile{Orders: []Order{order}}); err != nil {
 		t.Fatalf("write orders: %v", err)
 	}
@@ -254,7 +253,7 @@ func TestSpawnScheduleDispatchFailureMarksStageFailed(t *testing.T) {
 
 	cfg := localLandingConfig()
 	cfg.Runtime.Default = "sprites"
-	order := scheduleOrder(cfg, "")
+	order := scheduleOrder("")
 	if err := writeOrdersAtomic(ordersPath, OrdersFile{Orders: []Order{order}}); err != nil {
 		t.Fatalf("write orders: %v", err)
 	}

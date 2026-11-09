@@ -354,7 +354,7 @@ func (l *Loop) advanceAndPersist(ctx context.Context, cook *cookHandle, message 
 					if hasScheduleOrder(*orders) || hasScheduleBootstrapOrder(*orders) {
 						return false, nil
 					}
-					prependOrder(orders, scheduleOrder(l.config, ""))
+					prependOrder(orders, scheduleOrder(""))
 					return true, nil
 				}); err != nil {
 					return err

@@ -931,7 +931,7 @@ func TestRemoveOrderDeletesCanonicalOrder(t *testing.T) {
 	ordersPath := filepath.Join(runtimeDir, "orders.json")
 	orders := OrdersFile{
 		Orders: []Order{
-			scheduleOrder(localLandingConfig(), ""),
+			scheduleOrder(""),
 			testOrder("42", "execute", "execute", "claude", "claude-opus-4-6"),
 		},
 	}

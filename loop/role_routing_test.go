@@ -105,7 +105,7 @@ func TestQueuedStagesKeepNoResolvedRouting(t *testing.T) {
 
 func TestScheduleOrderResolvesSchedulerRoleAtDispatch(t *testing.T) {
 	cfg := config.DefaultConfig()
-	stage := scheduleOrder(cfg, "").Stages[0]
+	stage := scheduleOrder("").Stages[0]
 	if stage.Provider != "" || stage.Model != "" {
 		t.Fatalf("schedule stage persisted %s/%s, want none", stage.Provider, stage.Model)
 	}
@@ -139,5 +139,19 @@ func TestIntegrationSensitiveRepoStaysOnOneProvider(t *testing.T) {
 		if len(call.DenyProviders) != 1 || call.DenyProviders[0] != "codex" {
 			t.Errorf("%s DenyProviders = %v, want [codex]", call.Skill, call.DenyProviders)
 		}
+	}
+}
+
+// The review-parked payload and canonical stage record the stage definition: a
+// resolved value would reload as a pinned provider and model.
+func TestReviewPayloadKeepsStageDefinitionRouting(t *testing.T) {
+	l := &Loop{config: config.DefaultConfig()}
+	cook := &cookHandle{cookIdentity: cookIdentity{orderID: "o", stage: Stage{TaskKey: "execute"}}}
+	payload := l.reviewPayloadForCook(cook, "needs review")
+	if payload["provider"] != "" || payload["model"] != "" {
+		t.Errorf("review payload routing = %v/%v, want the empty stage definition", payload["provider"], payload["model"])
+	}
+	if p, m := l.stageRouting(cook.stage); p == "" || m == "" {
+		t.Errorf("stageRouting = %q/%q, want resolved values", p, m)
 	}
 }

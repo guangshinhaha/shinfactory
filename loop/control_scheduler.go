@@ -78,7 +78,7 @@ func (l *Loop) controlAddStage(cmd ControlCommand) error {
 	if taskKey == "" {
 		return fmt.Errorf("add-stage requires task_key")
 	}
-	if err := l.config.ValidateStageProvider(cmd.Provider); err != nil {
+	if err := l.config.ValidateStageRouting(cmd.Provider, cmd.Model); err != nil {
 		return err
 	}
 

@@ -34,7 +34,7 @@ func (l *Loop) controlEnqueue(cmd ControlCommand) error {
 	if orderID == "" {
 		return fmt.Errorf("enqueue requires order_id")
 	}
-	if err := l.config.ValidateStageProvider(cmd.Provider); err != nil {
+	if err := l.config.ValidateStageRouting(cmd.Provider, cmd.Model); err != nil {
 		return err
 	}
 	prompt := strings.TrimSpace(cmd.Prompt)
@@ -120,6 +120,19 @@ func (l *Loop) controlEditItem(cmd ControlCommand) error {
 			if taskKey := strings.TrimSpace(cmd.TaskKey); taskKey != "" && orders.Orders[i].Stages[stageIdx].TaskKey != taskKey {
 				orders.Orders[i].Stages[stageIdx].TaskKey = taskKey
 				changed = true
+			}
+			// Validate only an edit that touches routing. A new provider drops the old
+			// model, which names a model of the old provider.
+			if cmd.Provider != "" || cmd.Model != "" {
+				current := orders.Orders[i].Stages[stageIdx]
+				nextProvider := nonEmpty(strings.TrimSpace(cmd.Provider), current.Provider)
+				nextModel := strings.TrimSpace(cmd.Model)
+				if nextModel == "" && stringx.Normalize(nextProvider) == stringx.Normalize(current.Provider) {
+					nextModel = current.Model
+				}
+				if err := l.config.ValidateStageRouting(nextProvider, nextModel); err != nil {
+					return false, err
+				}
 			}
 			if provider := strings.TrimSpace(cmd.Provider); provider != "" && orders.Orders[i].Stages[stageIdx].Provider != provider {
 				orders.Orders[i].Stages[stageIdx].Provider = provider

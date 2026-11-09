@@ -144,6 +144,9 @@ func TestMissingScheduleSkillTriggersBootstrap(t *testing.T) {
 	if l.bootstrapInFlight == nil {
 		t.Fatal("expected bootstrapInFlight to be set")
 	}
+	if _, builderModel := l.config.ResolveStageRouting("oops", "", ""); req.Model != builderModel {
+		t.Fatalf("bootstrap model = %q, want builder role model %q", req.Model, builderModel)
+	}
 	if got := l.bootstrapInFlight.stage.Provider; got != req.Provider {
 		t.Fatalf("bootstrap provider = %q, want %q", got, req.Provider)
 	}
