@@ -95,6 +95,8 @@ export default defineConfig({
           { text: "Adapters", link: "/concepts/adapters" },
           { text: "Modes", link: "/concepts/modes" },
           { text: "Runtimes", link: "/concepts/runtimes" },
+          { text: "Backlog States", link: "/concepts/backlog-states" },
+          { text: "Operating Model", link: "/concepts/operating-model" },
           { text: "Self-Learning (Optional)", link: "/concepts/brain" },
         ],
       },

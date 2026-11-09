@@ -43,6 +43,11 @@ Or follow the [getting started guide](https://noodle-run.github.io/noodle/gettin
 
 Full documentation lives at [noodle-run.github.io/noodle](https://noodle-run.github.io/noodle/).
 
+Factory concepts for this repo:
+
+- [Backlog states](docs/concepts/backlog-states.md): the labels that decide what the factory builds.
+- [Operating model](docs/concepts/operating-model.md): how the queue, the coordinator and the agents fit together.
+
 ## Contributing
 
 ```sh
