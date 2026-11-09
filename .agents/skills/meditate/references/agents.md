@@ -55,7 +55,7 @@ Prompt spec:
 - Each proposed principle: insight, evidence (which notes), why independent, which shinstack folder it fits (general, engineering, product)
 
 **Section 3 — Skill review:**
-- For each skill, check against shinstack principles:
+- For each skill, check against shinstack principles (when shinstack is not installed, check against the project's brain and the skill's own stated rules):
   - Does it contradict any principle?
   - Does it miss a structural enforcement opportunity? (can an instruction become a lint rule, script, metadata flag, or runtime check?)
   - Does it duplicate instructions that a mechanism already handles?
@@ -92,4 +92,7 @@ Use this format when presenting the consolidated summary in Step 4:
 ## Skill Review Results
 - S skills reviewed, N findings
 - [list each with: skill name, principle gap, proposed fix]
+
+## General lessons
+- [principle candidates, only when shinstack is not installed to receive them; otherwise omit]
 ```

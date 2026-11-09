@@ -23,10 +23,12 @@ reviewers — those run on *your own* model, which defeats the purpose.
 
 ## Step 1 — Load Principles
 
-If the `shinstack:craft` skill is in your skill list, load it and read the principles its router lists for this work, in full. These govern reviewer judgments. If shinstack is not installed, don't try to load it; use prove-it-works (a claim counts only when run or shown), laziness-protocol (flag needless layers and options) and fix-root-causes (flag symptom patches) as the lenses' frame.
+If the `shinstack:craft` skill is in your skill list, load it and read the principles its router lists for this work, in full. These govern reviewer judgments. If shinstack is not installed, don't try to load it; use these as the lenses' frame, and tell each reviewer to apply them:
+- **prove-it-works:** a claim counts only when it was run or shown.
+- **laziness-protocol:** flag layers, flags and options nobody asked for.
+- **fix-root-causes:** flag a fix that hides the symptom while the cause remains.
 Apply shinstack `interrogate`'s rule to every finding, with or without the plugin: it
 counts only if the reviewer can show it (a failing run, a concrete input, a cited line), not
-assert it.
 assert it.
 
 ## Step 2 — Determine Scope and Intent

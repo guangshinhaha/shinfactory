@@ -66,7 +66,7 @@ Apply all changes directly. The user reviews the diff.
 - **Verbose notes**: Condense in place
 - **New connections**: Add `[[wikilinks]]`
 - **Tensions**: Reword to clarify boundaries
-- **New principles**: Only from the distillation section, only if genuinely independent. Principles live in shinstack: when it is installed, append one line per candidate to `~/.claude/shinstack-friction.md` for shinstack's `reflect` to review; when it isn't, list the candidates in the report for the human. Never write principle files into the brain
+- **New principles**: Only from the distillation section, only if genuinely independent. Principles live in shinstack: when it is installed, append one line per candidate to `~/.claude/shinstack-friction.md` for shinstack's `reflect` to review; when it isn't, list the candidates under "General lessons" in the report for the human. Never write principle files into the brain
 - **Merge principles**: not done here; principles live in shinstack
 - **Bloated skill descriptions**: Tighten frontmatter descriptions — cut what Claude can infer, keep only distinctive triggers and purpose
 - **CLAUDE.md issues**: Rewrite or delete
