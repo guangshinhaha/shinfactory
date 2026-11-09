@@ -72,6 +72,8 @@ func New(projectDir, noodleBin string, cfg config.Config, deps Dependencies) *Lo
 		deps.StatusFile = filepath.Join(runtimeDir, "status.json")
 	}
 
+	cfg.Landing.Mode = resolveLandingMode(projectDir, cfg.Landing.Mode)
+
 	registry := deps.Registry
 	var registryErr error
 	if len(registry.All()) == 0 {

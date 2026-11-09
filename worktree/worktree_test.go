@@ -1196,3 +1196,15 @@ func TestMergeWithDirtyWorktree(t *testing.T) {
 }
 
 // --- integration branch policy tests ---
+
+func TestCreateFromRemoteTrackingRefDoesNotTrackIt(t *testing.T) {
+	dir := setupTestRepo(t)
+	runGitIn(t, dir, "update-ref", "refs/remotes/origin/main", "HEAD")
+	app := &App{Root: dir}
+	if err := app.Create("no-track", CreateOpts{From: "refs/remotes/origin/main"}); err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+	if out, err := exec.Command("git", "-C", dir, "config", "--get", "branch.no-track.merge").CombinedOutput(); err == nil {
+		t.Fatalf("order branch tracks its base (%s); upstream must be set at first push", out)
+	}
+}

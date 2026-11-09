@@ -259,7 +259,7 @@ func normalizeParsedValues(config *Config, metadata toml.MetaData, diagnostics *
 
 	switch mode := stringx.Normalize(config.Landing.Mode); mode {
 	case "":
-		config.Landing.Mode = LandingModePR
+		// Unset: the loop resolves it from the project's remote.
 	case LandingModeLocal, LandingModePR:
 		config.Landing.Mode = mode
 	default:
