@@ -2,14 +2,29 @@ name: verdict-check
 # Fails a PR labelled risk:high unless a verifier's verdict (PASS or PASS+NOTES)
 # for its current head is posted as a PR comment. Skips unlabelled PRs. A verdict
 # comment re-runs the check by itself; actions: write is for that re-run.
+# risk-label adds risk:high to a PR that touches a High-risk path: gantry's
+# defaults (.github/workflows/**, template/.github/**, bin/gantry-protect) plus
+# the globs in .github/gantry-high-risk-paths (one per line, read from the base
+# branch). Delete that job and the `needs`, `if` and `with` lines below it to
+# label by hand only.
 on:
   pull_request:
     types: [opened, reopened, synchronize, labeled, unlabeled]
   issue_comment:
     types: [created, edited, deleted]
 jobs:
+  risk-label:
+    if: ${{ github.event_name == 'pull_request' }}
+    uses: guangshinhaha/gantry/.github/workflows/risk-label.yml@main
+    permissions:
+      contents: read
+      pull-requests: write
   verdict-check:
+    needs: risk-label
+    if: ${{ !cancelled() }}
     uses: guangshinhaha/gantry/.github/workflows/verdict-check.yml@main
+    with:
+      risk-label-result: ${{ needs.risk-label.result }}
     permissions:
       actions: write
       contents: read
