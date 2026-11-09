@@ -915,7 +915,7 @@ func TestFailedOrderRequiresRequeueBeforeDispatch(t *testing.T) {
 }
 
 func TestControlRejectsStageProviderOnSensitiveRepo(t *testing.T) {
-	cfg := config.DefaultConfig()
+	cfg := localLandingConfig()
 	cfg.Routing.Sensitive = true
 	projectDir := t.TempDir()
 	ordersPath := filepath.Join(projectDir, ".noodle", "orders.json")
