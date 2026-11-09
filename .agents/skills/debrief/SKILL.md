@@ -11,7 +11,7 @@ schedule: "Follow-up stage after quality — capture learnings from the complete
 
 Review the session and persist what it taught about **this project**: to `brain/`, to this repo's skill files, or as structural enforcement.
 
-Debrief is project-scoped. Shinstack's `reflect` is the separate, human-approved review that changes how agents work across every project. Don't edit shinstack from here.
+Debrief is project-scoped. Shinstack's `reflect` (when installed) is the separate, human-approved review that changes how agents work across every project. Don't edit shinstack from here.
 
 ## Process
 
@@ -36,11 +36,11 @@ Not everything belongs in the brain. Route each learning to where it will have t
 
 ### Structural enforcement check
 
-Before routing a learning to `brain/`, ask: can this be a lint rule, script, metadata flag, or runtime check? If yes, encode it structurally and skip the brain note. See shinstack's `encode-lessons-in-structure` principle.
+Before routing a learning to `brain/`, ask: can this be a lint rule, script, metadata flag, or runtime check? If yes, encode it structurally and skip the brain note. (This is shinstack's `encode-lessons-in-structure` principle; it applies with or without the plugin.)
 
 ### Lessons about how to work in general (not this project)
 
-A lesson that would apply to any project (a principle, a playbook gap, a shinstack file that was wrong or ignored) does not go in `brain/`. Append one line to `~/.claude/shinstack-friction.md` (`date | file | what went wrong`, no code or private content). Shinstack's `reflect` reads it and proposes the edit for the human to approve.
+A lesson that would apply to any project (a principle, a playbook gap, a shinstack file that was wrong or ignored) does not go in `brain/`. If shinstack is installed (the `shinstack:craft` skill is in your skill list), append one line to `~/.claude/shinstack-friction.md` (`date | file | what went wrong`, no code or private content). Shinstack's `reflect` reads it and proposes the edit for the human to approve. If it isn't installed, don't create that file: list the lesson under "General lessons" in your summary for the human instead.
 
 ### Brain files (`brain/`)
 
@@ -57,7 +57,7 @@ If a learning is about how a specific skill works — its process, prompts, or e
 ### Orchestration workflow improvements
 
 If the session revealed systemic orchestration issues, route to:
-- **General delegation heuristic** → the shinstack friction line above, not the brain
+- **General delegation heuristic** → the shinstack friction line above (or the summary when shinstack is absent), not the brain
 - **Skill mechanics change** (monitoring loop, review step) → relevant skill file
 - **New skill opportunity** (recurring workflow that could be encoded) → note in summary for the user
 
@@ -73,5 +73,5 @@ Follow-up work that can't be done during the debrief — bugs, non-trivial rewri
 - Skills: [skill files modified, one-line each]
 - Structural: [rules/scripts/checks added]
 - Todos: [follow-up items filed]
-- Shinstack friction: [lines appended, one each]
+- Shinstack friction: [lines appended, one each; or "General lessons" for the human when shinstack is absent]
 ```
