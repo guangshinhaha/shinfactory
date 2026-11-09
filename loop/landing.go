@@ -89,17 +89,18 @@ func (g ghLander) PushAndEnsureDraft(ctx context.Context, dir string, spec PRSpe
 	if spec.Branch == "" || branch != spec.Branch {
 		return PullRequest{}, fmt.Errorf("worktree %s is on branch %q, not the order branch %q; refusing to push or open a PR", dir, branch, spec.Branch)
 	}
-	if _, err := g.run(ctx, dir, "git", "push", "--set-upstream", "origin", branch); err != nil {
-		return PullRequest{}, err
-	}
-	if pr, ok, err := g.find(ctx, dir, branch, spec.Base); err != nil {
+	// The PR may already be merged (by a human, or a merge queue, while the
+	// order waited on checks). Pushing would recreate the deleted branch and
+	// opening another PR would be a stray one.
+	if pr, ok, err := g.findMerged(ctx, dir, branch); err != nil {
 		return PullRequest{}, err
 	} else if ok {
 		return pr, nil
 	}
-	// The PR may already be merged (by a human, or a merge queue, while the
-	// order waited on checks). Opening another would be a stray PR.
-	if pr, ok, err := g.findMerged(ctx, dir, branch); err != nil {
+	if _, err := g.run(ctx, dir, "git", "push", "--set-upstream", "origin", branch); err != nil {
+		return PullRequest{}, err
+	}
+	if pr, ok, err := g.find(ctx, dir, branch, spec.Base); err != nil {
 		return PullRequest{}, err
 	} else if ok {
 		return pr, nil
@@ -186,26 +187,36 @@ type prState struct {
 	} `json:"statusCheckRollup"`
 }
 
-func (p prState) checksPending() bool {
+// checksPending reports what the PR still waits on, or "" when nothing.
+func (p prState) checksPending() string {
 	if p.MergeStateStatus == "UNKNOWN" {
-		return true
+		return "GitHub has not computed mergeability yet"
 	}
 	// Right after a push GitHub reports no checks yet and the PR as BLOCKED
 	// by the ruleset that is about to attach them. Wait; a PR blocked for
 	// another reason (a review) stays parked for a human, never failed.
 	if p.MergeStateStatus == "BLOCKED" && len(p.StatusCheckRollup) == 0 {
-		return true
+		return "no checks reported yet and the PR is blocked: checks not attached, or a required review is missing"
 	}
 	for _, c := range p.StatusCheckRollup {
 		if c.Status != "" && c.Status != "COMPLETED" {
-			return true
+			return "checks are still running"
 		}
 		if c.State == "PENDING" || c.State == "EXPECTED" {
-			return true
+			return "checks are still running"
 		}
 	}
-	return false
+	return ""
 }
+
+// pendingError is ErrChecksPending with what the PR waits on, so a parked
+// order can tell a human why.
+type pendingError struct{ url, detail string }
+
+func (e pendingError) Error() string {
+	return ErrChecksPending.Error() + " on " + e.url + ": " + e.detail
+}
+func (e pendingError) Is(target error) bool { return target == ErrChecksPending }
 
 func (g ghLander) view(ctx context.Context, dir string, pr PullRequest) (prState, error) {
 	out, err := g.run(ctx, dir, "gh", "pr", "view", pr.URL, "--json", "headRefName,headRefOid,state,isDraft,isCrossRepository,mergeStateStatus,statusCheckRollup")
@@ -228,8 +239,18 @@ func (g ghLander) MarkReadyAndMerge(ctx context.Context, dir string, pr PullRequ
 	if pr.Branch == "" || st.HeadRefName != pr.Branch || st.IsCrossRepository {
 		return fmt.Errorf("PR %s has head %q, not the order branch %q; refusing to ready or merge it", pr.URL, st.HeadRefName, pr.Branch)
 	}
+	// GitHub can lag a push: merging a stale head would ship without the final
+	// commits. Merge exactly the commit this worktree holds.
+	head, err := g.run(ctx, dir, "git", "rev-parse", "HEAD")
+	if err != nil {
+		return err
+	}
 	switch st.State {
 	case "MERGED":
+		// A human may have merged an older head before the last push.
+		if st.HeadRefOid != head {
+			return fmt.Errorf("PR %s merged at %.12s, but the worktree holds %.12s: the final commits are not in it", pr.URL, st.HeadRefOid, head)
+		}
 		return nil
 	case "OPEN":
 	default:
@@ -243,17 +264,11 @@ func (g ghLander) MarkReadyAndMerge(ctx context.Context, dir string, pr PullRequ
 			return err
 		}
 	}
-	if st.checksPending() {
-		return fmt.Errorf("%w on %s", ErrChecksPending, pr.URL)
-	}
-	// GitHub can lag a push: merging a stale head would ship without the final
-	// commits. Merge exactly the commit this worktree holds.
-	head, err := g.run(ctx, dir, "git", "rev-parse", "HEAD")
-	if err != nil {
-		return err
+	if detail := st.checksPending(); detail != "" {
+		return pendingError{pr.URL, detail}
 	}
 	if st.HeadRefOid != head {
-		return fmt.Errorf("%w: %s shows head %.12s, not the pushed %.12s", ErrChecksPending, pr.URL, st.HeadRefOid, head)
+		return pendingError{pr.URL, fmt.Sprintf("GitHub shows head %.12s, not the pushed %.12s", st.HeadRefOid, head)}
 	}
 	// A plain merge: GitHub refuses it while a required check is failing, and
 	// the order is then parked with that reason. --auto would return success
@@ -262,11 +277,13 @@ func (g ghLander) MarkReadyAndMerge(ctx context.Context, dir string, pr PullRequ
 		return err
 	}
 	// A merge queue can accept the merge and return before it lands.
+	// The merge ran, so a failed read must not fail the stage: the next
+	// attempt sees MERGED and finishes.
 	if st, err = g.view(ctx, dir, pr); err != nil {
-		return err
+		return pendingError{pr.URL, "merge ran but its status could not be read: " + err.Error()}
 	}
 	if st.State != "MERGED" {
-		return fmt.Errorf("%w: merge of %s is queued, not merged", ErrChecksPending, pr.URL)
+		return pendingError{pr.URL, "merge is queued, not merged"}
 	}
 	return nil
 }
@@ -379,7 +396,7 @@ func (l *Loop) completeWithPR(ctx context.Context, cook *cookHandle, hasCommits 
 				// Gantry's checks run on the final push. Wait for them: the
 				// order stays parked and each cycle retries the merge.
 				l.lastChecksPoll = l.deps.Now()
-				return l.parkPendingReview(cook, awaitingChecksReason(pr.URL))
+				return l.parkPendingReview(cook, awaitingChecksReason(pr.URL, err))
 			}
 			return l.failStage(ctx, cook, "ship PR: "+err.Error())
 		}
@@ -420,23 +437,46 @@ const shipTimeout = 2 * time.Minute
 // checksPollInterval is how often a waiting PR is re-checked.
 const checksPollInterval = 30 * time.Second
 
-func awaitingChecksReason(url string) string {
-	return awaitingChecksPrefix + " (" + url + ")"
+func awaitingChecksReason(url string, err error) string {
+	return awaitingChecksPrefix + " (" + url + "): " + pendingDetail(err)
+}
+
+// approvedAwaitingChecksPrefix marks a PR a human already approved. The loop
+// merges it once checks pass in any mode, so the human approves only once.
+const approvedAwaitingChecksPrefix = "approved, waiting for required checks"
+
+func approvedAwaitingChecksReason(err error) string {
+	var pe pendingError
+	if errors.As(err, &pe) {
+		return approvedAwaitingChecksPrefix + " (" + pe.url + "): " + pe.detail
+	}
+	return approvedAwaitingChecksPrefix + ": " + err.Error()
+}
+
+func pendingDetail(err error) string {
+	var pe pendingError
+	if errors.As(err, &pe) {
+		return pe.detail
+	}
+	return err.Error()
 }
 
 // retryAwaitingChecks merges parked PRs whose checks have finished. A PR whose
 // merge is refused stays parked with the refusal as its reason, for a human.
 func (l *Loop) retryAwaitingChecks(ctx context.Context) error {
-	if !l.config.Landing.PR() || !(mode.ModeGate{}).CanAutoMerge(l.canonical.Mode) {
+	if !l.config.Landing.PR() {
 		return nil
 	}
+	auto := (mode.ModeGate{}).CanAutoMerge(l.canonical.Mode)
 	now := l.deps.Now()
 	if now.Sub(l.lastChecksPoll) < checksPollInterval {
 		return nil
 	}
 	var waiting []*pendingReviewCook
 	for _, pending := range l.cooks.pendingReview {
-		if strings.HasPrefix(pending.reason, awaitingChecksPrefix) {
+		// Without auto mode only a PR a human already approved may merge.
+		if strings.HasPrefix(pending.reason, approvedAwaitingChecksPrefix) ||
+			(auto && strings.HasPrefix(pending.reason, awaitingChecksPrefix)) {
 			waiting = append(waiting, pending)
 		}
 	}
@@ -453,8 +493,18 @@ func (l *Loop) retryAwaitingChecks(ctx context.Context) error {
 			session:      &adoptedSession{id: pending.sessionID, status: "completed"},
 		}
 		err := l.shipParkedPR(ctx, cook, "required checks passed")
+		var pe pendingError
 		switch {
-		case err == nil, errors.Is(err, ErrChecksPending):
+		case err == nil:
+		case errors.Is(err, ErrChecksPending):
+			// Show what it waits on now, not on the first poll.
+			if errors.As(err, &pe) {
+				if strings.HasPrefix(pending.reason, approvedAwaitingChecksPrefix) {
+					pending.reason = approvedAwaitingChecksReason(err)
+				} else {
+					pending.reason = awaitingChecksReason(pe.url, err)
+				}
+			}
 		default:
 			l.logger.Warn("parked PR could not merge", "order", cook.orderID, "error", err)
 			pending.reason = "merge refused: " + err.Error()
@@ -469,15 +519,19 @@ func (l *Loop) retryAwaitingChecks(ctx context.Context) error {
 // approvePRShip is controlMerge in landing mode "pr": the human approved the
 // parked final stage, so ready and merge its PR, then finish the order.
 func (l *Loop) approvePRShip(cook *cookHandle) error {
-	return l.shipParkedPR(context.Background(), cook, "approved by user")
+	err := l.shipParkedPR(context.Background(), cook, "approved by user")
+	if errors.Is(err, ErrChecksPending) {
+		// The human has approved. Park the order as approved so the loop
+		// merges it when checks pass, instead of asking for a second yes.
+		l.lastChecksPoll = l.deps.Now()
+		return l.parkPendingReview(cook, approvedAwaitingChecksReason(err))
+	}
+	return err
 }
 
 // shipParkedPR ships the parked final stage's PR and finishes the order.
 // reason is recorded on the review approval.
 func (l *Loop) shipParkedPR(ctx context.Context, cook *cookHandle, reason string) error {
-	// Covers the push and PR lookup too: a hung gh must not stall Cycle.
-	ctx, cancel := context.WithTimeout(ctx, shipTimeout)
-	defer cancel()
 	if !l.isFinalStage(cook) {
 		// A parked non-final stage (e.g. a blocking stage message): approving
 		// it moves the order on; only the last stage ships the PR.
@@ -502,12 +556,11 @@ func (l *Loop) shipParkedPR(ctx context.Context, cook *cookHandle, reason string
 		return l.syncPendingReviewProjection()
 	}
 	order, _ := l.orderByID(cook.orderID)
-	pr, err := l.lander().PushAndEnsureDraft(ctx, cook.worktreePath, l.prSpec(order, cook))
+	// The deadline bounds the push, lookup and merge only. Marking the issue
+	// done afterwards gets the caller's full context.
+	pr, err := l.pushAndShip(ctx, cook, order)
 	if err != nil {
-		return fmt.Errorf("find order PR: %w", err)
-	}
-	if err := l.shipPR(ctx, cook, pr); err != nil {
-		return fmt.Errorf("ship PR: %w", err)
+		return err
 	}
 	if err := l.emitEventChecked(ingest.EventStageReviewApproved, map[string]any{
 		"order_id":    cook.orderID,
@@ -529,4 +582,19 @@ func (l *Loop) shipParkedPR(ctx context.Context, cook *cookHandle, reason string
 		return err
 	}
 	return l.syncPendingReviewProjection()
+}
+
+// pushAndShip finds the order's PR and merges it under one shipTimeout, so a
+// hung gh cannot stall Cycle.
+func (l *Loop) pushAndShip(ctx context.Context, cook *cookHandle, order Order) (PullRequest, error) {
+	ctx, cancel := context.WithTimeout(ctx, shipTimeout)
+	defer cancel()
+	pr, err := l.lander().PushAndEnsureDraft(ctx, cook.worktreePath, l.prSpec(order, cook))
+	if err != nil {
+		return PullRequest{}, fmt.Errorf("find order PR: %w", err)
+	}
+	if err := l.shipPR(ctx, cook, pr); err != nil {
+		return PullRequest{}, fmt.Errorf("ship PR: %w", err)
+	}
+	return pr, nil
 }
