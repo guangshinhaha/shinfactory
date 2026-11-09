@@ -35,6 +35,7 @@ sync = "defaults/adapters/github/backlog-sync"
 add = "defaults/adapters/github/backlog-add"
 done = "defaults/adapters/github/backlog-done"
 edit = "defaults/adapters/github/backlog-edit"
+stop = "defaults/adapters/github/backlog-stop"
 
 [landing]
 mode = "pr"

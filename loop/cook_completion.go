@@ -125,7 +125,11 @@ func (l *Loop) handleCompletion(ctx context.Context, cook *cookHandle, resultSta
 			if reason == "" {
 				reason = "stage reported failure with no reason"
 			}
-			return l.failStage(ctx, cook, reason)
+			if err := l.failStage(ctx, cook, reason); err != nil {
+				return err
+			}
+			l.noteRejectedStage(ctx, cook.orderID, reason)
+			return nil
 		}
 	}
 
@@ -364,6 +368,7 @@ func (l *Loop) advanceAndPersist(ctx context.Context, cook *cookHandle, message 
 				return err
 			}
 		}
+		l.clearFailedRounds(cook.orderID)
 	}
 	return nil
 }

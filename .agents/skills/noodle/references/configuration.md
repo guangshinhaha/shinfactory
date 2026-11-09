@@ -55,7 +55,7 @@ A provider is used only when the config names it. `[routing] sensitive = true` k
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `max_concurrency` | int | `4` | Maximum concurrent agent sessions |
+| `max_concurrency` | int | `2` | Maximum concurrent agent sessions |
 
 ## `[agents.claude]`
 

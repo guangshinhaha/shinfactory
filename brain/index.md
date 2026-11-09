@@ -20,6 +20,7 @@
 - [[codebase/merge-recovery-synthetic-cooks-must-preserve-task-key]]
 - [[codebase/orders-lifecycle-defaults-on-promotion]]
 - [[codebase/orders-must-name-a-ready-issue]]
+- [[codebase/needs-shin-stop-path]]
 - [[codebase/pr-landing-mode]]
 - [[codebase/provider-routing-must-fail-loudly]]
 - [[codebase/projection-owns-snapshot-active-order-ids]]
