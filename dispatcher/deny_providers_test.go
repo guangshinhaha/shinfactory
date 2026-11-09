@@ -3,6 +3,7 @@ package dispatcher
 import (
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"slices"
 	"strings"
@@ -67,5 +68,19 @@ func TestCodexStageCannotRunClaudeCLI(t *testing.T) {
 	}
 	if d, _ := writeDenyShims(t.TempDir(), nil); d != "" {
 		t.Errorf("no providers should write no shims, got %q", d)
+	}
+}
+
+func TestDenyShimEnvAppliesToCodexOnly(t *testing.T) {
+	d := &ProcessDispatcher{runtimeDir: t.TempDir()}
+	env, err := d.denyShimEnv(DispatchRequest{Provider: "codex", DenyProviders: []string{"claude"}})
+	if err != nil || len(env) != 1 || !strings.HasPrefix(env[0], "PATH="+filepath.Join(d.runtimeDir, "deny-bin")) {
+		t.Fatalf("codex stage env = %v, err = %v, want PATH led by deny-bin", env, err)
+	}
+	if env, _ := d.denyShimEnv(DispatchRequest{Provider: "claude", DenyProviders: []string{"codex"}}); env != nil {
+		t.Errorf("claude stage should rely on tool denials, got %v", env)
+	}
+	if env, _ := d.denyShimEnv(DispatchRequest{Provider: "codex"}); env != nil {
+		t.Errorf("non-sensitive codex stage got %v", env)
 	}
 }

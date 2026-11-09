@@ -176,6 +176,19 @@ func (d *ProcessDispatcher) sessionEnv(req DispatchRequest, sessionID string) []
 	)
 }
 
+// denyShimEnv returns the PATH entry that puts deny shims first. Only claude
+// has tool denials, so every other provider gets shims.
+func (d *ProcessDispatcher) denyShimEnv(req DispatchRequest) ([]string, error) {
+	if stringx.Normalize(req.Provider) == "claude" {
+		return nil, nil
+	}
+	shimDir, err := writeDenyShims(d.runtimeDir, req.DenyProviders)
+	if err != nil || shimDir == "" {
+		return nil, err
+	}
+	return []string{"PATH=" + shimDir + string(os.PathListSeparator) + os.Getenv("PATH")}, nil
+}
+
 // startSessionProcess builds the command, starts the child process, configures
 // the controller for stdin steering, drains stderr, and writes metadata.
 func (d *ProcessDispatcher) startSessionProcess(
@@ -188,16 +201,11 @@ func (d *ProcessDispatcher) startSessionProcess(
 	}
 	cmd.Dir = req.WorktreePath
 	cmd.Env = d.sessionEnv(req, sessionID)
-	if stringx.Normalize(req.Provider) != "claude" {
-		// Only claude has tool denials; other providers get shims ahead of PATH.
-		shimDir, err := writeDenyShims(d.runtimeDir, req.DenyProviders)
-		if err != nil {
-			return nil, nil, fmt.Errorf("deny provider CLIs: %w", err)
-		}
-		if shimDir != "" {
-			cmd.Env = append(cmd.Env, "PATH="+shimDir+string(os.PathListSeparator)+os.Getenv("PATH"))
-		}
+	denyEnv, err := d.denyShimEnv(req)
+	if err != nil {
+		return nil, nil, fmt.Errorf("deny provider CLIs: %w", err)
 	}
+	cmd.Env = append(cmd.Env, denyEnv...)
 
 	process, err := StartProcess(cmd)
 	if err != nil {
