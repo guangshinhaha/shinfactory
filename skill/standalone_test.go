@@ -18,21 +18,21 @@ const (
 
 var (
 	// A load of a shinstack skill: `shinstack:craft`, /shinstack:blast-radius.
-	shinstackLoad = regexp.MustCompile(`shinstack:[a-z]`)
+	shinstackLoad = regexp.MustCompile(`\bshinstack:[a-z]`)
 	// A shinstack dependency stated as a given.
 	shinstackGiven = regexp.MustCompile(`(?i)\b(per|see|from) shinstack\b`)
 	// Words that make a sentence conditional on shinstack being present.
 	shinstackQualifier = regexp.MustCompile(`(?i)installed|skill list|with or without`)
 	// A labeled fallback somewhere in the file.
 	shinstackFallback = regexp.MustCompile(`shinstack is not installed|Without shinstack`)
-	sentenceBreak     = regexp.MustCompile(`[.!?]\s+|\n`)
+	sentenceBreak     = regexp.MustCompile(`[.!?]\s+|\n\s*\n`)
 )
 
 // shinstackViolations returns the problems in one skill document: every
 // sentence that loads shinstack or states it as a given must itself say
-// "when installed" (or equivalent), and a file that loads shinstack must
-// carry a labeled fallback.
-func shinstackViolations(body string) []string {
+// "when installed" (or equivalent), and a SKILL.md that loads shinstack must
+// carry a labeled fallback (references fall under their skill's).
+func shinstackViolations(body string, needsFallback bool) []string {
 	var out []string
 	loads := false
 	for _, s := range sentenceBreak.Split(body, -1) {
@@ -46,7 +46,7 @@ func shinstackViolations(body string) []string {
 			out = append(out, "unqualified shinstack reference: "+strings.TrimSpace(s))
 		}
 	}
-	if loads && !shinstackFallback.MatchString(body) {
+	if needsFallback && loads && !shinstackFallback.MatchString(body) {
 		out = append(out, `loads a shinstack skill but has no "Without shinstack" fallback`)
 	}
 	return out
@@ -86,7 +86,7 @@ func TestShippedSkillsDoNotRequireShinstack(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		for _, v := range shinstackViolations(string(raw)) {
+		for _, v := range shinstackViolations(string(raw), filepath.Base(f) == "SKILL.md") {
 			t.Errorf("%s: %s", f, v)
 		}
 	}
@@ -105,10 +105,11 @@ func TestShinstackViolations(t *testing.T) {
 		{"See shinstack's", "See shinstack's interrogate rule.", 1},
 		{"From shinstack:", "From shinstack: prove-it-works.", 1},
 		{"From shinstack when installed", "From shinstack, when installed: prove-it-works.", 0},
+		{"qualifier on a wrapped line", "Load `shinstack:craft` first\nwhen it is installed.\n\nWithout shinstack: skip.", 0},
 		{"no mention", "Plain text.", 0},
 	}
 	for _, c := range cases {
-		if got := shinstackViolations(c.body); len(got) != c.want {
+		if got := shinstackViolations(c.body, true); len(got) != c.want {
 			t.Errorf("%s: got %d violations %v, want %d", c.name, len(got), got, c.want)
 		}
 	}
