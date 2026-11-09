@@ -40,7 +40,7 @@ Before routing a learning to `brain/`, ask: can this be a lint rule, script, met
 
 ### Lessons about how to work in general (not this project)
 
-A lesson that would apply to any project (a principle, a playbook gap, a shinstack file that was wrong or ignored) does not go in `brain/`. If shinstack is installed (the `shinstack:craft` skill is in your skill list), append one line to `~/.claude/shinstack-friction.md` (`date | file | what went wrong`, no code or private content). Shinstack's `reflect` reads it and proposes the edit for the human to approve. If it isn't installed, don't create that file: list the lesson under "General lessons" in your summary for the human instead.
+A lesson that would apply to any project (a principle, a playbook gap, a shinstack file that was wrong or ignored) does not go in `brain/`. If shinstack is installed (the `shinstack:craft` skill is in your skill list), append one line to `~/.claude/shinstack-friction.md` (`date | file | what went wrong`, no code or private content). Shinstack's `reflect` reads it and proposes the edit for the human to approve. If shinstack is not installed, don't create that file: list the lesson under "General lessons" in your summary for the human instead.
 
 ### Brain files (`brain/`)
 
