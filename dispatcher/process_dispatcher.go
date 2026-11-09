@@ -188,6 +188,16 @@ func (d *ProcessDispatcher) startSessionProcess(
 	}
 	cmd.Dir = req.WorktreePath
 	cmd.Env = d.sessionEnv(req, sessionID)
+	if stringx.Normalize(req.Provider) != "claude" {
+		// Only claude has tool denials; other providers get shims ahead of PATH.
+		shimDir, err := writeDenyShims(d.runtimeDir, req.DenyProviders)
+		if err != nil {
+			return nil, nil, fmt.Errorf("deny provider CLIs: %w", err)
+		}
+		if shimDir != "" {
+			cmd.Env = append(cmd.Env, "PATH="+shimDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+		}
+	}
 
 	process, err := StartProcess(cmd)
 	if err != nil {

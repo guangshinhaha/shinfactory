@@ -56,7 +56,7 @@ func deniedBashPatterns(providers []string) []string {
 		if p == "" {
 			continue
 		}
-		out = append(out, "Bash("+p+":*)", "Bash(*"+p+" exec*)")
+		out = append(out, "Bash("+p+":*)")
 	}
 	return out
 }
