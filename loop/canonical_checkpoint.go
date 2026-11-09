@@ -77,7 +77,7 @@ func (l *Loop) bootstrapCanonicalFromLegacy() error {
 		now = l.deps.Now().UTC()
 	}
 
-	l.canonical = synthesizeCanonicalState(orders, pendingReview, state.RunMode(l.config.Mode), now, l.stageRuntime(""))
+	l.canonical = synthesizeCanonicalState(orders, pendingReview, state.RunMode(l.config.Mode), now, l.stageRuntime(Stage{}))
 	l.effectLedger = reducer.NewEffectLedger()
 	l.eventCounter.Store(0)
 	l.canonicalLoaded = true
@@ -289,7 +289,7 @@ func (l *Loop) syncCanonicalOrderFromLegacyAt(order Order, sequence int) {
 				"skill":       stage.Skill,
 				"provider":    strings.TrimSpace(stage.Provider),
 				"model":       strings.TrimSpace(stage.Model),
-				"runtime":     nonEmpty(stage.Runtime, l.stageRuntime("")),
+				"runtime":     l.stageRuntime(stage),
 				"group":       stage.Group,
 			})
 		}
@@ -328,7 +328,7 @@ func (l *Loop) syncCanonicalOrderFromLegacyAt(order Order, sequence int) {
 			Skill:       strings.TrimSpace(stage.Skill),
 			Provider:    strings.TrimSpace(stage.Provider),
 			Model:       strings.TrimSpace(stage.Model),
-			Runtime:     nonEmpty(stage.Runtime, l.stageRuntime("")),
+			Runtime:     l.stageRuntime(stage),
 			Group:       stage.Group,
 			Extra:       cloneLegacyExtra(stage.Extra),
 			ExtraPrompt: strings.TrimSpace(stage.ExtraPrompt),

@@ -97,7 +97,9 @@ Do not choose models. Leave `with` and `model` off your stages: the loop fills t
 
 ## Runtime Routing
 
-Always set `"runtime": "process"` on all stages. The `sprites` runtime is still WIP and should not be used yet. Always include `"runtime"` on scheduled stages so dispatch routing is explicit.
+Leave `runtime` off your stages. The loop picks it from `[runtime] default` in `.noodle.toml`; setting `process` by habit would override a configured `orca` default and hide cook stages from the factory's Orca run.
+
+Set `runtime` only when this order needs a specific one, and then state why in the stage's `extra`: `"extra": {"runtime_reason": "<why this order needs it>"}`. A stage with `runtime` but no `runtime_reason` is ignored when the config default is `orca`. The `sprites` runtime is still WIP; do not use it.
 
 ## Output
 

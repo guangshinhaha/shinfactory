@@ -369,10 +369,10 @@ func TestOrcaRuntimeAbsentFallsBackToProcess(t *testing.T) {
 		}
 	}
 	l := &Loop{config: cfg, deps: Dependencies{Runtimes: map[string]loopruntime.Runtime{"process": newMockRuntime()}}}
-	if got := l.stageRuntime(""); got != "process" {
+	if got := l.stageRuntime(Stage{}); got != "process" {
 		t.Fatalf("stageRuntime with orca unwired = %q, want process", got)
 	}
-	if got := l.stageRuntime("process"); got != "process" {
+	if got := l.stageRuntime(Stage{Runtime: "process"}); got != "process" {
 		t.Fatalf("explicit process stage = %q, want process", got)
 	}
 }
@@ -385,10 +385,10 @@ func TestStageRuntimeKeepsLegacyDefaultsForOtherRuntimes(t *testing.T) {
 		cfg := localLandingConfig()
 		cfg.Runtime.Default = def
 		l := &Loop{config: cfg, deps: Dependencies{Runtimes: map[string]loopruntime.Runtime{"process": newMockRuntime()}}}
-		if got := l.stageRuntime(""); got != "process" {
+		if got := l.stageRuntime(Stage{}); got != "process" {
 			t.Errorf("default %q: stage without runtime = %q, want process", def, got)
 		}
-		if got := l.stageRuntime("sprites"); got != "sprites" {
+		if got := l.stageRuntime(Stage{Runtime: "sprites"}); got != "sprites" {
 			t.Errorf("default %q: explicit sprites stage = %q, want sprites", def, got)
 		}
 	}
@@ -620,5 +620,31 @@ func TestOrcaRuntimeSucceededWorkerPrintingLimitIsNotHeld(t *testing.T) {
 	}
 	if got := env.orderStages(t, "42"); got[0] != "execute:completed" {
 		t.Fatalf("stages = %v, want execute completed", got)
+	}
+}
+
+// Issue #72: a configured orca default must win over a runtime the scheduler
+// set by habit; only a stage that states a reason keeps its own runtime.
+func TestStageRuntimeOrcaDefaultWinsUnlessReasonStated(t *testing.T) {
+	cfg := localLandingConfig()
+	cfg.Runtime.Default = "orca"
+	l := &Loop{config: cfg, deps: Dependencies{Runtimes: map[string]loopruntime.Runtime{
+		"process": newMockRuntime(), "orca": newMockRuntime(),
+	}}}
+	reason := map[string]json.RawMessage{"runtime_reason": json.RawMessage(`"needs host docker"`)}
+	cases := []struct {
+		name  string
+		stage Stage
+		want  string
+	}{
+		{"no runtime", Stage{}, "orca"},
+		{"habitual process", Stage{Runtime: "process"}, "orca"},
+		{"process with reason", Stage{Runtime: "process", Extra: reason}, "process"},
+		{"blank reason", Stage{Runtime: "process", Extra: map[string]json.RawMessage{"runtime_reason": json.RawMessage(`"  "`)}}, "orca"},
+	}
+	for _, tc := range cases {
+		if got := l.stageRuntime(tc.stage); got != tc.want {
+			t.Errorf("%s: stageRuntime = %q, want %q", tc.name, got, tc.want)
+		}
 	}
 }
