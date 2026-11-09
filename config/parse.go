@@ -264,9 +264,9 @@ func normalizeParsedValues(config *Config, metadata toml.MetaData, diagnostics *
 		config.Landing.Mode = mode
 	default:
 		appendNormalizedValueDiagnostic(diagnostics, "landing.mode",
-			fmt.Sprintf("landing.mode %q unsupported; choosing from the project's remote", config.Landing.Mode),
+			fmt.Sprintf("landing.mode %q unsupported; using %q", config.Landing.Mode, LandingModePR),
 		)
-		config.Landing.Mode = ""
+		config.Landing.Mode = LandingModePR
 	}
 	config.Landing.Base = strings.TrimSpace(config.Landing.Base)
 

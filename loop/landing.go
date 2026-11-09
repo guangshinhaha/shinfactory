@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/guangshinhaha/shinfactory/config"
 	"github.com/guangshinhaha/shinfactory/internal/ingest"
 	"github.com/guangshinhaha/shinfactory/internal/mode"
 	"github.com/guangshinhaha/shinfactory/worktree"
@@ -530,56 +529,4 @@ func (l *Loop) shipParkedPR(ctx context.Context, cook *cookHandle, reason string
 		return err
 	}
 	return l.syncPendingReviewProjection()
-}
-
-// resolveLandingMode returns an explicit mode unchanged. An unset mode becomes
-// "pr" when the project's origin is on GitHub and "local" when it has no
-// GitHub remote.
-func resolveLandingMode(projectDir, mode string) string {
-	if mode != "" {
-		return mode
-	}
-	if hasGitHubRemote(projectDir) {
-		return config.LandingModePR
-	}
-	return config.LandingModeLocal
-}
-
-// hasGitHubRemote reports whether the project's origin URL points at GitHub.
-func hasGitHubRemote(projectDir string) bool {
-	out, err := exec.Command("git", "-C", projectDir, "config", "--get", "remote.origin.url").Output()
-	if err != nil {
-		return false
-	}
-	return strings.Contains(strings.ToLower(string(out)), "github.com")
-}
-
-// fetchBase is fetchLandingBase; test binaries swap it so loop tests with fake
-// worktrees need no remote.
-var fetchBase = fetchLandingBase
-
-// fetchLandingBase fetches the remote default branch (or base, when set) and
-// returns the remote-tracking ref a new order worktree branches from. A failed
-// fetch is an error: branching from a stale local main is what this prevents.
-func fetchLandingBase(projectDir, base string) (string, error) {
-	if base == "" {
-		out, err := exec.Command("git", "-C", projectDir, "ls-remote", "--symref", "origin", "HEAD").CombinedOutput()
-		if err != nil {
-			return "", fmt.Errorf("resolve origin default branch: %w: %s", err, strings.TrimSpace(string(out)))
-		}
-		for _, line := range strings.Split(string(out), "\n") {
-			if rest, ok := strings.CutPrefix(line, "ref: refs/heads/"); ok {
-				base, _, _ = strings.Cut(rest, "\t")
-				break
-			}
-		}
-		if base == "" {
-			return "", fmt.Errorf("origin default branch not found in ls-remote output %q", strings.TrimSpace(string(out)))
-		}
-	}
-	ref := "refs/remotes/origin/" + base
-	if out, err := exec.Command("git", "-C", projectDir, "fetch", "origin", "+refs/heads/"+base+":"+ref).CombinedOutput(); err != nil {
-		return "", fmt.Errorf("fetch origin %s: %w: %s", base, err, strings.TrimSpace(string(out)))
-	}
-	return ref, nil
 }

@@ -18,6 +18,9 @@ func TestLandingModeDefaultsFromTheProjectRemote(t *testing.T) {
 	gitIn(t, httpsRepo, "remote", "add", "origin", "https://github.com/o/r.git")
 	noRemote := t.TempDir()
 	gitIn(t, noRemote, "init", "-b", "main")
+	lookalike := t.TempDir()
+	gitIn(t, lookalike, "init", "-b", "main")
+	gitIn(t, lookalike, "remote", "add", "origin", "git@gitlab.com:org/github.com-mirror.git")
 	otherHost := t.TempDir()
 	gitIn(t, otherHost, "init", "-b", "main")
 	gitIn(t, otherHost, "remote", "add", "origin", "https://gitlab.example/o/r.git")
@@ -29,6 +32,7 @@ func TestLandingModeDefaultsFromTheProjectRemote(t *testing.T) {
 		{"github https remote defaults to pr", httpsRepo, "", config.LandingModePR},
 		{"no remote falls back to local", noRemote, "", config.LandingModeLocal},
 		{"non-github remote falls back to local", otherHost, "", config.LandingModeLocal},
+		{"github.com only in the path is not github", lookalike, "", config.LandingModeLocal},
 		{"explicit local wins over a github remote", githubRepo, config.LandingModeLocal, config.LandingModeLocal},
 		{"explicit pr wins over no remote", noRemote, config.LandingModePR, config.LandingModePR},
 	}

@@ -698,7 +698,7 @@ func TestParseLandingMode(t *testing.T) {
 		"pr":      LandingModePR,
 		" PR ":    LandingModePR,
 		"local":   LandingModeLocal,
-		"nonsens": "",
+		"nonsens": LandingModePR,
 	}
 	for in, want := range cases {
 		cfg, err := Parse([]byte("[landing]\nmode = \"" + in + "\"\nbase = \" develop \"\n"))
