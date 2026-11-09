@@ -105,7 +105,8 @@ func (l *Loop) clearOrderSpend(orderID string) {
 }
 
 // overSpendCap reports why the order may not launch another attempt of the
-// stage, or "" when it may. A cap of zero or less is off.
+// stage, or "" when it may. A cap of zero or less is off; config normalizes a configured zero to the
+// default, so only an unconfigured Config value reaches that case.
 func (l *Loop) overSpendCap(orderID, taskKey string) string {
 	spend := l.orderSpendOf(orderID)
 	caps := l.config.Spend
@@ -147,7 +148,6 @@ func (l *Loop) stopOverCap(ctx context.Context, cand dispatchCandidate, stage St
 	summary := fmt.Sprintf("Spending cap reached: %s. So far it spent $%.2f over %d stage attempts. Raise [spend] in .noodle.toml or reshape the issue, then put ready back.",
 		why, spend.CostUSD, spend.totalAttempts())
 	l.stopForPerson(ctx, cand.OrderID, summary, "")
-	l.clearOrderSpend(cand.OrderID)
 	return nil
 }
 
