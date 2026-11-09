@@ -33,7 +33,31 @@ func TestTaskKeysResolveToRoles(t *testing.T) {
 		}
 	}
 	if _, ok := RoleForTask("meditate"); ok {
-		t.Error("unmapped task key should fall back to routing.defaults")
+		t.Error("unrouted task key should fall back to routing.defaults")
+	}
+}
+
+func TestLookupTaskSeparatesRoutedUnroutedAndUnknown(t *testing.T) {
+	if role, routing := LookupTask(" Execute "); routing != TaskRouted || role != RoleBuilder {
+		t.Errorf("execute = %q,%v want builder,routed", role, routing)
+	}
+	if role, routing := LookupTask("meditate"); routing != TaskUnrouted || role != "" {
+		t.Errorf("meditate = %q,%v want unrouted", role, routing)
+	}
+	if _, routing := LookupTask("no-such-task"); routing != TaskUnknown {
+		t.Errorf("no-such-task = %v want unknown", routing)
+	}
+}
+
+func TestValidateStageRoutingRejectsProviderWithoutModel(t *testing.T) {
+	cfg := DefaultConfig()
+	if err := cfg.ValidateStageRouting("codex", ""); err == nil {
+		t.Error("provider with no model should be rejected")
+	}
+	for _, c := range [][2]string{{"", ""}, {"", "claude-opus-5-5"}, {"codex", "gpt-5.4"}} {
+		if err := cfg.ValidateStageRouting(c[0], c[1]); err != nil {
+			t.Errorf("ValidateStageRouting(%q,%q) = %v, want nil", c[0], c[1], err)
+		}
 	}
 }
 

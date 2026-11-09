@@ -155,16 +155,16 @@ func (l *Loop) ensureScheduleOrderPresent() error {
 			return false, nil
 		}
 		if l.hasTaskType(scheduleOrderID) {
-			orders.Orders = append(orders.Orders, scheduleOrder(l.config, ""))
+			orders.Orders = append(orders.Orders, scheduleOrder(""))
 			injectedOrderID = scheduleOrderID
 			return true, nil
 		}
 		if l.hasTaskType("oops") {
-			prependOrder(orders, scheduleBootstrapOopsOrder(l.config))
+			prependOrder(orders, scheduleBootstrapOopsOrder())
 			injectedOrderID = scheduleBootstrapOrderID
 			return true, nil
 		}
-		orders.Orders = append(orders.Orders, scheduleOrder(l.config, ""))
+		orders.Orders = append(orders.Orders, scheduleOrder(""))
 		injectedOrderID = scheduleOrderID
 		return true, nil
 	}); err != nil {

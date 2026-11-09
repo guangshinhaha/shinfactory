@@ -235,7 +235,7 @@ func (l *Loop) ensureScheduleIfNeeded(brief mise.Brief, orders *OrdersFile, mise
 		}
 	}
 	if miseChanged && !l.hasActiveScheduleCook() && !hasScheduleOrder(*orders) {
-		orders.Orders = append(orders.Orders, scheduleOrder(l.config, ""))
+		orders.Orders = append(orders.Orders, scheduleOrder(""))
 		if err := l.writeOrdersState(*orders); err != nil {
 			return false, err
 		}
@@ -255,7 +255,7 @@ func (l *Loop) bootstrapScheduleIfEmpty(brief mise.Brief, orders *OrdersFile) (i
 		l.setState(StateIdle)
 		return true, nil
 	}
-	*orders = bootstrapScheduleOrder(l.config)
+	*orders = bootstrapScheduleOrder()
 	if err := l.writeOrdersState(*orders); err != nil {
 		return false, err
 	}
@@ -360,7 +360,7 @@ func (l *Loop) recoverFromOrdersValidationError(normErr error) (OrdersFile, erro
 	l.lastPromotionError = repairMessage
 	l.scheduleNothingUntil = time.Time{}
 
-	repairOrders := bootstrapScheduleOrder(l.config)
+	repairOrders := bootstrapScheduleOrder()
 	if err := l.writeOrdersState(repairOrders); err != nil {
 		return OrdersFile{}, fmt.Errorf("recover invalid orders state: %w", err)
 	}

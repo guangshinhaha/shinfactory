@@ -93,7 +93,7 @@ func (l *Loop) spawnCook(ctx context.Context, cand dispatchCandidate, order Orde
 	prompt := buildCookPrompt(cand.OrderID, stage, order.Plan, order.Title, rationale, resumePrompt)
 
 	taskType, _ := l.registry.ByKey(stage.TaskKey)
-	stageProvider, stageModel := l.config.ResolveStageRouting(nonEmpty(stage.TaskKey, stage.Skill), stage.Provider, stage.Model)
+	stageProvider, stageModel := l.stageRouting(stage)
 	req := loopruntime.DispatchRequest{
 		Name:         name,
 		Prompt:       prompt,

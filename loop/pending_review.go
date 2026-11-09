@@ -20,6 +20,9 @@ type PendingReviewItem struct {
 	TaskKey      string   `json:"task_key,omitempty"`
 	Title        string   `json:"title,omitempty"`
 	Prompt       string   `json:"prompt,omitempty"`
+	// Provider and Model are the stage definition, not what ran. loadPendingReview
+	// turns them back into a Stage, so resolving here would pin routing onto it.
+	// Readers that show what ran resolve through Loop.stageRouting.
 	Provider     string   `json:"provider,omitempty"`
 	Model        string   `json:"model,omitempty"`
 	Runtime      string   `json:"runtime,omitempty"`
@@ -195,6 +198,9 @@ func (l *Loop) ensureCanonicalOrderFromOrders(orderID string) error {
 	return fmt.Errorf("canonical order %q missing from orders state", orderID)
 }
 
+// reviewPayloadForCook builds the stage.review_parked payload. Provider and model
+// are the stage definition (empty when unpinned): the reducer stores them on the
+// pending review, which loadPendingReview reads back as a Stage.
 func (l *Loop) reviewPayloadForCook(cook *cookHandle, reason string) map[string]any {
 	sessionID := ""
 	if cook.session != nil {

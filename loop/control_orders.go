@@ -34,7 +34,7 @@ func (l *Loop) controlEnqueue(cmd ControlCommand) error {
 	if orderID == "" {
 		return fmt.Errorf("enqueue requires order_id")
 	}
-	if err := l.config.ValidateStageProvider(cmd.Provider); err != nil {
+	if err := l.config.ValidateStageRouting(cmd.Provider, cmd.Model); err != nil {
 		return err
 	}
 	prompt := strings.TrimSpace(cmd.Prompt)
@@ -120,6 +120,12 @@ func (l *Loop) controlEditItem(cmd ControlCommand) error {
 			if taskKey := strings.TrimSpace(cmd.TaskKey); taskKey != "" && orders.Orders[i].Stages[stageIdx].TaskKey != taskKey {
 				orders.Orders[i].Stages[stageIdx].TaskKey = taskKey
 				changed = true
+			}
+			// Validate the stage as it will be after the edit: a provider needs a model.
+			nextProvider := nonEmpty(strings.TrimSpace(cmd.Provider), orders.Orders[i].Stages[stageIdx].Provider)
+			nextModel := nonEmpty(strings.TrimSpace(cmd.Model), orders.Orders[i].Stages[stageIdx].Model)
+			if err := l.config.ValidateStageRouting(nextProvider, nextModel); err != nil {
+				return false, err
 			}
 			if provider := strings.TrimSpace(cmd.Provider); provider != "" && orders.Orders[i].Stages[stageIdx].Provider != provider {
 				orders.Orders[i].Stages[stageIdx].Provider = provider

@@ -2,15 +2,14 @@ package taskreg
 
 import (
 	"path/filepath"
-	"slices"
 	"testing"
 
 	"github.com/guangshinhaha/shinfactory/config"
 	"github.com/guangshinhaha/shinfactory/skill"
 )
 
-// Every task type the repo ships either maps to a role or is listed in
-// config.UnroutedTasks, so a new skill cannot fall back to routing.defaults by
+// Every task type the repo ships either maps to a role or is marked unrouted in
+// the config routing table, so a new skill cannot fall back to routing.defaults by
 // accident.
 func TestBundledTaskTypesAreRoutedOrListedUnrouted(t *testing.T) {
 	root, err := filepath.Abs(filepath.Join("..", "..", ".agents", "skills"))
@@ -26,18 +25,16 @@ func TestBundledTaskTypesAreRoutedOrListedUnrouted(t *testing.T) {
 	}
 	reg := NewFromSkills(types)
 	for _, tt := range reg.All() {
-		_, routed := config.RoleForTask(tt.Key)
-		listed := slices.Contains(config.UnroutedTasks, tt.Key)
-		switch {
-		case !routed && !listed:
-			t.Errorf("task type %q has no role in config.RoleForTask and is not in config.UnroutedTasks", tt.Key)
-		case routed && listed:
-			t.Errorf("task type %q is both routed and listed in config.UnroutedTasks", tt.Key)
+		if _, routing := config.LookupTask(tt.Key); routing == config.TaskUnknown {
+			t.Errorf("task type %q is not in the config routing table: map it to a role or mark it unrouted", tt.Key)
 		}
 	}
-	for _, key := range config.UnroutedTasks {
+	for _, key := range config.KnownTasks() {
+		if _, routing := config.LookupTask(key); routing != config.TaskUnrouted {
+			continue
+		}
 		if _, ok := reg.ByKey(key); !ok {
-			t.Errorf("config.UnroutedTasks lists %q but no bundled task type has that key", key)
+			t.Errorf("config routing table marks %q unrouted but no bundled task type has that key", key)
 		}
 	}
 }

@@ -941,3 +941,43 @@ func TestControlRejectsStageProviderOnSensitiveRepo(t *testing.T) {
 		t.Errorf("rejected enqueue still wrote %d orders", len(got.Orders))
 	}
 }
+
+func TestControlRejectsStageProviderWithoutModel(t *testing.T) {
+	projectDir := t.TempDir()
+	ordersPath := filepath.Join(projectDir, ".noodle", "orders.json")
+	seed := OrdersFile{Orders: []Order{{
+		ID: "42", Status: OrderStatusActive,
+		Stages: []Stage{{TaskKey: "execute", Prompt: "p", Status: StageStatusPending}},
+	}}}
+	if err := writeOrdersAtomic(ordersPath, seed); err != nil {
+		t.Fatalf("write orders: %v", err)
+	}
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
+		Runtimes:   map[string]loopruntime.Runtime{"process": newMockRuntime()},
+		Worktree:   &fakeWorktree{},
+		Adapter:    &fakeAdapterRunner{},
+		Mise:       &fakeMise{},
+		Monitor:    fakeMonitor{},
+		Registry:   testLoopRegistry(),
+		Now:        time.Now,
+		OrdersFile: ordersPath,
+	})
+	cases := map[string]error{
+		"enqueue":   l.controlEnqueue(ControlCommand{Action: "enqueue", OrderID: "new", TaskKey: "execute", Provider: "codex"}),
+		"edit-item": l.controlEditItem(ControlCommand{Action: "edit-item", OrderID: "42", Provider: "codex"}),
+		"add-stage": l.controlAddStage(ControlCommand{Action: "add-stage", OrderID: "42", TaskKey: "oops", Provider: "codex"}),
+	}
+	for name, err := range cases {
+		if err == nil || !strings.Contains(err.Error(), "has no model") {
+			t.Errorf("%s err = %v, want provider-without-model rejection", name, err)
+		}
+	}
+	got, _ := readOrders(ordersPath)
+	if len(got.Orders) != 1 || len(got.Orders[0].Stages) != 1 || got.Orders[0].Stages[0].Provider != "" {
+		t.Errorf("rejected commands changed orders: %+v", got)
+	}
+	// A model alone, or provider with model, stays valid.
+	if err := l.controlEditItem(ControlCommand{Action: "edit-item", OrderID: "42", Provider: "codex", Model: "gpt-5.4"}); err != nil {
+		t.Errorf("edit-item with provider and model: %v", err)
+	}
+}

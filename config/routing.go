@@ -69,34 +69,69 @@ func isKnownRole(name string) bool {
 	return false
 }
 
-// RoleForTask maps a stage's task key (or skill) to its role. Unmapped task
-// keys return false and fall back to routing.defaults.
-func RoleForTask(taskKey string) (Role, bool) {
-	switch stringx.Normalize(taskKey) {
-	case "schedule":
-		return RoleScheduler, true
-	case "plan":
-		return RolePlanner, true
-	case "execute", "oops", "commit":
-		return RoleBuilder, true
-	case "explore", "refine":
-		return RoleExplorer, true
-	case "quality", "review":
-		return RoleReviewer, true
-	case "adversarial-review":
-		return RoleAdversary, true
-	case "verify":
-		return RoleVerifier, true
-	case "debrief":
-		return RoleDebrief, true
-	}
-	return "", false
+// taskRoles is the one table of bundled task types and where each routes. A
+// role means the stage runs on that role's policy. An empty role marks a task
+// type that deliberately has no role and runs on routing.defaults. A task type
+// missing from the table fails the registry test, so a new skill cannot fall
+// back to routing.defaults by accident.
+var taskRoles = map[string]Role{
+	"schedule":           RoleScheduler,
+	"plan":               RolePlanner,
+	"execute":            RoleBuilder,
+	"oops":               RoleBuilder,
+	"commit":             RoleBuilder,
+	"explore":            RoleExplorer,
+	"refine":             RoleExplorer,
+	"quality":            RoleReviewer,
+	"review":             RoleReviewer,
+	"adversarial-review": RoleAdversary,
+	"verify":             RoleVerifier,
+	"debrief":            RoleDebrief,
+	"meditate":           "",
 }
 
-// UnroutedTasks lists bundled task types that deliberately have no role and run
-// on routing.defaults. A task type in neither this list nor RoleForTask fails
-// the registry test, so a new skill cannot fall back by accident.
-var UnroutedTasks = []string{"meditate"}
+// TaskRouting says how a task key routes.
+type TaskRouting int
+
+const (
+	// TaskUnknown means the key is in no table: it falls back to routing.defaults.
+	TaskUnknown TaskRouting = iota
+	// TaskRouted means the key maps to a role.
+	TaskRouted
+	// TaskUnrouted means the key deliberately runs on routing.defaults.
+	TaskUnrouted
+)
+
+// LookupTask maps a stage's task key (or skill) to its role and says whether
+// the key is routed, deliberately unrouted, or unknown. The role is empty
+// unless the key is routed.
+func LookupTask(taskKey string) (Role, TaskRouting) {
+	role, ok := taskRoles[stringx.Normalize(taskKey)]
+	switch {
+	case !ok:
+		return "", TaskUnknown
+	case role == "":
+		return "", TaskUnrouted
+	}
+	return role, TaskRouted
+}
+
+// RoleForTask maps a stage's task key (or skill) to its role. Unrouted and
+// unknown task keys return false and fall back to routing.defaults.
+func RoleForTask(taskKey string) (Role, bool) {
+	role, routing := LookupTask(taskKey)
+	return role, routing == TaskRouted
+}
+
+// KnownTasks lists every task key in the routing table, sorted.
+func KnownTasks() []string {
+	keys := make([]string, 0, len(taskRoles))
+	for key := range taskRoles {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
 
 // ValidateStageProvider rejects a stage-level provider that routing.sensitive
 // forbids. An empty provider means "the role decides" and always passes.
@@ -106,6 +141,19 @@ func (c Config) ValidateStageProvider(provider string) error {
 		return nil
 	}
 	return fmt.Errorf("stage provider %q not allowed: routing.sensitive keeps every stage on %q", provider, c.Routing.Defaults.Provider)
+}
+
+// ValidateStageRouting validates a stage's own provider and model. On top of
+// ValidateStageProvider it rejects a provider with no model: a model name is
+// provider-specific, so ResolveStageRouting would ignore the provider silently.
+func (c Config) ValidateStageRouting(provider, model string) error {
+	if err := c.ValidateStageProvider(provider); err != nil {
+		return err
+	}
+	if stringx.Normalize(provider) != "" && strings.TrimSpace(model) == "" {
+		return fmt.Errorf("stage provider %q has no model: a stage provider needs a model, otherwise the role's provider is used", strings.TrimSpace(provider))
+	}
+	return nil
 }
 
 // knownProviders are the agent CLIs a stage could shell out to.
