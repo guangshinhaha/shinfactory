@@ -215,7 +215,7 @@ func (l *Loop) dispatchSession(ctx context.Context, req loopruntime.DispatchRequ
 			return fallbackSession, outcome, nil
 		}
 	}
-	return nil, RuntimeFallbackOutcome{}, classifyAgentStartFailure(l.stageRuntime(stage), err)
+	return nil, RuntimeFallbackOutcome{}, classifyAgentStartFailure(runtimeName, err)
 }
 
 func (l *Loop) handleCookDispatchFailure(cand dispatchCandidate, stage Stage, worktreeName string, created bool, attemptID string, err error) error {
