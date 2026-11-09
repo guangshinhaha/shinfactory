@@ -51,8 +51,9 @@ func (h *usageLimitHolds) release(runtime string) bool {
 const usageLimitResetSlack = time.Minute
 
 // stageRuntime resolves the runtime an order stage launches on: its own, else
-// process, as before the orca runtime existed. Only a configured default of
-// "orca" is honoured for stages without a runtime, so no other config changes.
+// process, as before the orca runtime existed. A configured default of "orca"
+// wins over the stage's own runtime unless the stage states
+// extra.runtime_reason, so a habitual scheduler "process" cannot hide cooks.
 func (l *Loop) stageRuntime(stage Stage) string {
 	name := stringx.Normalize(stage.Runtime)
 	if stringx.Normalize(l.config.Runtime.Default) == "orca" {
