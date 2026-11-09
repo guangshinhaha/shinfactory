@@ -28,20 +28,20 @@ func TestParallelDebriefsMergeWithoutConflict(t *testing.T) {
 		t.Fatal(err)
 	}
 	repo := t.TempDir()
-	git(t, repo, "init", "-q", "-b", "main")
+	runGit(t, repo, "init", "-q", "-b", "main")
 	if err := os.MkdirAll(filepath.Join(repo, "brain", "codebase"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	os.WriteFile(filepath.Join(repo, "brain", "codebase", "seed.md"), []byte("# Seed\n"), 0o644)
 	os.WriteFile(filepath.Join(repo, ".gitignore"), []byte("brain/index.md\n"), 0o644)
-	git(t, repo, "add", "-A")
-	git(t, repo, "commit", "-qm", "seed")
+	runGit(t, repo, "add", "-A")
+	runGit(t, repo, "commit", "-qm", "seed")
 
 	orders := []string{"order-a", "order-b"}
 	trees := map[string]string{}
 	for _, o := range orders {
 		wt := filepath.Join(t.TempDir(), o)
-		git(t, repo, "worktree", "add", "-q", "-b", o, wt)
+		runGit(t, repo, "worktree", "add", "-q", "-b", o, wt)
 		trees[o] = wt
 	}
 	var wg sync.WaitGroup
@@ -56,17 +56,17 @@ func TestParallelDebriefsMergeWithoutConflict(t *testing.T) {
 				t.Errorf("%s: index: %v\n%s", o, err, out)
 				return
 			}
-			git(t, wt, "add", "-A")
-			git(t, wt, "commit", "-qm", "debrief "+o)
+			runGit(t, wt, "add", "-A")
+			runGit(t, wt, "commit", "-qm", "debrief "+o)
 		}(o)
 	}
 	wg.Wait()
 
 	for _, o := range orders {
-		if st := git(t, trees[o], "ls-files", "brain/index.md"); strings.TrimSpace(st) != "" {
+		if st := runGit(t, trees[o], "ls-files", "brain/index.md"); strings.TrimSpace(st) != "" {
 			t.Fatalf("%s committed brain/index.md", o)
 		}
-		git(t, repo, "merge", "-q", "--no-edit", o)
+		runGit(t, repo, "merge", "-q", "--no-edit", o)
 	}
 	if out, err := exec.Command("sh", script, filepath.Join(repo, "brain")).CombinedOutput(); err != nil {
 		t.Fatalf("index: %v\n%s", err, out)
