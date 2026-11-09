@@ -28,7 +28,7 @@ func stageWrites(s Stage) []string {
 	out := make([]string, 0, len(paths))
 	for _, p := range paths {
 		p = path.Clean(strings.ReplaceAll(strings.TrimSpace(p), "\\", "/"))
-		p = strings.TrimPrefix(p, "./")
+		p = strings.TrimPrefix(strings.TrimPrefix(p, "./"), "/")
 		if p != "" && p != "." {
 			out = append(out, p)
 		}

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -289,14 +290,16 @@ func (g ghLander) MarkReadyAndMerge(ctx context.Context, dir string, pr PullRequ
 			return err
 		}
 	}
-	if st.Mergeable == "CONFLICTING" || st.MergeStateStatus == "DIRTY" {
-		return fmt.Errorf("%w: %s", ErrPRConflict, pr.URL)
-	}
 	if detail := st.checksPending(); detail != "" {
 		return pendingError{pr.URL, detail}
 	}
 	if st.HeadRefOid != head {
 		return pendingError{pr.URL, fmt.Sprintf("GitHub shows head %.12s, not the pushed %.12s", st.HeadRefOid, head)}
+	}
+	// After the head check: GitHub's mergeability of an older head says
+	// nothing about the commit this worktree holds.
+	if st.Mergeable == "CONFLICTING" || st.MergeStateStatus == "DIRTY" {
+		return fmt.Errorf("%w: %s", ErrPRConflict, pr.URL)
 	}
 	// A plain merge: GitHub refuses it while a required check is failing, and
 	// the order is then parked with that reason. --auto would return success
@@ -315,6 +318,8 @@ func (g ghLander) MarkReadyAndMerge(ctx context.Context, dir string, pr PullRequ
 	}
 	return nil
 }
+
+var treeID = regexp.MustCompile(`^[0-9a-f]{40,64}$`)
 
 // resolveBase returns base, or the repository's default branch when base is
 // empty.
@@ -348,7 +353,7 @@ func (g ghLander) RebaseOntoBase(ctx context.Context, dir, base string) error {
 		return err
 	}
 	if out, err := g.run(ctx, dir, "git", "rebase", "origin/"+base); err != nil {
-		files, _ := g.run(ctx, dir, "git", "diff", "--name-only", "--diff-filter=U")
+		files, _ := g.run(ctx, dir, "git", "-c", "core.quotepath=false", "diff", "--name-only", "--diff-filter=U")
 		_, _ = g.run(ctx, dir, "git", "rebase", "--abort")
 		if files != "" {
 			return &RebaseConflictError{Files: strings.Split(files, "\n")}
@@ -369,13 +374,18 @@ func (g ghLander) ConflictingFiles(ctx context.Context, dir, base string) ([]str
 	}
 	// merge-tree exits 1 on conflicts; its output is the tree id, then the
 	// conflicted file names, then a blank line and the messages.
-	out, err := g.run(ctx, dir, "git", "merge-tree", "--write-tree", "--name-only", "origin/"+base, "HEAD")
+	out, err := g.run(ctx, dir, "git", "-c", "core.quotepath=false", "merge-tree", "--write-tree", "--name-only", "origin/"+base, "HEAD")
 	if err == nil {
 		return nil, nil
 	}
 	lines := strings.Split(out, "\n")
+	// Output that does not start with a tree id is an error message (git
+	// older than 2.38 has no --write-tree), not a file list.
+	if !treeID.MatchString(lines[0]) {
+		return nil, err
+	}
 	var files []string
-	for _, line := range lines[min(1, len(lines)):] {
+	for _, line := range lines[1:] {
 		if strings.TrimSpace(line) == "" {
 			break
 		}

@@ -40,14 +40,12 @@ func (l *Loop) readRebased() map[string]int {
 	return counts
 }
 
-func (l *Loop) writeRebased(counts map[string]int) {
+func (l *Loop) writeRebased(counts map[string]int) error {
 	data, err := json.Marshal(counts)
 	if err == nil {
 		err = os.WriteFile(l.rebasedFile(), data, 0o644)
 	}
-	if err != nil {
-		l.logger.Warn("could not record rebase", "error", err)
-	}
+	return err
 }
 
 func (l *Loop) rebaseCount(orderID string) int {
@@ -56,12 +54,14 @@ func (l *Loop) rebaseCount(orderID string) int {
 	return l.readRebased()[orderID]
 }
 
-func (l *Loop) bumpRebased(orderID string) {
+// bumpRebased records a rebase. It must succeed: an unrecorded rebase would
+// let the next conflict rebase again, and "once" would mean nothing.
+func (l *Loop) bumpRebased(orderID string) error {
 	rebasedMu.Lock()
 	defer rebasedMu.Unlock()
 	counts := l.readRebased()
 	counts[orderID]++
-	l.writeRebased(counts)
+	return l.writeRebased(counts)
 }
 
 func (l *Loop) clearRebased(orderID string) {
@@ -72,7 +72,9 @@ func (l *Loop) clearRebased(orderID string) {
 		return
 	}
 	delete(counts, orderID)
-	l.writeRebased(counts)
+	if err := l.writeRebased(counts); err != nil {
+		l.logger.Warn("could not clear rebase count", "order", orderID, "error", err)
+	}
 }
 
 // reviewStageToReopen is the first review stage after the order's last execute
@@ -103,10 +105,16 @@ func reviewStageToReopen(order Order, shipStage int) int {
 // back to review on the rebased head. When it is false, err is the result of
 // shipping the rebased PR again (nil means it merged).
 func (l *Loop) onShipConflict(ctx context.Context, cook *cookHandle, pr PullRequest, parked bool) (stopped bool, err error) {
-	order, _ := l.orderByID(cook.orderID)
+	order, ok := l.orderByID(cook.orderID)
+	if !ok {
+		return true, l.failStage(ctx, cook, "merge conflict at ship, but the order is missing from orders.json, so its tier is unknown")
+	}
 	base := l.config.Landing.Base
 	if l.rebaseCount(cook.orderID) >= 1 {
 		return true, l.stopConflicted(ctx, cook, l.probeConflicts(ctx, cook, base), "it still conflicts after the one rebase")
+	}
+	if err := l.bumpRebased(cook.orderID); err != nil {
+		return true, l.failStage(ctx, cook, "could not record the rebase, so it will not run: "+err.Error())
 	}
 	rctx, cancel := context.WithTimeout(ctx, rebaseTimeout)
 	defer cancel()
@@ -115,9 +123,9 @@ func (l *Loop) onShipConflict(ctx context.Context, cook *cookHandle, pr PullRequ
 		if errors.As(err, &ce) {
 			return true, l.stopConflicted(ctx, cook, ce.Files, "the rebase onto the base branch conflicts")
 		}
+		l.clearRebased(cook.orderID)
 		return true, l.failStage(ctx, cook, "rebase onto the base branch: "+err.Error())
 	}
-	l.bumpRebased(cook.orderID)
 	l.logger.Info("order rebased onto the base branch", "order", cook.orderID, "pr", pr.URL)
 
 	idx := reviewStageToReopen(order, cook.stageIndex)
