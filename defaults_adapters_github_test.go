@@ -31,6 +31,23 @@ if [ "$1 $2" = "issue list" ]; then
     shift
   done
 fi
+if [ "$1 $2" = "issue view" ]; then
+  n=$3
+  while [ $# -gt 0 ]; do
+    if [ "$1" = "--jq" ]; then jq -r ".[] | select(.number == $n) | $2" "` + issuesPath + `"; exit $?; fi
+    shift
+  done
+fi
+if [ "$1 $2" = "issue edit" ]; then
+  n=$3
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --add-label) jq -c "map(if .number == $n then .labels += [{name: \"$2\"}] else . end)" "` + issuesPath + `" > "` + issuesPath + `.new" && mv "` + issuesPath + `.new" "` + issuesPath + `" ;;
+      --remove-label) jq -c "map(if .number == $n then .labels |= map(select(.name != \"$2\")) else . end)" "` + issuesPath + `" > "` + issuesPath + `.new" && mv "` + issuesPath + `.new" "` + issuesPath + `" ;;
+    esac
+    shift
+  done
+fi
 case "$1 $*" in api*--input*) cat > "` + filepath.Join(dir, "api-input.json") + `"; echo 42 ;; esac
 `
 	if err := os.WriteFile(filepath.Join(dir, "gh"), []byte(stub), 0o755); err != nil {
@@ -258,5 +275,73 @@ func TestGitHubBacklogEditRenames(t *testing.T) {
 	runGitHubAdapter(t, env, "backlog-edit", `{"title":"Sharper title"}`, "3")
 	if !strings.Contains(readLog(t, logPath), "issue edit 3 --title Sharper title") {
 		t.Fatalf("edit did not rename: %s", readLog(t, logPath))
+	}
+}
+
+const stopIssues = `[
+  {"number": 7, "title": "Vague", "body": "make it better", "url": "u7", "labels": [{"name": "ready"}]},
+  {"number": 8, "title": "Fine", "body": "ok", "url": "u8", "labels": [{"name": "ready"}]}
+]`
+
+func backlogIDs(t *testing.T, env []string) string {
+	t.Helper()
+	out := runGitHubAdapter(t, env, "backlog-sync", "")
+	var ids []string
+	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+		if line == "" {
+			continue
+		}
+		var item struct {
+			ID string `json:"id"`
+		}
+		if err := json.Unmarshal([]byte(line), &item); err != nil {
+			t.Fatalf("parse %q: %v", line, err)
+		}
+		ids = append(ids, item.ID)
+	}
+	return strings.Join(ids, ",")
+}
+
+// A stopped issue gets one comment saying what is needed and the needs-shin label, drops out
+// of the backlog, and returns once a person removes the label.
+func TestGitHubBacklogStopCommentsOnceLabelsAndPausesTheIssue(t *testing.T) {
+	env, logPath := fakeGH(t, stopIssues)
+	if got := backlogIDs(t, env); got != "7,8" {
+		t.Fatalf("before the stop, backlog = %q, want 7,8", got)
+	}
+
+	runGitHubAdapter(t, env, "backlog-stop", "Unbuildable: the issue has no observable Done when. Shin, what should it check?", "7")
+	runGitHubAdapter(t, env, "backlog-stop", "Second round also failed.", "7")
+
+	log := readLog(t, logPath)
+	if n := strings.Count(log, "issue comment 7"); n != 1 {
+		t.Fatalf("comments on issue 7 = %d, want exactly 1:\n%s", n, log)
+	}
+	if !strings.Contains(log, "issue comment 7 --body shinfactory: stopped. Unbuildable: the issue has no observable Done when. Shin, what should it check?") {
+		t.Fatalf("comment does not carry the message:\n%s", log)
+	}
+	if !strings.Contains(log, "issue edit 7 --add-label needs-shin") {
+		t.Fatalf("issue 7 not labelled needs-shin:\n%s", log)
+	}
+	if got := backlogIDs(t, env); got != "8" {
+		t.Fatalf("after the stop, backlog = %q, want only 8", got)
+	}
+
+	cmd := exec.Command(filepath.Join(filepath.Dir(logPath), "gh"), "issue", "edit", "7", "--remove-label", "needs-shin")
+	cmd.Env = env
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("remove label: %v\n%s", err, out)
+	}
+	if got := backlogIDs(t, env); got != "7,8" {
+		t.Fatalf("after the label is removed, backlog = %q, want 7,8", got)
+	}
+}
+
+func TestGitHubBacklogStopRefusesAnEmptyMessage(t *testing.T) {
+	env, _ := fakeGH(t, stopIssues)
+	cmd := exec.Command(filepath.Join("defaults", "adapters", "github", "backlog-stop"), "7")
+	cmd.Env = env
+	if out, err := cmd.CombinedOutput(); err == nil {
+		t.Fatalf("stop with no message succeeded:\n%s", out)
 	}
 }
