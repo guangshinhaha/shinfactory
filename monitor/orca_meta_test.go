@@ -33,7 +33,6 @@ func checkOrcaMeta(t *testing.T, outcome string, want SessionStatus) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	time.Sleep(50 * time.Millisecond)
 	fake.Settle(t, fake.LastDispatch(t), outcome)
 	select {
 	case <-s.Done():
@@ -45,14 +44,20 @@ func checkOrcaMeta(t *testing.T, outcome string, want SessionStatus) {
 		t.Fatalf("RunOnce: %v %v", metas, err)
 	}
 	m := metas[0]
-	t.Logf("meta: %+v", m)
 	if m.Runtime != "orca" || m.Model != "claude-sonnet-5-5" {
 		t.Errorf("runtime/model = %q/%q", m.Runtime, m.Model)
 	}
 	if m.Status != want || m.Alive {
 		t.Errorf("status = %q alive=%v, want %q", m.Status, m.Alive, want)
 	}
-	if m.DurationSeconds < 0 {
-		t.Errorf("duration")
+}
+
+func TestDeriveDurationEndsAtTerminalEventWhileHeartbeatIsFresh(t *testing.T) {
+	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	claims := SessionClaims{SessionID: "s", HasEvents: true, Completed: true,
+		FirstEventAt: start, LastEventAt: start.Add(90 * time.Second)}
+	meta := DeriveSessionMeta("s", Observation{SessionID: "s", Alive: true}, claims, SessionMeta{}, start.Add(10*time.Minute))
+	if meta.DurationSeconds != 90 || meta.Status != SessionStatusExited {
+		t.Fatalf("meta = %+v, want duration 90 and exited", meta)
 	}
 }
