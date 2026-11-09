@@ -17,7 +17,7 @@ Debrief is project-scoped. Shinstack's `reflect` (when installed) is the separat
 
 **Use Tasks to track progress** (TaskCreate per step, TaskUpdate to in_progress/completed).
 
-1. **Read `brain/index.md`** to understand what notes already exist
+1. **Read `brain/index.md`** (generated, gitignored; run `sh scripts/brain-index.sh` if it is missing) to understand what notes already exist
 2. **Scan the conversation** for:
    - Mistakes made and corrections received
    - User preferences and workflow patterns
@@ -28,7 +28,7 @@ Debrief is project-scoped. Shinstack's `reflect` (when installed) is the separat
    - Repeated manual steps that could be automated or encoded
 3. **Skip** anything trivial or already captured in existing brain files
 4. **Route each learning** to the right destination (see Routing below)
-5. **Update `brain/index.md`** if any brain files were added or removed
+5. **Never edit `brain/index.md`.** It is generated from the note files, so parallel orders never conflict on it. Run `sh scripts/brain-index.sh` if you want to see it refreshed
 
 ## Routing
 
@@ -46,7 +46,9 @@ A lesson that would apply to any project (a principle, a playbook gap, a shinsta
 
 Codebase knowledge, gotchas, project decisions — anything about this project that informs future sessions. This is the default destination. Use the `brain` skill for writing conventions.
 
-- One topic per file. File name = topic slug.
+- **New learnings from an order go in one new file: `brain/notes/<order-id>.md`**, committed in that order's own PR. Never edit another order's note, and never edit `brain/index.md`. This is what keeps two parallel debriefs from conflicting. Use the order id (the branch name with `/` replaced by `-`, e.g. `guangshinhaha-issue-71`).
+- Fixing or deleting an existing `brain/codebase/` note is fine; add new knowledge as the order's note.
+- One order's note may hold several short bullets; keep each bullet one topic.
 - Group in directories with index files using `[[wikilinks]]`.
 - No inlined content in index files.
 
