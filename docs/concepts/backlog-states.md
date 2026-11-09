@@ -1,6 +1,6 @@
 # Backlog States
 
-Every issue in a factory repo is in one of five states. The state is set by a label, and an issue carries at most one state label.
+Every issue in a factory repo is in one of five states. Three states are a label, and an issue carries at most one state label. Inbox is the absence of a label, and Closed is the issue being closed.
 
 | State | How it shows | Meaning |
 | --- | --- | --- |
