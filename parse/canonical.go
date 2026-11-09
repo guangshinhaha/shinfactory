@@ -12,6 +12,10 @@ const (
 	EventError    EventType = "error"
 	EventComplete EventType = "complete"
 	EventDelta    EventType = "delta"
+	// EventFailed marks a session that ended unsuccessfully. Runtimes that do
+	// not stream provider output (orca) write it so the monitor can tell a
+	// failed session from one that finished.
+	EventFailed EventType = "failed"
 )
 
 // CanonicalEvent is the provider-agnostic event schema.
