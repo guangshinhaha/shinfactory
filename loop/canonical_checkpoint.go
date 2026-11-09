@@ -77,7 +77,7 @@ func (l *Loop) bootstrapCanonicalFromLegacy() error {
 		now = l.deps.Now().UTC()
 	}
 
-	l.canonical = synthesizeCanonicalState(orders, pendingReview, state.RunMode(l.config.Mode), now)
+	l.canonical = synthesizeCanonicalState(orders, pendingReview, state.RunMode(l.config.Mode), now, l.stageRuntime(""))
 	l.effectLedger = reducer.NewEffectLedger()
 	l.eventCounter.Store(0)
 	l.canonicalLoaded = true
@@ -105,6 +105,7 @@ func synthesizeCanonicalState(
 	pendingReview []PendingReviewItem,
 	mode state.RunMode,
 	now time.Time,
+	defaultRuntime string,
 ) state.State {
 	reviewByOrder := make(map[string]PendingReviewItem, len(pendingReview))
 	for _, item := range pendingReview {
@@ -141,7 +142,7 @@ func synthesizeCanonicalState(
 			}
 			stageNode.Merge = canonicalMergeRecoveryFromLegacyStage(stage, stageStatus)
 			if stageNode.Runtime == "" {
-				stageNode.Runtime = "process"
+				stageNode.Runtime = defaultRuntime
 			}
 			if hasReview && reviewItem.StageIndex == i {
 				attempt := state.AttemptNode{
@@ -288,7 +289,7 @@ func (l *Loop) syncCanonicalOrderFromLegacyAt(order Order, sequence int) {
 				"skill":       stage.Skill,
 				"provider":    strings.TrimSpace(stage.Provider),
 				"model":       strings.TrimSpace(stage.Model),
-				"runtime":     nonEmpty(stage.Runtime, "process"),
+				"runtime":     nonEmpty(stage.Runtime, l.stageRuntime("")),
 				"group":       stage.Group,
 			})
 		}
@@ -325,7 +326,7 @@ func (l *Loop) syncCanonicalOrderFromLegacyAt(order Order, sequence int) {
 			Skill:       strings.TrimSpace(stage.Skill),
 			Provider:    strings.TrimSpace(stage.Provider),
 			Model:       strings.TrimSpace(stage.Model),
-			Runtime:     nonEmpty(stage.Runtime, "process"),
+			Runtime:     nonEmpty(stage.Runtime, l.stageRuntime("")),
 			Group:       stage.Group,
 			Extra:       cloneLegacyExtra(stage.Extra),
 			ExtraPrompt: strings.TrimSpace(stage.ExtraPrompt),

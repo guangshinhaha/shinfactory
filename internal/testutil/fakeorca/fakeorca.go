@@ -1,6 +1,6 @@
 // Package fakeorca provides a stand-in `orca` CLI for tests, so nothing
 // touches a real Orca. It speaks the slice of `orca orchestration` the orca
-// runtime uses: worker-start, worker-list, worker-show, worker-read and worker-stop.
+// runtime uses: run-create, run-show, worker-start, worker-list, worker-show, worker-read and worker-stop.
 package fakeorca
 
 import (
@@ -12,7 +12,9 @@ import (
 	"testing"
 )
 
-// Fake is a fake orca CLI backed by a state directory.
+// Fake is a fake orca CLI backed by a state directory. It models runs: every
+// worker belongs to the run it was started with, and worker-list shows only
+// the run it is asked for.
 type Fake struct {
 	// Bin is the path of the fake CLI script.
 	Bin string
@@ -37,25 +39,51 @@ row() {
 case "$cmd" in
 worker-start)
   if [ -f "$D/limit" ]; then
-    echo "Claude usage limit reached. Your limit will reset at 3pm." >&2
+    cat "$D/limit" >&2
     exit 1
   fi
   n=$(( $(cat "$D/n" 2>/dev/null || echo 0) + 1 ))
   echo "$n" > "$D/n"
   prev=""
+  run=""
   for a in "$@"; do
     [ "$prev" = "--spec-file" ] && cp "$a" "$D/spec-$n.md"
+    [ "$prev" = "--run" ] && run="$a"
     prev="$a"
   done
   echo "in_progress" > "$D/w-ctx_fake$n"
+  echo "$run" > "$D/run-ctx_fake$n"
   echo "{\"ok\":true,\"result\":{\"dispatchId\":\"ctx_fake$n\",\"state\":\"ready\"}}"
   ;;
+run-create)
+  n=$(( $(cat "$D/runs" 2>/dev/null || echo 0) + 1 ))
+  echo "$n" > "$D/runs"
+  echo "run_fake$n" >> "$D/runs.list"
+  echo "{\"ok\":true,\"result\":{\"run\":{\"id\":\"run_fake$n\"}}}"
+  ;;
+run-show)
+  id=""
+  prev=""
+  for a in "$@"; do
+    [ "$prev" = "--id" ] && id="$a"
+    prev="$a"
+  done
+  grep -qx "$id" "$D/runs.list" 2>/dev/null || { echo "no such run" >&2; exit 1; }
+  echo "{\"ok\":true,\"result\":{\"run\":{\"id\":\"$id\"}}}"
+  ;;
 worker-list)
+  want=""
+  prev=""
+  for a in "$@"; do
+    [ "$prev" = "--run" ] && want="$a"
+    prev="$a"
+  done
   printf '{"ok":true,"result":{"workers":['
   sep=""
   for f in "$D"/w-ctx_fake*; do
     [ -e "$f" ] || continue
     id=$(basename "$f" | sed 's/^w-//')
+    [ -n "$want" ] && [ "$(cat "$D/run-$id")" != "$want" ] && continue
     printf '%s%s' "$sep" "$(row "$id" "$(cat "$f")")"
     sep=","
   done
@@ -125,9 +153,16 @@ func New(t *testing.T) *Fake {
 // SetLimit makes worker-start fail with a usage-limit error until cleared.
 func (f *Fake) SetLimit(t *testing.T, on bool) {
 	t.Helper()
+	f.SetLimitMessage(t, on, "Claude usage limit reached.")
+}
+
+// SetLimitMessage is SetLimit with the text the refusal prints, so a fixture
+// can include a reset time.
+func (f *Fake) SetLimitMessage(t *testing.T, on bool, message string) {
+	t.Helper()
 	path := filepath.Join(f.Dir, "limit")
 	if on {
-		if err := os.WriteFile(path, nil, 0o644); err != nil {
+		if err := os.WriteFile(path, []byte(message+"\n"), 0o644); err != nil {
 			t.Fatalf("set limit: %v", err)
 		}
 		return
@@ -181,6 +216,26 @@ func (f *Fake) Spec(t *testing.T, n int) string {
 		t.Fatalf("read spec %d: %v", n, err)
 	}
 	return string(data)
+}
+
+// Runs returns the ids of the runs the fake has created.
+func (f *Fake) Runs() []string {
+	data, err := os.ReadFile(filepath.Join(f.Dir, "runs.list"))
+	if err != nil {
+		return nil
+	}
+	return strings.Fields(string(data))
+}
+
+// Worker returns a worker's state as the fake stores it: "in_progress",
+// "succeeded", or the failed outcome it was settled or stopped with.
+func (f *Fake) Worker(t *testing.T, dispatchID string) string {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(f.Dir, "w-"+dispatchID))
+	if err != nil {
+		t.Fatalf("no worker %s: %v", dispatchID, err)
+	}
+	return strings.TrimSpace(string(data))
 }
 
 // LastDispatch returns the id of the most recently launched worker. A start
