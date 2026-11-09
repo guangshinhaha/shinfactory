@@ -116,7 +116,7 @@ backlog sync line 12: missing required field id
 
 ## Writing an adapter
 
-A ready-made GitHub Issues adapter lives in `defaults/adapters/github/`: every open issue labelled `ready` is a backlog item, labels become tags, a `Plan: brain/plans/NN-slug/overview.md` line in the body links a plan, and `done` labels the issue `shinfactory-done` instead of closing it (the human's push with `Closes #N` closes it). Copy the four scripts into your project and point `[adapters.backlog.scripts]` at them; it needs `gh` signed in. Env: `NOODLE_GH_LABEL` renames the `ready` label, `NOODLE_GH_DONE_LABEL` renames the done label.
+A ready-made GitHub Issues adapter lives in `defaults/adapters/github/`: every open issue labelled `ready` is a backlog item, labels become tags, a `Plan: brain/plans/NN-slug/overview.md` line in the body links a plan, and `done` labels the issue `shinfactory-done` instead of closing it. With landing mode `pr`, the order's PR body carries `Closes #N` when `[landing] close_issues = true`, so merging the PR closes the issue. Copy the four scripts into your project and point `[adapters.backlog.scripts]` at them; it needs `gh` signed in. Env: `NOODLE_GH_LABEL` renames the `ready` label, `NOODLE_GH_DONE_LABEL` renames the done label.
 
 ### Handing an issue to the factory
 

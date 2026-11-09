@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/guangshinhaha/shinfactory/config"
 	"github.com/guangshinhaha/shinfactory/event"
 	loopruntime "github.com/guangshinhaha/shinfactory/runtime"
 )
@@ -35,7 +34,7 @@ func TestHandleCompletionFailureForwardsToScheduler(t *testing.T) {
 		t.Fatalf("write orders: %v", err)
 	}
 
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"process": newMockRuntime()},
 		Worktree:   &fakeWorktree{},
 		Adapter:    &fakeAdapterRunner{},
@@ -150,7 +149,7 @@ func TestHandleCompletionCancelledClassifiesAsStageTerminal(t *testing.T) {
 		t.Fatalf("write orders: %v", err)
 	}
 
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"process": newMockRuntime()},
 		Worktree:   &fakeWorktree{},
 		Adapter:    &fakeAdapterRunner{},
@@ -216,7 +215,7 @@ func TestHandleCompletionStageFailEventFailsCleanlyFinishedStage(t *testing.T) {
 	}
 
 	worktrees := &fakeWorktree{}
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"process": newMockRuntime()},
 		Worktree:   worktrees,
 		Adapter:    &fakeAdapterRunner{},
@@ -295,7 +294,7 @@ func TestReadStageFailTreatsUnreadableLogAsFailure(t *testing.T) {
 	if err := os.MkdirAll(sessionDir, 0o755); err != nil {
 		t.Fatalf("mkdir session: %v", err)
 	}
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes: map[string]loopruntime.Runtime{"process": newMockRuntime()},
 		Worktree: &fakeWorktree{},
 		Adapter:  &fakeAdapterRunner{},

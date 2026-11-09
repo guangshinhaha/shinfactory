@@ -28,13 +28,17 @@ type Config struct {
 
 // LandingConfig controls how finished work reaches the default branch.
 type LandingConfig struct {
-	// Mode is "local" (default: merge each stage's worktree into the local
-	// default branch) or "pr" (one branch per order; push and open a draft PR
+	// Mode is "pr" (default: one branch per order; push and open a draft PR
 	// after the first stage with commits, mark it ready and merge it when the
-	// last stage completes).
+	// last stage completes) or "local" (merge each stage's worktree into the
+	// local default branch; for projects with no GitHub remote).
 	Mode string `toml:"mode"`
 	// Base is the PR base branch; empty means the repository default.
 	Base string `toml:"base"`
+	// CloseIssues puts "Closes #<order id>" in the PR body, so merging the PR
+	// closes the order's GitHub issue. Set it only when the backlog is this
+	// repository's GitHub issues, where an order ID is an issue number.
+	CloseIssues bool `toml:"close_issues"`
 }
 
 // PR reports whether work lands through a pull request.
@@ -249,7 +253,8 @@ func DefaultConfig() Config {
 		Skills: SkillsConfig{
 			Paths: defaultSkillPaths(),
 		},
-		Mode: defaultMode,
+		Mode:    defaultMode,
+		Landing: LandingConfig{Mode: LandingModePR},
 		Concurrency: ConcurrencyConfig{
 			MaxConcurrency: 4,
 		},

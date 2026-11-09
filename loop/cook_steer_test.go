@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/guangshinhaha/shinfactory/config"
 	"github.com/guangshinhaha/shinfactory/event"
 	loopruntime "github.com/guangshinhaha/shinfactory/runtime"
 )
@@ -70,7 +69,7 @@ func newSteerTestLoop(t *testing.T, rt *mockRuntime) *Loop {
 		t.Fatalf("mkdir runtime: %v", err)
 	}
 	ordersPath := filepath.Join(runtimeDir, "orders.json")
-	return New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	return New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"process": rt},
 		Worktree:   &fakeWorktree{},
 		Adapter:    &fakeAdapterRunner{},

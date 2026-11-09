@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/guangshinhaha/shinfactory/config"
 	"github.com/guangshinhaha/shinfactory/internal/statusfile"
 	loopruntime "github.com/guangshinhaha/shinfactory/runtime"
 )
@@ -20,7 +19,7 @@ func TestStampStatusWarningChangeTriggersWrite(t *testing.T) {
 	}
 	statusPath := filepath.Join(runtimeDir, "status.json")
 
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"process": newMockRuntime()},
 		Worktree:   &fakeWorktree{},
 		Adapter:    &fakeAdapterRunner{},

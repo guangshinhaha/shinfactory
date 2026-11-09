@@ -36,6 +36,11 @@ add = "defaults/adapters/github/backlog-add"
 done = "defaults/adapters/github/backlog-done"
 edit = "defaults/adapters/github/backlog-edit"
 
+[landing]
+mode = "pr"
+# The backlog is this repo's GitHub issues, so merging an order's PR closes its issue.
+close_issues = true
+
 [runtime]
 # "process" | "sprites"
 default = "process"

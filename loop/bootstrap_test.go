@@ -52,8 +52,8 @@ func cycleUntilBootstrapFailureCollected(t *testing.T, l *Loop) {
 func testRegistryWithoutSchedule() taskreg.Registry {
 	return taskreg.NewFromSkills([]skill.SkillMeta{
 		{
-			Name: "execute",
-			Path: "/skills/execute",
+			Name:        "execute",
+			Path:        "/skills/execute",
 			Frontmatter: skill.Frontmatter{Schedule: "When a planned item is ready"},
 		},
 	})
@@ -94,7 +94,7 @@ You are a bootstrap agent. Read history from {{history_dirs}}.
 
 // bootstrapConfig returns a config with skill search paths pointing to the fixture.
 func bootstrapConfig(skillSearchPath string) config.Config {
-	cfg := config.DefaultConfig()
+	cfg := localLandingConfig()
 	cfg.Skills.Paths = []string{skillSearchPath}
 	return cfg
 }
@@ -109,13 +109,13 @@ func TestMissingScheduleSkillTriggersBootstrap(t *testing.T) {
 
 	rt := newMockRuntime()
 	l := New(projectDir, "noodle", bootstrapConfig(skillPath), Dependencies{
-		Runtimes:   map[string]loopruntime.Runtime{"process": rt},
-		Worktree:   &fakeWorktree{},
-		Adapter:    &fakeAdapterRunner{},
-		Mise:       bootstrapMise(),
-		Monitor:    fakeMonitor{},
-		Registry:   testRegistryWithoutSchedule(),
-		Now:        time.Now,
+		Runtimes: map[string]loopruntime.Runtime{"process": rt},
+		Worktree: &fakeWorktree{},
+		Adapter:  &fakeAdapterRunner{},
+		Mise:     bootstrapMise(),
+		Monitor:  fakeMonitor{},
+		Registry: testRegistryWithoutSchedule(),
+		Now:      time.Now,
 	})
 
 	if err := l.Cycle(context.Background()); err != nil {
@@ -165,13 +165,13 @@ func TestBootstrapSessionUsesSystemPromptNotSkill(t *testing.T) {
 
 	rt := newMockRuntime()
 	l := New(projectDir, "noodle", bootstrapConfig(skillPath), Dependencies{
-		Runtimes:   map[string]loopruntime.Runtime{"process": rt},
-		Worktree:   &fakeWorktree{},
-		Adapter:    &fakeAdapterRunner{},
-		Mise:       bootstrapMise(),
-		Monitor:    fakeMonitor{},
-		Registry:   testRegistryWithoutSchedule(),
-		Now:        time.Now,
+		Runtimes: map[string]loopruntime.Runtime{"process": rt},
+		Worktree: &fakeWorktree{},
+		Adapter:  &fakeAdapterRunner{},
+		Mise:     bootstrapMise(),
+		Monitor:  fakeMonitor{},
+		Registry: testRegistryWithoutSchedule(),
+		Now:      time.Now,
 	})
 
 	if err := l.Cycle(context.Background()); err != nil {
@@ -204,13 +204,13 @@ func TestFailedBootstrapIncrements(t *testing.T) {
 
 	rt := newMockRuntime()
 	l := New(projectDir, "noodle", bootstrapConfig(skillPath), Dependencies{
-		Runtimes:   map[string]loopruntime.Runtime{"process": rt},
-		Worktree:   &fakeWorktree{},
-		Adapter:    &fakeAdapterRunner{},
-		Mise:       bootstrapMise(),
-		Monitor:    fakeMonitor{},
-		Registry:   testRegistryWithoutSchedule(),
-		Now:        time.Now,
+		Runtimes: map[string]loopruntime.Runtime{"process": rt},
+		Worktree: &fakeWorktree{},
+		Adapter:  &fakeAdapterRunner{},
+		Mise:     bootstrapMise(),
+		Monitor:  fakeMonitor{},
+		Registry: testRegistryWithoutSchedule(),
+		Now:      time.Now,
 	})
 
 	// First cycle: bootstrap dispatched.
@@ -250,13 +250,13 @@ func TestBootstrapExhaustedAfterThreeFailures(t *testing.T) {
 
 	rt := newMockRuntime()
 	l := New(projectDir, "noodle", bootstrapConfig(skillPath), Dependencies{
-		Runtimes:   map[string]loopruntime.Runtime{"process": rt},
-		Worktree:   &fakeWorktree{},
-		Adapter:    &fakeAdapterRunner{},
-		Mise:       bootstrapMise(),
-		Monitor:    fakeMonitor{},
-		Registry:   testRegistryWithoutSchedule(),
-		Now:        time.Now,
+		Runtimes: map[string]loopruntime.Runtime{"process": rt},
+		Worktree: &fakeWorktree{},
+		Adapter:  &fakeAdapterRunner{},
+		Mise:     bootstrapMise(),
+		Monitor:  fakeMonitor{},
+		Registry: testRegistryWithoutSchedule(),
+		Now:      time.Now,
 	})
 
 	for i := 0; i < 3; i++ {
@@ -297,13 +297,13 @@ func TestBootstrapExhaustionEmitsFeedEvent(t *testing.T) {
 
 	rt := newMockRuntime()
 	l := New(projectDir, "noodle", bootstrapConfig(skillPath), Dependencies{
-		Runtimes:   map[string]loopruntime.Runtime{"process": rt},
-		Worktree:   &fakeWorktree{},
-		Adapter:    &fakeAdapterRunner{},
-		Mise:       bootstrapMise(),
-		Monitor:    fakeMonitor{},
-		Registry:   testRegistryWithoutSchedule(),
-		Now:        time.Now,
+		Runtimes: map[string]loopruntime.Runtime{"process": rt},
+		Worktree: &fakeWorktree{},
+		Adapter:  &fakeAdapterRunner{},
+		Mise:     bootstrapMise(),
+		Monitor:  fakeMonitor{},
+		Registry: testRegistryWithoutSchedule(),
+		Now:      time.Now,
 	})
 
 	// Exhaust bootstrap attempts.
@@ -354,13 +354,13 @@ func TestSuccessfulBootstrapTriggersRebuild(t *testing.T) {
 
 	rt := newMockRuntime()
 	l := New(projectDir, "noodle", bootstrapConfig(skillPath), Dependencies{
-		Runtimes:   map[string]loopruntime.Runtime{"process": rt},
-		Worktree:   &fakeWorktree{},
-		Adapter:    &fakeAdapterRunner{},
-		Mise:       bootstrapMise(),
-		Monitor:    fakeMonitor{},
-		Registry:   testRegistryWithoutSchedule(),
-		Now:        time.Now,
+		Runtimes: map[string]loopruntime.Runtime{"process": rt},
+		Worktree: &fakeWorktree{},
+		Adapter:  &fakeAdapterRunner{},
+		Mise:     bootstrapMise(),
+		Monitor:  fakeMonitor{},
+		Registry: testRegistryWithoutSchedule(),
+		Now:      time.Now,
 	})
 
 	// Dispatch bootstrap.
