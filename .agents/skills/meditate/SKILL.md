@@ -74,7 +74,7 @@ Apply all changes directly. The user reviews the diff.
 
 ### 7. Housekeep
 
-Clean stale `.noodle/` state (old debates, completed sessions, stale plan artifacts). Update `brain/index.md` for any files added or removed.
+Clean stale `.noodle/` state (old debates, completed sessions, stale plan artifacts). `brain/index.md` is generated; run `sh scripts/brain-index.sh` instead of editing it.
 
 ## Summary
 
