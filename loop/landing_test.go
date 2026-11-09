@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -20,6 +21,7 @@ type fakeLander struct {
 	merged   []PullRequest
 	pushErr  error
 	mergeErr error
+	pending  int // MarkReadyAndMerge returns ErrChecksPending this many times first
 }
 
 func (f *fakeLander) PushAndEnsureDraft(_ context.Context, dir string, spec PRSpec) (PullRequest, error) {
@@ -28,10 +30,14 @@ func (f *fakeLander) PushAndEnsureDraft(_ context.Context, dir string, spec PRSp
 	if f.pushErr != nil {
 		return PullRequest{}, f.pushErr
 	}
-	return PullRequest{URL: "https://example.test/pr/1", Branch: "b", IsDraft: len(f.merged) == 0}, nil
+	return PullRequest{URL: "https://example.test/pr/1", Branch: spec.Branch, IsDraft: len(f.merged) == 0}, nil
 }
 
 func (f *fakeLander) MarkReadyAndMerge(_ context.Context, _ string, pr PullRequest) error {
+	if f.pending > 0 {
+		f.pending--
+		return ErrChecksPending
+	}
 	if f.mergeErr != nil {
 		return f.mergeErr
 	}
@@ -64,7 +70,7 @@ func newLandingHarness(t *testing.T, runMode string, stages int) *landingHarness
 	cfg := config.DefaultConfig()
 	cfg.Mode = runMode
 	cfg.Landing.Mode = config.LandingModePR
-	cfg.Adapters["backlog"] = config.AdapterConfig{Scripts: map[string]string{"done": "defaults/adapters/github/backlog-done"}}
+	cfg.Landing.CloseIssues = true
 	h.l = New(projectDir, "noodle", cfg, Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"process": h.rt},
 		Worktree:   h.wt,
@@ -199,6 +205,86 @@ func TestPRLandingMergeRefusedFailsStageWithoutDone(t *testing.T) {
 	}
 	if len(h.wt.cleaned) != 0 {
 		t.Fatalf("worktree cleaned though merge was refused: %v", h.wt.cleaned)
+	}
+}
+
+// Gantry's checks start on the final push. The order must wait for them, not
+// fail, and the loop merges by itself once they pass.
+func TestPRLandingWaitsForChecksThenMerges(t *testing.T) {
+	h := newLandingHarness(t, "auto", 1)
+	h.ln.pending = 2
+
+	h.runStage(t, 1)
+	review, parked := h.l.cooks.pendingReview["42"]
+	if !parked || !strings.HasPrefix(review.reason, awaitingChecksPrefix) {
+		t.Fatalf("pending review = %+v (parked=%v), want parked waiting for checks", review, parked)
+	}
+	if len(h.ar.doneCalls) != 0 || len(h.wt.cleaned) != 0 {
+		t.Fatalf("order finished while checks were pending: done=%v cleaned=%v", h.ar.doneCalls, h.wt.cleaned)
+	}
+	if o, _ := h.l.orderByID("42"); o.Status == OrderStatusFailed {
+		t.Fatal("order failed while checks were pending")
+	}
+
+	// Within the poll interval nothing is retried.
+	h.l.lastChecksPoll = time.Now()
+	if err := h.l.Cycle(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if h.ln.pending != 1 {
+		t.Fatalf("retried inside the poll interval: pending left = %d", h.ln.pending)
+	}
+
+	// Checks still running: stays parked.
+	h.l.lastChecksPoll = time.Time{}
+	if err := h.l.Cycle(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if _, still := h.l.cooks.pendingReview["42"]; !still || len(h.ln.merged) != 0 {
+		t.Fatalf("parked=%v merged=%d, want still waiting", still, len(h.ln.merged))
+	}
+
+	// Checks pass: the loop merges and finishes the order unasked.
+	h.l.lastChecksPoll = time.Time{}
+	if err := h.l.Cycle(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(h.ln.merged) != 1 {
+		t.Fatalf("merges = %d, want 1 once checks passed", len(h.ln.merged))
+	}
+	if _, still := h.l.cooks.pendingReview["42"]; still {
+		t.Fatal("still parked after merging")
+	}
+	if len(h.ar.doneCalls) != 1 || len(h.wt.cleaned) != 1 {
+		t.Fatalf("done=%v cleaned=%v, want both once merged", h.ar.doneCalls, h.wt.cleaned)
+	}
+}
+
+func TestPRLandingWaitingPRRefusedAfterChecksStaysParkedWithReason(t *testing.T) {
+	h := newLandingHarness(t, "auto", 1)
+	h.ln.pending = 1
+	h.runStage(t, 1)
+
+	h.ln.mergeErr = errors.New("a required check failed")
+	h.l.lastChecksPoll = time.Time{}
+	if err := h.l.Cycle(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	review, parked := h.l.cooks.pendingReview["42"]
+	if !parked || !strings.Contains(review.reason, "a required check failed") {
+		t.Fatalf("pending review = %+v (parked=%v), want parked with the refusal", review, parked)
+	}
+	if len(h.ar.doneCalls) != 0 {
+		t.Fatal("order marked done though the merge was refused")
+	}
+	// A refusal is not retried by itself: a human decides.
+	h.ln.mergeErr = nil
+	h.l.lastChecksPoll = time.Time{}
+	if err := h.l.Cycle(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(h.ln.merged) != 0 {
+		t.Fatal("retried a refused merge without a human")
 	}
 }
 

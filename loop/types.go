@@ -216,6 +216,7 @@ type Loop struct {
 
 	reconciledFailures []reconciledFailure
 	lastMiseWarnings   []string
+	lastChecksPoll     time.Time // last time parked PRs were re-checked for merge
 
 	lastLoopFailure *LoopFailureEnvelope
 

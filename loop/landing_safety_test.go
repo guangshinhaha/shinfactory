@@ -37,7 +37,7 @@ func newOrderRepo(t *testing.T, branch string) (work string) {
 // real shinfactory worktree and merged its open PR. A test binary must never
 // run gh unless a test opts in on purpose.
 func TestGHLanderRefusesToRunInsideATestBinaryWithoutOptIn(t *testing.T) {
-	logPath := stubGH(t)
+	logPath := installStubGH(t)
 	work := newOrderRepo(t, "42-0-task")
 
 	if _, err := (ghLander{}).PushAndEnsureDraft(context.Background(), work, PRSpec{Title: "T", Branch: "42-0-task"}); err == nil {
