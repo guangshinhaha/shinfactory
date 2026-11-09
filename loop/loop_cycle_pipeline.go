@@ -40,6 +40,20 @@ func (l *Loop) mergeOrdersNext(brief mise.Brief) (mergeResult, error) {
 	return consumeOrdersNext(l.deps.OrdersNextFile, orders, brief.Backlog)
 }
 
+func appendUnique(dst, src []string) []string {
+	seen := make(map[string]struct{}, len(dst))
+	for _, id := range dst {
+		seen[id] = struct{}{}
+	}
+	for _, id := range src {
+		if _, ok := seen[id]; !ok {
+			seen[id] = struct{}{}
+			dst = append(dst, id)
+		}
+	}
+	return dst
+}
+
 // handlePromotionResult processes the side effects of an orders-next
 // promotion: error classification, cooldown management, and canonical
 // event emission.
@@ -56,8 +70,8 @@ func (l *Loop) handlePromotionResult(result mergeResult, err error) error {
 	l.schedulePromoted = true
 	l.lastPromotionError = ""
 	if len(result.Unbuildable) > 0 {
-		l.lastPromotionError = "dropped orders that name no ready issue: " + strings.Join(result.Unbuildable, ", ")
-		l.logger.Warn(l.lastPromotionError)
+		l.droppedOrderIDs = appendUnique(l.droppedOrderIDs, result.Unbuildable)
+		l.logger.Warn("dropped orders that name no ready issue", "orders", strings.Join(result.Unbuildable, ", "))
 	}
 	if result.EmptyPromotion {
 		l.scheduleNothingUntil = l.deps.Now().Add(5 * time.Minute)
@@ -85,6 +99,11 @@ func (l *Loop) handlePromotionResult(result mergeResult, err error) error {
 		return nil
 	}
 	l.emitPromotedOrders()
+	if len(result.Unbuildable) > 0 {
+		// Emit once the promotion is persisted: a failed step above leaves
+		// orders-next.json in place and the retry would emit it again.
+		_ = l.events.Emit(LoopEventOrdersUnready, OrdersUnreadyPayload{OrderIDs: result.Unbuildable})
+	}
 	return nil
 }
 

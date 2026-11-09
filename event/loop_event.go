@@ -28,6 +28,7 @@ const (
 	LoopEventBootstrapCompleted LoopEventType = "bootstrap.completed"
 	LoopEventBootstrapExhausted LoopEventType = "bootstrap.exhausted"
 	LoopEventPromotionFailed    LoopEventType = "promotion.failed"
+	LoopEventOrdersUnready      LoopEventType = "orders.unready"
 )
 
 // LoopEvent is one append-only NDJSON record in loop-events.ndjson.

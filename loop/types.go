@@ -198,6 +198,7 @@ type Loop struct {
 	schedulePromoted     bool      // set when consumeOrdersNext promotes after a schedule dispatch
 	scheduleNothingUntil time.Time // cooldown: suppress schedule re-spawn until this time
 	lastPromotionError   string    // latest scheduler-output validation issue to inject into next schedule prompt
+	droppedOrderIDs      []string  // unready order ids dropped since the last schedule prompt; survives clean promotions
 
 	activeSummary  mise.ActiveSummary
 	recentHistory  []mise.HistoryItem

@@ -225,6 +225,14 @@ func readLoopEvents(runtimeDir string) []FeedEvent {
 			} else {
 				body = "Sync degraded"
 			}
+		case "orders.unready":
+			label = "Dropped"
+			category = "orders_unready"
+			var p struct {
+				OrderIDs []string `json:"order_ids"`
+			}
+			_ = json.Unmarshal(raw.Payload, &p)
+			body = "no ready issue: " + strings.Join(p.OrderIDs, ", ")
 		case "promotion.failed":
 			label = "Rejected"
 			category = "promotion_failed"

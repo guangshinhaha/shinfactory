@@ -156,11 +156,12 @@ func (l *Loop) spawnSchedule(ctx context.Context, order Order, attempt int, resu
 	taskTypesPrompt := buildOrderTaskTypesPrompt(l.registry.All())
 	promotionError := l.lastPromotionError
 	l.lastPromotionError = ""
+	droppedOrders := l.droppedOrderIDs
 	failures := l.reconciledFailures
 	stageProvider, stageModel := l.config.ResolveStageRouting("schedule", stage.Provider, stage.Model)
 	req := loopruntime.DispatchRequest{
 		Name:                 name,
-		Prompt:               buildSchedulePrompt(skillName, taskTypesPrompt, order, resumePrompt, l.runtimeDir, promotionError, failures, l.lastMiseWarnings),
+		Prompt:               buildSchedulePrompt(skillName, taskTypesPrompt, order, resumePrompt, l.runtimeDir, promotionError, droppedOrders, failures, l.lastMiseWarnings),
 		Provider:             stageProvider,
 		Model:                stageModel,
 		Skill:                skillName,
@@ -190,6 +191,7 @@ func (l *Loop) spawnSchedule(ctx context.Context, order Order, attempt int, resu
 			"error", err)
 	}
 	l.reconciledFailures = nil // clear only after successful dispatch
+	l.droppedOrderIDs = nil    // the prompt carried them; a failed dispatch keeps them for the retry
 	cook := &cookHandle{
 		cookIdentity: cookIdentity{
 			orderID:    order.ID,
@@ -287,7 +289,7 @@ func (l *Loop) spawnBootstrapIfNeeded(ctx context.Context, order Order) error {
 	return nil
 }
 
-func buildSchedulePrompt(skillName, taskTypesPrompt string, order Order, resumePrompt string, runtimeDir string, lastPromotionError string, failures []reconciledFailure, miseWarnings []string) string {
+func buildSchedulePrompt(skillName, taskTypesPrompt string, order Order, resumePrompt string, runtimeDir string, lastPromotionError string, droppedOrders []string, failures []reconciledFailure, miseWarnings []string) string {
 	miseFile := filepath.Join(runtimeDir, "mise.json")
 	ordersNextFile := filepath.Join(runtimeDir, "orders-next.json")
 	parts := []string{
@@ -303,6 +305,9 @@ func buildSchedulePrompt(skillName, taskTypesPrompt string, order Order, resumeP
 	}
 	if errMsg := strings.TrimSpace(lastPromotionError); errMsg != "" {
 		parts = append(parts, "PREVIOUS ORDERS ISSUE: The loop rejected or repaired your recent schedule output. Fix the following issue in your next orders-next.json output:\n"+errMsg)
+	}
+	if len(droppedOrders) > 0 {
+		parts = append(parts, "DROPPED ORDERS: The loop dropped these orders because they name no ready issue. Propose only orders whose id is a ready backlog issue: "+strings.Join(droppedOrders, ", "))
 	}
 	if rationale := strings.TrimSpace(order.Rationale); rationale != "" {
 		parts = append(parts, "Chef guidance: "+rationale)

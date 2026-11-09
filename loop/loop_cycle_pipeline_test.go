@@ -1,10 +1,14 @@
 package loop
 
 import (
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/guangshinhaha/shinfactory/adapter"
+	"github.com/guangshinhaha/shinfactory/internal/orderx"
 	loopruntime "github.com/guangshinhaha/shinfactory/runtime"
 )
 
@@ -129,5 +133,81 @@ func TestCancelSupersededActiveCooksKeepsMatchingStage(t *testing.T) {
 	}
 	if len(worktree.cleaned) != 0 {
 		t.Fatalf("expected no worktree cleanup, got %v", worktree.cleaned)
+	}
+}
+
+func newPromotionTestLoop(t *testing.T) (*Loop, string) {
+	t.Helper()
+	projectDir := t.TempDir()
+	runtimeDir := filepath.Join(projectDir, ".noodle")
+	ordersPath := filepath.Join(runtimeDir, "orders.json")
+	if err := writeOrdersAtomic(ordersPath, OrdersFile{}); err != nil {
+		t.Fatalf("write orders: %v", err)
+	}
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
+		Runtimes:       map[string]loopruntime.Runtime{"process": newMockRuntime()},
+		Worktree:       &fakeWorktree{},
+		Adapter:        &fakeAdapterRunner{},
+		Mise:           &fakeMise{},
+		Monitor:        fakeMonitor{},
+		Registry:       testLoopRegistry(),
+		Now:            time.Now,
+		OrdersFile:     ordersPath,
+		OrdersNextFile: filepath.Join(runtimeDir, "orders-next.json"),
+	})
+	return l, runtimeDir
+}
+
+func promoteProposal(t *testing.T, l *Loop, ids []string, backlog []adapter.BacklogItem) {
+	t.Helper()
+	compact := orderx.CompactOrdersFile{}
+	for _, id := range ids {
+		compact.Orders = append(compact.Orders, orderx.CompactOrder{ID: id, Stages: []orderx.CompactStage{{Do: "execute"}}})
+	}
+	writeCompactOrders(t, l.deps.OrdersNextFile, compact)
+	orders, err := l.currentOrders()
+	if err != nil {
+		t.Fatalf("currentOrders: %v", err)
+	}
+	result, err := consumeOrdersNext(l.deps.OrdersNextFile, orders, backlog)
+	if err := l.handlePromotionResult(result, err); err != nil {
+		t.Fatalf("handlePromotionResult: %v", err)
+	}
+}
+
+func TestDroppedOrdersEmitOwnEventAndSurviveCleanPromotion(t *testing.T) {
+	l, runtimeDir := newPromotionTestLoop(t)
+
+	promoteProposal(t, l, []string{"chore-side-note"}, nil)
+	data, err := os.ReadFile(filepath.Join(runtimeDir, "loop-events.ndjson"))
+	if err != nil {
+		t.Fatalf("read loop events: %v", err)
+	}
+	if !strings.Contains(string(data), `"type":"orders.unready"`) || !strings.Contains(string(data), "chore-side-note") {
+		t.Fatalf("want orders.unready event naming the id, got %s", data)
+	}
+	if l.lastPromotionError != "" {
+		t.Fatalf("dropped orders must not reuse lastPromotionError, got %q", l.lastPromotionError)
+	}
+
+	// A clean promotion in between must not erase the dropped ids.
+	promoteProposal(t, l, []string{"7"}, []adapter.BacklogItem{{ID: "7"}})
+
+	taskTypes := buildOrderTaskTypesPrompt(l.registry.All())
+	first := buildSchedulePrompt("schedule", taskTypes, Order{}, "", runtimeDir, l.lastPromotionError, l.droppedOrderIDs, nil, nil)
+	if got := strings.Count(first, "chore-side-note"); got != 1 {
+		t.Fatalf("dropped id appears %d times in prompt, want once:\n%s", got, first)
+	}
+}
+
+func TestProposalOfUnreadyAndScheduleEntersCooldown(t *testing.T) {
+	l, _ := newPromotionTestLoop(t)
+	now := time.Now()
+	l.deps.Now = func() time.Time { return now }
+
+	promoteProposal(t, l, []string{"chore-side-note", "schedule"}, nil)
+
+	if !l.scheduleNothingUntil.After(now) {
+		t.Fatalf("want empty-promotion cooldown after [unready, schedule], got %v", l.scheduleNothingUntil)
 	}
 }

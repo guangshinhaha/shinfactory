@@ -18,6 +18,7 @@ const (
 	LoopEventBootstrapCompleted = event.LoopEventBootstrapCompleted
 	LoopEventBootstrapExhausted = event.LoopEventBootstrapExhausted
 	LoopEventPromotionFailed    = event.LoopEventPromotionFailed
+	LoopEventOrdersUnready      = event.LoopEventOrdersUnready
 )
 
 // Payload structs for loop events.
@@ -88,6 +89,12 @@ type MergeConflictPayload struct {
 
 type OrderRequeuedPayload struct {
 	OrderID string `json:"order_id"`
+}
+
+// OrdersUnreadyPayload names scheduler orders dropped because they name no
+// ready issue.
+type OrdersUnreadyPayload struct {
+	OrderIDs []string `json:"order_ids"`
 }
 
 type PromotionFailedPayload struct {
