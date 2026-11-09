@@ -1,6 +1,7 @@
 package loop
 
 import (
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -44,6 +45,37 @@ func (h *usageLimitHolds) release(runtime string) bool {
 	_, was := h.until[key]
 	delete(h.until, key)
 	return was
+}
+
+// maxUsageLimitRequeues bounds how often one stage may die on a usage limit
+// and be requeued. A stage that keeps dying that way (for instance one whose
+// own output trips the detector) fails instead of relaunching forever.
+const maxUsageLimitRequeues = 5
+
+// usageLimitRequeueCap is the requeue bound; tests lower it to stay quick.
+func (l *Loop) usageLimitRequeueCap() int {
+	if l.limitRequeues.cap > 0 {
+		return l.limitRequeues.cap
+	}
+	return maxUsageLimitRequeues
+}
+
+// usageLimitRequeues counts requeues per stage since the loop started.
+type usageLimitRequeues struct {
+	mu  sync.Mutex
+	n   map[string]int
+	cap int // overrides maxUsageLimitRequeues when positive
+}
+
+func (r *usageLimitRequeues) bump(orderID string, stageIndex int) int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.n == nil {
+		r.n = map[string]int{}
+	}
+	key := fmt.Sprintf("%s/%d", orderID, stageIndex)
+	r.n[key]++
+	return r.n[key]
 }
 
 // usageLimitResetSlack keeps the probe launch from landing in the second the
@@ -119,6 +151,9 @@ func (l *Loop) requeueAfterUsageLimit(cook *cookHandle) error {
 	runtimeName := nonEmpty(cook.dispatchedRuntime, l.stageRuntime(cook.stage))
 	reason := nonEmpty(cook.session.Outcome().Reason, "usage limit reached")
 	l.holdRuntime(runtimeName, reason)
+	if n := l.limitRequeues.bump(cook.orderID, cook.stageIndex); n > l.usageLimitRequeueCap() {
+		return l.failStage(nil, cook, fmt.Sprintf("stage was requeued after the usage limit %d times: %s", n, reason))
+	}
 	if err := l.resetStageToPending(cook.orderID, cook.stageIndex, reason); err != nil {
 		return err
 	}

@@ -35,3 +35,12 @@ func TestParseUsageLimitReset(t *testing.T) {
 		}
 	}
 }
+
+func TestIsUsageLimitTextIgnoresBareRateLimitError(t *testing.T) {
+	if IsUsageLimitText(`handler returns {"type":"rate_limit_error"} on 429`) {
+		t.Fatal("a failure that merely mentions rate_limit_error read as a usage limit")
+	}
+	if !IsUsageLimitText("Claude usage limit reached. resets 3pm") {
+		t.Fatal("a real usage limit message no longer matches")
+	}
+}
