@@ -772,3 +772,18 @@ func assertFailureStateMessage(t *testing.T, message string) {
 		}
 	}
 }
+
+func TestParseControlRequestAcceptsEveryLoopAction(t *testing.T) {
+	for _, action := range loop.ControlActions() {
+		cmd, err := parseControlRequest(action, controlRequest{})
+		if err != nil {
+			t.Errorf("parseControlRequest(%q) = %v, want accepted", action, err)
+		}
+		if cmd.Action != action {
+			t.Errorf("parseControlRequest(%q).Action = %q", action, cmd.Action)
+		}
+	}
+	if _, err := parseControlRequest("nope", controlRequest{}); err == nil {
+		t.Error("parseControlRequest(nope) accepted an unknown action")
+	}
+}
