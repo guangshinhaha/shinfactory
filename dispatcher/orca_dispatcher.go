@@ -22,6 +22,12 @@ import (
 const (
 	orcaStartTimeout        = 2 * time.Minute
 	defaultOrcaPollInterval = 5 * time.Second
+
+	// A stage's worktree is created moments before worker-start, and Orca may
+	// not have noticed it yet (selector_not_found). Retrying beats registering:
+	// `orca worktree create` makes a new worktree, it cannot adopt ours.
+	defaultOrcaSelectorRetries = 6
+	defaultOrcaSelectorBackoff = 500 * time.Millisecond
 )
 
 // OrcaDispatcherConfig configures an orca dispatcher.
@@ -32,7 +38,10 @@ type OrcaDispatcherConfig struct {
 	RunID         string // Orca run to launch workers in; empty = the factory creates and remembers its own
 	SkillResolver skill.Resolver
 	PollInterval  time.Duration // 0 = default
-	Sink          SessionEventSink
+	// SelectorBackoff is the first wait before retrying a worker-start that
+	// Orca refused with selector_not_found; it doubles per retry. 0 = default.
+	SelectorBackoff time.Duration
+	Sink            SessionEventSink
 }
 
 // OrcaDispatcher launches each stage as an Orca worker
@@ -45,6 +54,8 @@ type OrcaDispatcher struct {
 	skillResolver skill.Resolver
 	pollInterval  time.Duration
 	sink          SessionEventSink
+
+	selectorBackoff time.Duration
 
 	// run executes the orca CLI. Injected for testing.
 	run orcaRunner
@@ -67,15 +78,20 @@ func NewOrcaDispatcher(config OrcaDispatcherConfig) *OrcaDispatcher {
 	if poll <= 0 {
 		poll = defaultOrcaPollInterval
 	}
+	backoff := config.SelectorBackoff
+	if backoff <= 0 {
+		backoff = defaultOrcaSelectorBackoff
+	}
 	return &OrcaDispatcher{
-		projectDir:    strings.TrimSpace(config.ProjectDir),
-		runtimeDir:    strings.TrimSpace(config.RuntimeDir),
-		bin:           bin,
-		skillResolver: config.SkillResolver,
-		pollInterval:  poll,
-		sink:          config.Sink,
-		run:           runOrcaCLI,
-		runID:         strings.TrimSpace(config.RunID),
+		selectorBackoff: backoff,
+		projectDir:      strings.TrimSpace(config.ProjectDir),
+		runtimeDir:      strings.TrimSpace(config.RuntimeDir),
+		bin:             bin,
+		skillResolver:   config.SkillResolver,
+		pollInterval:    poll,
+		sink:            config.Sink,
+		run:             runOrcaCLI,
+		runID:           strings.TrimSpace(config.RunID),
 	}
 }
 
@@ -230,6 +246,16 @@ func (d *OrcaDispatcher) startWorker(ctx context.Context, runID, sessionID, spec
 	startCtx, cancel := context.WithTimeout(ctx, orcaStartTimeout)
 	defer cancel()
 	out, err := d.run(startCtx, d.bin, args...)
+	wait := d.selectorBackoff
+	for retry := 0; err != nil && retry < defaultOrcaSelectorRetries && isSelectorNotFound(err, out); retry++ {
+		select {
+		case <-startCtx.Done():
+			return "", fmt.Errorf("orca worker-start failed: %w", err)
+		case <-time.After(wait):
+		}
+		wait *= 2
+		out, err = d.run(startCtx, d.bin, args...)
+	}
 	if err != nil {
 		if IsUsageLimitText(err.Error()) || IsUsageLimitText(string(out)) {
 			return "", UsageLimitError{Runtime: "orca", Detail: strings.TrimSpace(err.Error())}
@@ -241,6 +267,11 @@ func (d *OrcaDispatcher) startWorker(ctx context.Context, runID, sessionID, spec
 		return "", fmt.Errorf("orca worker-start reply unreadable: %w", err)
 	}
 	return dispatchID, nil
+}
+
+// isSelectorNotFound reports Orca refusing a worktree selector it does not know yet.
+func isSelectorNotFound(err error, out []byte) bool {
+	return strings.Contains(err.Error(), "selector_not_found") || strings.Contains(string(out), "selector_not_found")
 }
 
 // stopWorker fences a worker best-effort; used when a launch must be undone.

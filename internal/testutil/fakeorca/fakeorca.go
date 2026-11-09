@@ -38,6 +38,14 @@ row() {
 }
 case "$cmd" in
 worker-start)
+  if [ -f "$D/unknown" ]; then
+    left=$(cat "$D/unknown")
+    if [ "$left" -gt 0 ]; then
+      echo $(( left - 1 )) > "$D/unknown"
+      echo '{"ok":false,"error":{"code":"selector_not_found","message":"No worktree matches selector"}}' >&2
+      exit 1
+    fi
+  fi
   if [ -f "$D/limit" ]; then
     cat "$D/limit" >&2
     exit 1
@@ -169,6 +177,15 @@ func (f *Fake) SetLimitMessage(t *testing.T, on bool, message string) {
 	}
 	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 		t.Fatalf("clear limit: %v", err)
+	}
+}
+
+// RefuseUnknownWorktree makes the next n worker-starts fail with
+// selector_not_found, as real Orca does for a worktree it has not noticed yet.
+func (f *Fake) RefuseUnknownWorktree(t *testing.T, n int) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(f.Dir, "unknown"), []byte(strconv.Itoa(n)), 0o644); err != nil {
+		t.Fatalf("refuse unknown worktree: %v", err)
 	}
 }
 

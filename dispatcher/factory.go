@@ -40,7 +40,9 @@ func (f *DispatcherFactory) Dispatch(ctx context.Context, req DispatchRequest) (
 	}
 	req.Runtime = runtime
 	session, err := dispatcher.Dispatch(ctx, req)
-	if err != nil && runtime != "process" && !IsUsageLimit(err) {
+	// An orca stage never falls back: process runs on the default login, not the
+	// Orca-managed one, and nothing would say so. The caller holds or fails the stage.
+	if err != nil && runtime != "process" && runtime != "orca" && !IsUsageLimit(err) {
 		fallback, hasFallback := f.runtimes["process"]
 		if hasFallback {
 			fmt.Fprintf(os.Stderr, "dispatch: %s runtime failed, falling back to process: %v\n", runtime, err)

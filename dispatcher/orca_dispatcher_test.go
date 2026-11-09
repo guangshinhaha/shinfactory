@@ -182,3 +182,29 @@ func TestOrcaSessionFindsWorkerBeyondFirstListPage(t *testing.T) {
 		t.Fatalf("outcome = %+v, want completed via worker-show", out)
 	}
 }
+
+func TestOrcaDispatchRetriesUnknownWorktreeThenLaunches(t *testing.T) {
+	fake := fakeorca.New(t)
+	fake.RefuseUnknownWorktree(t, 2)
+	d, dir := orcaTestDispatcher(t, fake)
+	d.selectorBackoff = time.Millisecond
+
+	if _, err := d.Dispatch(context.Background(), orcaTestRequest(dir)); err != nil {
+		t.Fatalf("dispatch: %v", err)
+	}
+	if n := len(fake.Starts()); n != 3 {
+		t.Fatalf("worker-start calls = %d, want 3 (two refusals, then success)", n)
+	}
+}
+
+func TestOrcaDispatchGivesUpOnPersistentUnknownWorktree(t *testing.T) {
+	fake := fakeorca.New(t)
+	fake.RefuseUnknownWorktree(t, 1000)
+	d, dir := orcaTestDispatcher(t, fake)
+	d.selectorBackoff = time.Millisecond
+
+	_, err := d.Dispatch(context.Background(), orcaTestRequest(dir))
+	if err == nil || !strings.Contains(err.Error(), "selector_not_found") {
+		t.Fatalf("dispatch error = %v, want one naming selector_not_found", err)
+	}
+}

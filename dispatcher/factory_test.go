@@ -167,3 +167,18 @@ func TestDispatcherFactoryDoesNotFallBackOnUsageLimit(t *testing.T) {
 		t.Fatalf("process was dispatched (%q) despite a usage limit", processStub.lastReq.Runtime)
 	}
 }
+
+func TestDispatcherFactoryDoesNotFallBackFromOrca(t *testing.T) {
+	factory := NewDispatcherFactory()
+	processStub := &factoryDispatcherStub{session: &factorySessionStub{id: "fallback-1", status: "running"}}
+	orcaStub := &failingDispatcherStub{err: fmt.Errorf("selector_not_found")}
+	_ = factory.Register("process", processStub)
+	_ = factory.Register("orca", orcaStub)
+
+	if _, err := factory.Dispatch(context.Background(), DispatchRequest{Name: "cook", Runtime: "orca"}); err == nil {
+		t.Fatal("expected the orca error, got a silent process fallback")
+	}
+	if processStub.lastReq.Runtime == "process" {
+		t.Fatal("process dispatcher was called for an orca stage")
+	}
+}
