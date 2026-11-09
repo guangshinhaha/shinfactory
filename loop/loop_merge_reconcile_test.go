@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/guangshinhaha/shinfactory/adapter"
-	"github.com/guangshinhaha/shinfactory/config"
 	"github.com/guangshinhaha/shinfactory/internal/ingest"
 	"github.com/guangshinhaha/shinfactory/internal/reducer"
 	"github.com/guangshinhaha/shinfactory/internal/state"
@@ -37,7 +36,7 @@ func TestMergeCookWorktreeUsesRemoteBranchSyncResult(t *testing.T) {
 	}
 
 	wt := &fakeWorktree{}
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes: map[string]loopruntime.Runtime{"process": newMockRuntime()},
 		Worktree: wt,
 		Adapter:  &fakeAdapterRunner{},
@@ -71,7 +70,7 @@ func TestMergeCookWorktreeFallsBackToLocalMerge(t *testing.T) {
 	}
 
 	wt := &fakeWorktree{}
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes: map[string]loopruntime.Runtime{"process": newMockRuntime()},
 		Worktree: wt,
 		Adapter:  &fakeAdapterRunner{},
@@ -114,7 +113,7 @@ func TestCycleMergeConflictMarksFailedAndSkips(t *testing.T) {
 	wt := &fakeWorktree{
 		remoteMergeErr: &worktree.MergeConflictError{Branch: "origin/noodle/session-a"},
 	}
-	cfg := config.DefaultConfig()
+	cfg := localLandingConfig()
 	cfg.Mode = "auto"
 	l := New(projectDir, "noodle", cfg, Dependencies{
 		Runtimes: map[string]loopruntime.Runtime{"process": rt},
@@ -173,7 +172,7 @@ func TestAutoMergeWithLocalChanges(t *testing.T) {
 		t.Fatalf("write orders: %v", err)
 	}
 
-	cfg := config.DefaultConfig()
+	cfg := localLandingConfig()
 	cfg.Mode = "auto"
 
 	rt := newMockRuntime()
@@ -220,7 +219,7 @@ func TestSupervisedMergeWithLocalChangesParksPendingReview(t *testing.T) {
 		t.Fatalf("write orders: %v", err)
 	}
 
-	cfg := config.DefaultConfig()
+	cfg := localLandingConfig()
 	cfg.Mode = "supervised"
 
 	rt := newMockRuntime()
@@ -283,7 +282,7 @@ func TestAutoAdvanceWithoutChanges(t *testing.T) {
 		t.Fatalf("write orders: %v", err)
 	}
 
-	cfg := config.DefaultConfig()
+	cfg := localLandingConfig()
 	cfg.Mode = "auto"
 
 	rt := newMockRuntime()
@@ -345,7 +344,7 @@ func TestAutoMergeWithRemoteSyncResult(t *testing.T) {
 		t.Fatalf("write orders: %v", err)
 	}
 
-	cfg := config.DefaultConfig()
+	cfg := localLandingConfig()
 	cfg.Mode = "auto"
 
 	rt := newMockRuntime()
@@ -410,7 +409,7 @@ func TestStageCompletedPersistsCanonicalMergeRecovery(t *testing.T) {
 		t.Fatalf("write orders: %v", err)
 	}
 
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"process": newMockRuntime()},
 		Worktree:   &fakeWorktree{},
 		Adapter:    &fakeAdapterRunner{},
@@ -474,7 +473,7 @@ func TestStageCompletedPersistsRemoteMergeRecovery(t *testing.T) {
 		t.Fatalf("write orders: %v", err)
 	}
 
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"process": newMockRuntime()},
 		Worktree:   &fakeWorktree{},
 		Adapter:    &fakeAdapterRunner{},
@@ -548,7 +547,7 @@ func TestHandleAlreadyMergedStagePreservesTaskKeyInStageCompletedEvent(t *testin
 		t.Fatalf("write orders: %v", err)
 	}
 
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"process": newMockRuntime()},
 		Worktree:   &fakeWorktree{},
 		Adapter:    &fakeAdapterRunner{},
@@ -626,7 +625,7 @@ func TestReconcileMergingStagesMissingMetadataFails(t *testing.T) {
 		t.Fatalf("write orders: %v", err)
 	}
 
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"process": newMockRuntime()},
 		Worktree:   &fakeWorktree{},
 		Adapter:    &fakeAdapterRunner{},
@@ -682,7 +681,7 @@ func TestReconcileMergingStagesAdoptedSessionResetsToActive(t *testing.T) {
 		t.Fatalf("write orders: %v", err)
 	}
 
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"process": newMockRuntime()},
 		Worktree:   &fakeWorktree{},
 		Adapter:    &fakeAdapterRunner{},
@@ -749,7 +748,7 @@ func TestReconcileMergingStagesNoMergingStagesIsNoop(t *testing.T) {
 		t.Fatalf("write orders: %v", err)
 	}
 
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"process": newMockRuntime()},
 		Worktree:   &fakeWorktree{},
 		Adapter:    &fakeAdapterRunner{},

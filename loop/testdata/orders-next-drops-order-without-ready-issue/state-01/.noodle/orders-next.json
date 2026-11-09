@@ -1,0 +1,19 @@
+{
+  "orders": [
+    {
+      "id": "chore-gitignore-tally-bin",
+      "title": "Side note from a quality review",
+      "stages": [
+        {"do": "execute", "with": "claude", "model": "claude-opus-4-6"}
+      ]
+    },
+    {
+      "id": "7",
+      "title": "Ready issue",
+      "stages": [
+        {"do": "execute", "with": "claude", "model": "claude-opus-4-6"},
+        {"do": "quality", "with": "claude", "model": "claude-opus-4-6"}
+      ]
+    }
+  ]
+}

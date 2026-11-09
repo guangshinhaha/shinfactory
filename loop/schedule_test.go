@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/guangshinhaha/shinfactory/config"
 	loopruntime "github.com/guangshinhaha/shinfactory/runtime"
 )
 
@@ -66,7 +65,7 @@ func TestHasNonScheduleOrders(t *testing.T) {
 }
 
 func TestBootstrapScheduleOrderCreatesSingleStageOrder(t *testing.T) {
-	cfg := config.DefaultConfig()
+	cfg := localLandingConfig()
 	cfg.Routing.Defaults.Provider = "claude"
 	cfg.Routing.Defaults.Model = "claude-haiku-5-5"
 
@@ -91,11 +90,8 @@ func TestBootstrapScheduleOrderCreatesSingleStageOrder(t *testing.T) {
 	if stage.Status != StageStatusPending {
 		t.Fatalf("stage status = %q, want %q", stage.Status, StageStatusPending)
 	}
-	if stage.Provider != "claude" {
-		t.Fatalf("stage provider = %q, want %q", stage.Provider, "claude")
-	}
-	if stage.Model != "claude-haiku-5-5" {
-		t.Fatalf("stage model = %q, want %q", stage.Model, "claude-haiku-5-5")
+	if stage.Provider != "" || stage.Model != "" {
+		t.Fatalf("stage routing = %s/%s, want none (resolved at dispatch)", stage.Provider, stage.Model)
 	}
 }
 
@@ -193,7 +189,7 @@ func TestBuildSchedulePromptIncludesReconciledFailures(t *testing.T) {
 }
 
 func TestScheduleOrderWithChefGuidance(t *testing.T) {
-	cfg := config.DefaultConfig()
+	cfg := localLandingConfig()
 	order := scheduleOrder(cfg, "focus on auth refactor")
 	if order.Rationale != "Chef steer: focus on auth refactor" {
 		t.Fatalf("rationale = %q, want Chef steer prefix", order.Rationale)
@@ -208,7 +204,7 @@ func TestSpawnSchedulePersistsActiveStageStatus(t *testing.T) {
 	}
 	ordersPath := filepath.Join(runtimeDir, "orders.json")
 
-	cfg := config.DefaultConfig()
+	cfg := localLandingConfig()
 	order := scheduleOrder(cfg, "")
 	if err := writeOrdersAtomic(ordersPath, OrdersFile{Orders: []Order{order}}); err != nil {
 		t.Fatalf("write orders: %v", err)
@@ -256,7 +252,7 @@ func TestSpawnScheduleDispatchFailureMarksStageFailed(t *testing.T) {
 	}
 	ordersPath := filepath.Join(runtimeDir, "orders.json")
 
-	cfg := config.DefaultConfig()
+	cfg := localLandingConfig()
 	cfg.Runtime.Default = "sprites"
 	order := scheduleOrder(cfg, "")
 	if err := writeOrdersAtomic(ordersPath, OrdersFile{Orders: []Order{order}}); err != nil {

@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/guangshinhaha/shinfactory/config"
 	"github.com/guangshinhaha/shinfactory/internal/failure"
 	loopruntime "github.com/guangshinhaha/shinfactory/runtime"
 )
@@ -25,7 +24,7 @@ func newControlTestLoop(t *testing.T, wt *fakeWorktree, rt *mockRuntime) *Loop {
 	}}}); err != nil {
 		t.Fatalf("write orders: %v", err)
 	}
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"process": rt},
 		Worktree:   wt,
 		Adapter:    &fakeAdapterRunner{},
@@ -292,7 +291,7 @@ func TestControlEnqueueCreatesSingleStageOrder(t *testing.T) {
 	if err := writeOrdersAtomic(ordersPath, OrdersFile{Orders: []Order{}}); err != nil {
 		t.Fatalf("write orders: %v", err)
 	}
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"process": newMockRuntime()},
 		Worktree:   &fakeWorktree{},
 		Adapter:    &fakeAdapterRunner{},
@@ -355,7 +354,7 @@ func TestControlEditItemModifiesStageFields(t *testing.T) {
 	}}}); err != nil {
 		t.Fatalf("write orders: %v", err)
 	}
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"process": newMockRuntime()},
 		Worktree:   &fakeWorktree{},
 		Adapter:    &fakeAdapterRunner{},
@@ -415,7 +414,7 @@ func TestControlReorderChangesOrderPosition(t *testing.T) {
 	}}); err != nil {
 		t.Fatalf("write orders: %v", err)
 	}
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"process": newMockRuntime()},
 		Worktree:   &fakeWorktree{},
 		Adapter:    &fakeAdapterRunner{},
@@ -464,7 +463,7 @@ func TestControlSkipCancelsRemainingStages(t *testing.T) {
 	}}}); err != nil {
 		t.Fatalf("write orders: %v", err)
 	}
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"process": newMockRuntime()},
 		Worktree:   &fakeWorktree{},
 		Adapter:    &fakeAdapterRunner{},
@@ -499,7 +498,7 @@ func TestControlRequeueOrderNotInOrdersFile(t *testing.T) {
 	if err := writeOrdersAtomic(ordersPath, OrdersFile{Orders: []Order{}}); err != nil {
 		t.Fatalf("write orders: %v", err)
 	}
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"process": newMockRuntime()},
 		Worktree:   &fakeWorktree{},
 		Adapter:    &fakeAdapterRunner{},
@@ -530,7 +529,7 @@ func TestControlMergeFinalStageActiveOrderFiresDone(t *testing.T) {
 		t.Fatalf("write orders: %v", err)
 	}
 	ar := &fakeAdapterRunner{}
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"process": newMockRuntime()},
 		Worktree:   &fakeWorktree{},
 		Adapter:    ar,
@@ -579,7 +578,7 @@ func TestCommandSequenceAssignment(t *testing.T) {
 	if err := writeOrdersAtomic(ordersPath, OrdersFile{Orders: []Order{}}); err != nil {
 		t.Fatalf("write orders: %v", err)
 	}
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"process": newMockRuntime()},
 		Worktree:   &fakeWorktree{},
 		Adapter:    &fakeAdapterRunner{},
@@ -624,7 +623,7 @@ func TestCommandSequencePersistenceRoundTrip(t *testing.T) {
 	if err := writeOrdersAtomic(ordersPath, OrdersFile{Orders: []Order{}}); err != nil {
 		t.Fatalf("write orders: %v", err)
 	}
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"process": newMockRuntime()},
 		Worktree:   &fakeWorktree{},
 		Adapter:    &fakeAdapterRunner{},
@@ -654,7 +653,7 @@ func TestCommandSequencePersistenceRoundTrip(t *testing.T) {
 	}
 
 	// Create a new loop and hydrate — should recover the sequence.
-	l2 := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l2 := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"process": newMockRuntime()},
 		Worktree:   &fakeWorktree{},
 		Adapter:    &fakeAdapterRunner{},
@@ -682,7 +681,7 @@ func TestCommandSequenceSkipsReplayedCommands(t *testing.T) {
 	if err := writeOrdersAtomic(ordersPath, OrdersFile{Orders: []Order{}}); err != nil {
 		t.Fatalf("write orders: %v", err)
 	}
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"process": newMockRuntime()},
 		Worktree:   &fakeWorktree{},
 		Adapter:    &fakeAdapterRunner{},
@@ -726,7 +725,7 @@ func TestCommandSequenceIdempotentReplay(t *testing.T) {
 	if err := writeOrdersAtomic(ordersPath, OrdersFile{Orders: []Order{}}); err != nil {
 		t.Fatalf("write orders: %v", err)
 	}
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"process": newMockRuntime()},
 		Worktree:   &fakeWorktree{},
 		Adapter:    &fakeAdapterRunner{},
@@ -772,7 +771,7 @@ func TestProcessControlLineDerivesDeterministicIDWhenMissing(t *testing.T) {
 		t.Fatalf("write orders: %v", err)
 	}
 	now := time.Date(2026, 3, 3, 12, 0, 0, 0, time.UTC)
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"process": newMockRuntime()},
 		Worktree:   &fakeWorktree{},
 		Adapter:    &fakeAdapterRunner{},
@@ -805,7 +804,7 @@ func TestProcessControlLineDerivesDistinctIDsForDistinctTimestamps(t *testing.T)
 	if err := writeOrdersAtomic(ordersPath, OrdersFile{Orders: []Order{}}); err != nil {
 		t.Fatalf("write orders: %v", err)
 	}
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"process": newMockRuntime()},
 		Worktree:   &fakeWorktree{},
 		Adapter:    &fakeAdapterRunner{},
@@ -837,7 +836,7 @@ func TestFlushStatePersistsLastAppliedSeq(t *testing.T) {
 	if err := writeOrdersAtomic(ordersPath, OrdersFile{Orders: []Order{}}); err != nil {
 		t.Fatalf("write orders: %v", err)
 	}
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"process": newMockRuntime()},
 		Worktree:   &fakeWorktree{},
 		Adapter:    &fakeAdapterRunner{},
@@ -883,7 +882,7 @@ func TestFailedOrderRequiresRequeueBeforeDispatch(t *testing.T) {
 	}}}); err != nil {
 		t.Fatalf("write orders: %v", err)
 	}
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"process": newMockRuntime()},
 		Worktree:   &fakeWorktree{},
 		Adapter:    &fakeAdapterRunner{},
@@ -912,5 +911,33 @@ func TestFailedOrderRequiresRequeueBeforeDispatch(t *testing.T) {
 	candidates = dispatchableStages(orders, nil, nil, nil)
 	if len(candidates) != 1 {
 		t.Fatalf("candidates = %d, want 1 after requeue", len(candidates))
+	}
+}
+
+func TestControlRejectsStageProviderOnSensitiveRepo(t *testing.T) {
+	cfg := localLandingConfig()
+	cfg.Routing.Sensitive = true
+	projectDir := t.TempDir()
+	ordersPath := filepath.Join(projectDir, ".noodle", "orders.json")
+	if err := writeOrdersAtomic(ordersPath, OrdersFile{Orders: []Order{}}); err != nil {
+		t.Fatalf("write orders: %v", err)
+	}
+	l := New(projectDir, "noodle", cfg, Dependencies{
+		Runtimes:   map[string]loopruntime.Runtime{"process": newMockRuntime()},
+		Worktree:   &fakeWorktree{},
+		Adapter:    &fakeAdapterRunner{},
+		Mise:       &fakeMise{},
+		Monitor:    fakeMonitor{},
+		Registry:   testLoopRegistry(),
+		Now:        time.Now,
+		OrdersFile: ordersPath,
+	})
+	err := l.controlEnqueue(ControlCommand{Action: "enqueue", OrderID: "t", TaskKey: "execute", Provider: "codex", Model: "gpt-5.4"})
+	if err == nil || !strings.Contains(err.Error(), "routing.sensitive") {
+		t.Fatalf("enqueue err = %v, want routing.sensitive rejection", err)
+	}
+	got, _ := readOrders(ordersPath)
+	if len(got.Orders) != 0 {
+		t.Errorf("rejected enqueue still wrote %d orders", len(got.Orders))
 	}
 }

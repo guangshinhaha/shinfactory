@@ -38,7 +38,9 @@ Tell the user this task doesn't need a plan and suggest implementing directly wi
 
 ## Step 1 — Load Principles
 
-Load the `shinstack:craft` skill and follow its `multi-phase-plan` playbook for how to slice the work; the files still go in `brain/plans/` in the template below. Read the principles the router lists for this change, in full. These principles govern all plan decisions — cite them by name in the plan overview and phase files. For types or module boundaries, sketch them as shinstack `architect` would, skipping its human checkpoint in autonomous mode.
+If the `shinstack:craft` skill is in your skill list, load it and follow its `multi-phase-plan` playbook for how to slice the work; the files still go in `brain/plans/` in the template below. Read the principles the router lists for this change, in full. These principles govern all plan decisions: cite them by name in the plan overview and phase files. For types or module boundaries, sketch them as shinstack `architect` would, skipping its human checkpoint in autonomous mode.
+
+If shinstack is not installed, don't try to load it. Slice the work so each phase ends in a checkable state and fits the sizing rule in Step 5b. Govern decisions by these principles and cite them by name instead: **sequence-verifiable-units** (every phase ends in something you can run and check), **laziness-protocol** (the smallest design that meets the goal; no layer nobody needs), **prove-it-works** (each phase names the command that proves it).
 
 **Do NOT skip this. Do NOT use memorized principle content — always read fresh.** The self-check in Step 5b will verify citations exist.
 
@@ -88,7 +90,7 @@ Don't bolt changes onto existing designs — redesign holistically.
 
 ### Alternatives check
 
-For architectural decisions, briefly sketch 2-3 approaches in the overview's Constraints section. State which was chosen and why. This prevents premature commitment and documents the design space explored. See shinstack's `exhaust-the-design-space` (situational).
+For architectural decisions, briefly sketch 2-3 approaches in the overview's Constraints section. State which was chosen and why. This prevents premature commitment and documents the design space explored. With shinstack installed, see its `exhaust-the-design-space` (situational).
 
 ### Update plans index and backlog
 
@@ -106,7 +108,7 @@ Move directory to `brain/archive/plans/`, update `brain/plans/index.md`, mark to
 
 After writing all plan files, verify these three constraints before proceeding. Fix any violations before moving on.
 
-**Principles cited:** The overview must cite at least 2 shinstack principles by name. If not, re-read the shinstack router's principle list and add the most relevant ones to the overview's design decisions.
+**Principles cited:** The overview must cite at least 2 principles by name. With shinstack installed, they come from its router's principle list; without it, from the three named in Step 1. If it cites fewer, add the most relevant ones to the overview's design decisions.
 
 **Phase sizing:** Review each phase. If any phase touches >3 files or lists >5 test cases, split it into smaller phases. Count the files listed under "Changes" — if the list exceeds 3, the phase is too big.
 

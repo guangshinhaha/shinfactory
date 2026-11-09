@@ -8,6 +8,8 @@ description: >-
 
 # Codex
 
+If `NOODLE_SENSITIVE` is set, stop: the loop keeps this repo's work on one provider and does not allow delegation to Codex.
+
 ## Profiles
 
 - **(no profile)** — read-only analysis (no compilation, no tests)
@@ -68,7 +70,7 @@ This is a Go project. Use `go test`, `go build`, `go vet` in prompts. Codex work
 
 When other work exists in the same codebase, include explicit "DO NOT modify or delete" file lists in the prompt. The positive instruction ("only touch these files") is insufficient — Codex interprets "clean up" broadly.
 
-Per shinstack prove-it-works: trust artifacts, not self-reports.
+Prove it works: trust artifacts, not self-reports. (This is shinstack's `prove-it-works` when it is installed; the rule holds without it.)
 
 ## Worktree Usage
 

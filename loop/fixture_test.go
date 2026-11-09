@@ -175,7 +175,7 @@ func TestLoopDirectoryFixtures(t *testing.T) {
 				}
 			}
 
-			baseCfg := config.DefaultConfig()
+			baseCfg := localLandingConfig()
 			applySetupConfig(&baseCfg, setup)
 			if path := strings.TrimSpace(fixtureCase.Layout.BaseConfigPath); path != "" {
 				applyConfigOverride(t, &baseCfg, path)
@@ -277,8 +277,10 @@ func buildMiseResults(stateInputs []loopFixtureStateInput) []fakeMiseResult {
 }
 
 func applySetupConfig(cfg *config.Config, setup loopFixtureSetup) {
-	_ = cfg
 	_ = setup
+	// The recorded fixtures assume room for four concurrent cooks, not the
+	// new-repo default of two.
+	cfg.Concurrency.MaxConcurrency = 4
 }
 
 func applyFixtureActiveSessions(l *Loop, sessions []loopFixtureActiveSession) {

@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/guangshinhaha/shinfactory/config"
 	"github.com/guangshinhaha/shinfactory/mise"
 	loopruntime "github.com/guangshinhaha/shinfactory/runtime"
 )
@@ -25,7 +24,7 @@ func TestParkPendingReviewWritesFile(t *testing.T) {
 		t.Fatalf("write orders: %v", err)
 	}
 
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes: map[string]loopruntime.Runtime{"process": newMockRuntime()},
 		Worktree: &fakeWorktree{},
 		Adapter:  &fakeAdapterRunner{},
@@ -91,7 +90,7 @@ func TestLoadPendingReviewHydratesLoopState(t *testing.T) {
 		t.Fatalf("write orders: %v", err)
 	}
 
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes: map[string]loopruntime.Runtime{"process": newMockRuntime()},
 		Worktree: &fakeWorktree{},
 		Adapter:  &fakeAdapterRunner{},
@@ -154,7 +153,7 @@ func TestLoadPendingReviewPreservesEntryWithoutWorktreeName(t *testing.T) {
 		t.Fatalf("write orders: %v", err)
 	}
 
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes: map[string]loopruntime.Runtime{"process": newMockRuntime()},
 		Worktree: &fakeWorktree{},
 		Adapter:  &fakeAdapterRunner{},
@@ -190,7 +189,7 @@ func TestPlanCycleSpawnsSkipsPendingReviewTargets(t *testing.T) {
 		t.Fatalf("write orders: %v", err)
 	}
 
-	cfg := config.DefaultConfig()
+	cfg := localLandingConfig()
 	cfg.Concurrency.MaxConcurrency = 2
 	l := New(projectDir, "noodle", cfg, Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"process": newMockRuntime()},

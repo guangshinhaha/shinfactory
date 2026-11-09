@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/guangshinhaha/shinfactory/config"
 	loopruntime "github.com/guangshinhaha/shinfactory/runtime"
 )
 
@@ -48,7 +47,7 @@ func TestReconcileFailedOrdersArchivesAndSummarizes(t *testing.T) {
 		t.Fatalf("write orders: %v", err)
 	}
 
-	cfg := config.DefaultConfig()
+	cfg := localLandingConfig()
 	l := New(projectDir, "noodle", cfg, Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"process": newMockRuntime()},
 		Worktree:   &fakeWorktree{},
@@ -119,7 +118,7 @@ func TestReconcileFailedOrdersSkipsScheduleOrder(t *testing.T) {
 		t.Fatalf("write orders: %v", err)
 	}
 
-	cfg := config.DefaultConfig()
+	cfg := localLandingConfig()
 	l := New(projectDir, "noodle", cfg, Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"process": newMockRuntime()},
 		Worktree:   &fakeWorktree{},
@@ -173,7 +172,7 @@ func TestReconcileFailedOrdersNoopWhenNoFailures(t *testing.T) {
 		t.Fatalf("write orders: %v", err)
 	}
 
-	cfg := config.DefaultConfig()
+	cfg := localLandingConfig()
 	l := New(projectDir, "noodle", cfg, Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"process": newMockRuntime()},
 		Worktree:   &fakeWorktree{},
@@ -225,7 +224,7 @@ func TestFullReconcileArchivesFailedOrders(t *testing.T) {
 		t.Fatalf("write orders: %v", err)
 	}
 
-	cfg := config.DefaultConfig()
+	cfg := localLandingConfig()
 	l := New(projectDir, "noodle", cfg, Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"process": newMockRuntime()},
 		Worktree:   &fakeWorktree{},

@@ -26,6 +26,16 @@ Each stage has a `do` field (task key, must match a registered task type) and ru
 
 A typical order pipeline: execute, then quality, then debrief — all as stages of one order.
 
+### Tier and the review gate
+
+Set `"tier"` on every order that builds a backlog item: `none` (docs or inert config), `low`, `medium`, or `high`. Take it from the item's `risk:` label if it has one; if the tier is unclear, take the higher one. A missing tier counts as `medium`. The loop refuses to ship an order whose stages don't fit its tier:
+
+- `none`: any stages.
+- `low`, `medium`: `execute`, then `quality` (after the last `execute`).
+- `high`: `execute`, then `quality`, then `verify` (a fresh verifier that writes a verdict at the branch head).
+
+Nothing merges before the order's last stage. Findings from `quality` or a `FAIL` from `verify` send the order back to `execute` on the same branch, at most 2 times, then the order stops and lands in `action_needed`. Don't add stages to answer a rejection yourself.
+
 ## Task Types
 
 Read `task_types` from mise to discover every schedulable task type and its `schedule` hint. Any registered task type can be a stage within an order. Use `do` on each stage to bind it to a task type.
@@ -46,7 +56,7 @@ An item that fails gets no order. Listing it in `action_needed` isn't enough, be
 
 Skip any item tagged `not_ready`. Items with no plan and items with a plan both go through this check, and every order that builds a backlog item ends in a `quality` stage, which tests the work against the Done when.
 
-**Shared infrastructure:** When multiple plans depend on common infrastructure (shared types, utilities, base packages), propose a standalone infra order before the plan's phases. Use a descriptive slug ID (e.g., `"infra-shared-types"`).
+**One order, one ready issue.** Every order's `id` is the ID of an item in `backlog`, which holds only issues a person marked ready. The loop drops any other order and logs its ID, so an invented ID (`chore-...`, `fix-...`, `infra-...`) builds nothing. Shared infrastructure, a cleanup you noticed, a follow-up from a quality note or a fix after a failed merge are all new work nobody marked ready: file each as an issue with the `todo` skill (Goal, observable Done when, Out of scope; never the `ready` label) and leave it out of `orders-next.json`. A person decides whether it gets built.
 
 **Items with plans:** When a backlog item has a `plan` field (a relative path like `brain/plans/29-foo/overview.md`), read the plan overview and phase files to understand the work. Schedule one order with a stage per remaining unfinished phase (each unchecked `- [ ]` item). Populate `order.plan` with the plan path(s). Use `extra_prompt` on each stage to inject plan context: the phase brief and any cross-phase dependencies.
 
@@ -54,13 +64,11 @@ Skip any item tagged `not_ready`. Items with no plan and items with a plan both 
 
 **Items without plans:** Assess complexity before scheduling. If the item is straightforward (single concern, clear scope, small change), schedule as a simple execute task using the backlog item's title and description as the prompt. If the item is complex (multi-file, cross-cutting, ambiguous scope, or you'd want to see an architecture sketch before coding), schedule a plan-first order: a `prompt`-only stage (no `do`) that invokes `/plan`, followed by an `adversarial-review` stage to challenge the plan. No quality or debrief stages — planning output is a design document, not code. **Do NOT use `"do": "execute"` for plan-first stages** — the execute skill tells the agent to implement, which conflicts with the plan skill's "stop after planning" instruction. The plan skill will write phased plans to `brain/plans/`; on the next scheduling cycle, the item will have a `plan` field and can be scheduled normally with the standard execute → quality → debrief pipeline.
 
-**Standalone orders:** Orders can have arbitrary IDs — they don't need to correspond to a backlog item. When a standalone order completes, the `backlog done` adapter call is a no-op (no matching item to mark done). Use standalone orders for shared infrastructure, maintenance tasks, or cross-cutting work that serves multiple backlog items.
-
 **Nothing to schedule:** When no backlog items are actionable (all blocked, all in-progress, all done, etc.), still write `orders-next.json` with an empty orders array (`{"orders":[]}`). This signals to the loop that scheduling ran but found nothing — preventing hot-loop re-spawns.
 
-### Follow-Up and Standalone Stages
+### Follow-Up Stages
 
-Each task type's `schedule` field describes when and how to schedule it — as a follow-up stage within an order, as a standalone order, or both. Read these hints from `task_types` in mise and compose orders accordingly.
+Each task type's `schedule` field describes when and how to schedule it — as a follow-up stage within an order. A hint that asks for a standalone order cannot run: the order would name no ready issue. Read these hints from `task_types` in mise and compose orders accordingly.
 
 ## Recent Events
 
@@ -70,7 +78,7 @@ The mise brief includes a `recent_events` array — lifecycle events emitted by 
 
 Events are context, not commands. Consider them alongside backlog state and session history when deciding what to schedule:
 
-- After `stage.failed` or `order.failed` — consider whether the failure needs a debugging order, or if the item should be retried with a different approach. If the reason starts with `Unbuildable:`, don't retry: send the item back as above, quoting the reason. To retry a `quality` rejection, write a fresh order with the same ID that ends in `quality`. Never use `add-stage` or `advance` to get past a failed `quality` stage: the order would complete and mark the item done with the rejection unanswered.
+- After `stage.failed` or `order.failed` — consider whether the item should be retried with a different approach. A failure that needs separate work (a bug in the loop, a broken merge) becomes a new issue without the `ready` label, not an order. If the reason starts with `Unbuildable:`, don't retry and don't comment: the loop has already told a person and swapped its `ready` label for `needs-shin`. The same holds after two failed rounds on one item. To retry a `quality` rejection, write a fresh order with the same ID that ends in `quality`. Never use `add-stage` or `advance` to get past a failed `quality` stage: the order would complete and mark the item done with the rejection unanswered.
 - After `order.completed` — consider follow-up work (debrief, related items that were blocked).
 - After `merge.conflict` — the affected order may need manual attention; avoid re-scheduling it immediately.
 - After external events like `ci.failed` — consider scheduling an investigation or fix order if it seems actionable.

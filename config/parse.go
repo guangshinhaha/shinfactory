@@ -15,7 +15,7 @@ const (
 	defaultRoutingProvider = "claude"
 	defaultRoutingModel    = modelStandard
 	defaultMode            = string(state.RunModeSupervised)
-	defaultMaxConcurrency  = 4
+	defaultMaxConcurrency  = 2
 	defaultRuntimeName     = "process"
 	defaultServerPort      = 3000
 )
@@ -74,10 +74,6 @@ func applyDefaultsFromMetadata(config *Config, metadata toml.MetaData, diagnosti
 	if !metadata.IsDefined("routing", "defaults", "provider") {
 		config.Routing.Defaults.Provider = defaultRoutingProvider
 	}
-	if !metadata.IsDefined("routing", "defaults", "model") {
-		config.Routing.Defaults.Model = defaultRoutingModel
-	}
-
 	if !metadata.IsDefined("mode") {
 		config.Mode = defaultMode
 	}
@@ -247,26 +243,30 @@ func normalizeParsedValues(config *Config, metadata toml.MetaData, diagnostics *
 	}
 
 	if strings.TrimSpace(config.Routing.Defaults.Model) == "" {
-		if metadata.IsDefined("routing", "defaults", "model") {
+		if metadata.IsDefined("routing", "defaults", "model") && config.Routing.Defaults.Provider == defaultRoutingProvider {
 			appendNormalizedValueDiagnostic(diagnostics, "routing.defaults.model",
 				fmt.Sprintf("model not set; using %q", defaultRoutingModel),
 			)
 		}
-		config.Routing.Defaults.Model = defaultRoutingModel
+		// The default model is a claude model: only fill it for claude. A codex
+		// defaults table without a model stays empty and Validate reports it.
+		if config.Routing.Defaults.Provider == defaultRoutingProvider {
+			config.Routing.Defaults.Model = defaultRoutingModel
+		}
 	}
 
 	normalizeRoles(config, diagnostics)
 
 	switch mode := stringx.Normalize(config.Landing.Mode); mode {
-	case "", LandingModeLocal:
-		config.Landing.Mode = LandingModeLocal
-	case LandingModePR:
-		config.Landing.Mode = LandingModePR
+	case "":
+		// Unset: the loop resolves it from the project's remote.
+	case LandingModeLocal, LandingModePR:
+		config.Landing.Mode = mode
 	default:
 		appendNormalizedValueDiagnostic(diagnostics, "landing.mode",
-			fmt.Sprintf("landing.mode %q unsupported; using %q", config.Landing.Mode, LandingModeLocal),
+			fmt.Sprintf("landing.mode %q unsupported; using %q", config.Landing.Mode, LandingModePR),
 		)
-		config.Landing.Mode = LandingModeLocal
+		config.Landing.Mode = LandingModePR
 	}
 	config.Landing.Base = strings.TrimSpace(config.Landing.Base)
 

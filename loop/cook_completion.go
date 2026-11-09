@@ -125,13 +125,24 @@ func (l *Loop) handleCompletion(ctx context.Context, cook *cookHandle, resultSta
 			if reason == "" {
 				reason = "stage reported failure with no reason"
 			}
-			return l.failStage(ctx, cook, reason)
+			if err := l.failStage(ctx, cook, reason); err != nil {
+				return err
+			}
+			l.noteRejectedStage(ctx, cook.orderID, reason)
+			return nil
 		}
 	}
 
 	if resultStatus == StageResultCompleted {
 		if isScheduleStage(cook.stage) {
 			return l.handleScheduleCompletion(cook)
+		}
+		if l.config.Landing.PR() {
+			// Before the stage message: a blocking message parks the stage, and
+			// approving it later must not skip the review or verify check.
+			if handled, err := l.reviewGate(cook); handled || err != nil {
+				return err
+			}
 		}
 		blocked, msg := l.processStageMessage(cook)
 		if blocked {
@@ -364,6 +375,7 @@ func (l *Loop) advanceAndPersist(ctx context.Context, cook *cookHandle, message 
 				return err
 			}
 		}
+		l.clearFailedRounds(cook.orderID)
 	}
 	return nil
 }

@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/guangshinhaha/shinfactory/config"
 	"github.com/guangshinhaha/shinfactory/internal/taskreg"
 	loopruntime "github.com/guangshinhaha/shinfactory/runtime"
 	"github.com/guangshinhaha/shinfactory/skill"
@@ -54,7 +53,7 @@ func TestScaleBurstCompletionProcessesAllOrders(t *testing.T) {
 
 	rt := newMockRuntime()
 	wt := &fakeWorktree{}
-	cfg := config.DefaultConfig()
+	cfg := localLandingConfig()
 	cfg.Mode = "auto"
 	cfg.Concurrency.MaxConcurrency = orderCount
 	cfg.Runtime.Process.MaxConcurrent = orderCount
@@ -118,7 +117,7 @@ func TestScaleLoopStateSnapshotIncludesActiveSummary(t *testing.T) {
 	}
 
 	rt := newMockRuntime()
-	cfg := config.DefaultConfig()
+	cfg := localLandingConfig()
 	cfg.Mode = "auto"
 	l := New(projectDir, "noodle", cfg, Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"process": rt},
@@ -166,7 +165,7 @@ func TestMockRuntimeDispatchAndComplete(t *testing.T) {
 	}
 
 	rt := newMockRuntime()
-	cfg := config.DefaultConfig()
+	cfg := localLandingConfig()
 	cfg.Mode = "auto"
 	l := New(projectDir, "noodle", cfg, Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"process": rt},
@@ -234,7 +233,7 @@ func TestMockRuntimeRecoverBuildsAdoptedIndex(t *testing.T) {
 		},
 	}
 
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"process": rt},
 		Worktree:   &fakeWorktree{},
 		Adapter:    &fakeAdapterRunner{},
@@ -295,7 +294,7 @@ func TestRecoverAdoptedSessionsUpdatesActiveSummary(t *testing.T) {
 		},
 	}
 
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"process": rt},
 		Worktree:   &fakeWorktree{},
 		Adapter:    &fakeAdapterRunner{},
@@ -347,7 +346,7 @@ func TestReconcileInjectsScheduleOrderOnStartup(t *testing.T) {
 	}
 
 	rt := newMockRuntime()
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"process": rt},
 		Worktree:   &fakeWorktree{},
 		Adapter:    &fakeAdapterRunner{},
@@ -383,7 +382,7 @@ func TestReconcileInjectsOopsBootstrapOrderWhenScheduleMissing(t *testing.T) {
 	writeTaskTypeSkill(t, projectDir, "oops", "When infrastructure failures are detected")
 	writeTaskTypeSkill(t, projectDir, "execute", "When a planned item is ready")
 
-	cfg := config.DefaultConfig()
+	cfg := localLandingConfig()
 	cfg.Mode = "auto"
 	cfg.Skills.Paths = []string{filepath.Join(projectDir, ".agents", "skills")}
 
@@ -447,7 +446,7 @@ func TestOopsBootstrapCompletionInjectsScheduleOrder(t *testing.T) {
 	writeTaskTypeSkill(t, projectDir, "oops", "When infrastructure failures are detected")
 	writeTaskTypeSkill(t, projectDir, "execute", "When a planned item is ready")
 
-	cfg := config.DefaultConfig()
+	cfg := localLandingConfig()
 	cfg.Mode = "auto"
 	cfg.Skills.Paths = []string{filepath.Join(projectDir, ".agents", "skills")}
 
@@ -488,17 +487,10 @@ func TestOopsBootstrapCompletionInjectsScheduleOrder(t *testing.T) {
 	// Simulate the oops agent having created and merged a schedule skill.
 	writeTaskTypeSkill(t, projectDir, "schedule", "When orders are empty")
 	rt.sessions[0].complete("completed")
-	time.Sleep(20 * time.Millisecond)
 
-	for i := 0; i < 5; i++ {
-		if err := l.Cycle(context.Background()); err != nil {
-			t.Fatalf("completion cycle %d: %v", i+1, err)
-		}
-		if len(rt.calls) >= 2 && rt.calls[1].Skill == "schedule" {
-			return
-		}
-	}
-	t.Fatalf("expected schedule dispatch after bootstrap completion, calls=%#v", rt.calls)
+	cycleUntil(t, l, "schedule dispatch after bootstrap completion", func() bool {
+		return len(rt.calls) >= 2 && rt.calls[1].Skill == "schedule"
+	})
 }
 
 func TestReconcileAndCycleDispatchBootstrapWhenNoScheduleOrOopsTaskType(t *testing.T) {
@@ -522,7 +514,7 @@ func TestReconcileAndCycleDispatchBootstrapWhenNoScheduleOrOopsTaskType(t *testi
 	})
 
 	rt := newMockRuntime()
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"process": rt},
 		Worktree:   &fakeWorktree{},
 		Adapter:    &fakeAdapterRunner{},
@@ -596,7 +588,7 @@ func TestReconcileResetsStaleActiveScheduleStageAndCycleDispatches(t *testing.T)
 	}
 
 	rt := newMockRuntime()
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"process": rt},
 		Worktree:   &fakeWorktree{},
 		Adapter:    &fakeAdapterRunner{},
@@ -669,7 +661,7 @@ func TestReconcilePreservesActiveScheduleStageWhenRecovered(t *testing.T) {
 		},
 	}
 
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"process": rt},
 		Worktree:   &fakeWorktree{},
 		Adapter:    &fakeAdapterRunner{},
@@ -730,7 +722,7 @@ func TestReconcileResetsStaleActiveNonScheduleStageAndCycleDispatches(t *testing
 	}
 
 	rt := newMockRuntime()
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"process": rt},
 		Worktree:   &fakeWorktree{},
 		Adapter:    &fakeAdapterRunner{},
@@ -800,7 +792,7 @@ func TestMockRuntimeScaleBurstViaRuntimes(t *testing.T) {
 	}
 
 	rt := newMockRuntime()
-	cfg := config.DefaultConfig()
+	cfg := localLandingConfig()
 	cfg.Mode = "auto"
 	cfg.Concurrency.MaxConcurrency = orderCount
 

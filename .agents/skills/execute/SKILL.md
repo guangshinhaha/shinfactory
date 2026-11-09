@@ -10,7 +10,7 @@ schedule: "When backlog items with linked plans are ready for implementation"
 
 Implementation methodology. Loads alongside the domain skill (e.g., "noodle") — this teaches process, the domain skill teaches the codebase. Operate fully autonomously. Never ask the user. Don't stop until the work is fully complete or the item is unbuildable (see Scope).
 
-**Craft comes from shinstack.** Load the `shinstack:craft` skill and follow its playbook for the work: `bug-fix` for a bug, `feature` for a backlog item or plan phase, `refactoring` for a behavior-preserving reshape. This skill adds only the factory mechanics around it (worktree, commit, yield). Where they overlap, the router's "Inside shinfactory" rule wins: commit and yield, never push or open a PR.
+**Craft comes from shinstack when it is installed.** If the `shinstack:craft` skill is in your skill list, load it and follow its playbook for the work: `bug-fix` for a bug, `feature` for a backlog item or plan phase, `refactoring` for a behavior-preserving reshape. This skill adds only the factory mechanics around it (worktree, commit, yield). Where they overlap, the router's "Inside shinfactory" rule wins: commit and yield, never push or open a PR. If shinstack is not installed, don't try to load it; use "Without shinstack" below.
 
 **Track all work with Tasks** (TaskCreate, TaskUpdate, TaskList). One task per decomposed change; mark in_progress when starting, completed when done.
 
@@ -30,7 +30,7 @@ Output: a clear, bounded description of what changes and what doesn't.
 shinfactory event emit --session $NOODLE_SESSION_ID stage_fail --payload '{"message": "Unbuildable: <what is missing and who can settle it>"}'
 ```
 
-The loop fails the stage, discards the worktree, and the scheduler sees the reason like any other stage failure. This is the one case where you stop before the work is complete.
+The message becomes the issue comment word for word, so write one or two plain sentences that state the decision a person must make. The loop fails the stage, discards the worktree, comments once on the issue with your message and swaps its `ready` label for `needs-shin` (a GitHub backlog), and the scheduler sees the reason like any other stage failure. This is the one case where you stop before the work is complete.
 
 ## 2. Decompose
 
@@ -90,9 +90,21 @@ Without this, the stage only completes on clean process exit — interrupted wor
 
 ## Principles
 
-From shinstack (read each in full before applying):
+With shinstack installed, read each of these in full before applying:
 - prove-it-works
 - laziness-protocol
 - guard-the-context-window
 - boundary-discipline
 - sequence-verifiable-units
+
+## Without shinstack
+
+Same job, built in:
+
+- **Reproduce first.** For a bug, make it fail before you fix it. For a feature, write the check that fails without it.
+- **Smallest change.** Meet the Done when and nothing else. No new layers, flags or options nobody asked for.
+- **Slices.** Build in small steps that each end in a passing state; run the repo's checks after each, then commit.
+- **Validate at the edge.** Check input where it enters; inside, trust the types.
+- **Commit and yield.** Never push, open a PR or comment on issues from a factory stage; the loop owns those.
+- **Prove it.** Run the real thing, not only the tests, and paste the output into your stage message. A self-report is not proof.
+- **Language.** Go: wrap errors with context (`fmt.Errorf("doing X: %w", err)`), accept interfaces and return structs, table-driven tests, no goroutine without an owner that waits for it. TypeScript/React: no `any`, derive state instead of syncing it, effects only for external systems, test what a user sees.

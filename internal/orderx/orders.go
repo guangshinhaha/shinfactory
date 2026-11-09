@@ -58,44 +58,6 @@ func WriteOrdersAtomic(path string, of OrdersFile) error {
 	return nil
 }
 
-// ApplyOrderRoutingDefaults fills missing provider/model on stages from config
-// defaults. Updates fields in-place to preserve Stage.Extra.
-func ApplyOrderRoutingDefaults(of OrdersFile, reg taskreg.Registry, cfg config.Config) (OrdersFile, bool) {
-	orders := make([]Order, len(of.Orders))
-	copy(orders, of.Orders)
-	changed := false
-	for i := range orders {
-		for j := range orders[i].Stages {
-			if stageChanged := applyStageRoutingDefaults(&orders[i].Stages[j], reg, cfg); stageChanged {
-				changed = true
-			}
-		}
-	}
-	if !changed {
-		return of, false
-	}
-	of.Orders = orders
-	return of, true
-}
-
-func applyStageRoutingDefaults(stage *Stage, _ taskreg.Registry, cfg config.Config) bool {
-	taskKey := stage.TaskKey
-	if strings.TrimSpace(taskKey) == "" {
-		taskKey = stage.Skill
-	}
-	provider, model := cfg.ResolveStageRouting(taskKey, stage.Provider, stage.Model)
-	changed := false
-	if provider != "" && stage.Provider != provider {
-		stage.Provider = provider
-		changed = true
-	}
-	if model != "" && stage.Model != model {
-		stage.Model = model
-		changed = true
-	}
-	return changed
-}
-
 // ApplyLifecycleDefaults fills empty lifecycle statuses so scheduler output can
 // omit them:
 //   - Order.Status defaults to "active"
@@ -205,6 +167,9 @@ func NormalizeAndValidateOrders(
 				changed = true
 			}
 			if err := ValidateStageStatus(orders[i].Stages[j].Status); err != nil {
+				return of, false, fmt.Errorf("order %q stage %d: %w", id, j, err)
+			}
+			if err := cfg.ValidateStageProvider(orders[i].Stages[j].Provider); err != nil {
 				return of, false, fmt.Errorf("order %q stage %d: %w", id, j, err)
 			}
 			if isValidStageTaskType(&orders[i].Stages[j], reg) || isFoundationalScheduleStage(orders[i].ID, &orders[i].Stages[j]) {

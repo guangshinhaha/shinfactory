@@ -170,12 +170,9 @@ func reduceDispatchCompleted(current state.State, event ingest.StateEvent) (stat
 		WorktreeName: payload.WorktreeName,
 	}
 	if idx, found := attemptIndexByID(stage.Attempts, attemptID); found {
-		existing := stage.Attempts[idx]
-		existing.SessionID = attempt.SessionID
-		existing.Status = attempt.Status
-		existing.StartedAt = attempt.StartedAt
-		existing.WorktreeName = attempt.WorktreeName
-		stage.Attempts[idx] = existing
+		// A relaunch (a stage requeued after a usage limit keeps its attempt id)
+		// is a fresh run: nothing from the cancelled one carries over.
+		stage.Attempts[idx] = attempt
 	} else {
 		stage.Attempts = append(stage.Attempts, attempt)
 	}

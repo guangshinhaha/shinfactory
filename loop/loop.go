@@ -72,6 +72,9 @@ func New(projectDir, noodleBin string, cfg config.Config, deps Dependencies) *Lo
 		deps.StatusFile = filepath.Join(runtimeDir, "status.json")
 	}
 
+	cfg.Landing.Mode = resolveLandingMode(projectDir, cfg.Landing.Mode)
+	cfg.Mode = resolveRunMode(projectDir, cfg.Mode)
+
 	registry := deps.Registry
 	var registryErr error
 	if len(registry.All()) == 0 {
@@ -584,6 +587,9 @@ func (l *Loop) runCycleMaintenance(ctx context.Context) (bool, error) {
 		return false, err
 	}
 	if err := l.processControlCommands(); err != nil {
+		return false, err
+	}
+	if err := l.retryAwaitingChecks(ctx); err != nil {
 		return false, err
 	}
 	if err := l.drainCompletions(ctx); err != nil {

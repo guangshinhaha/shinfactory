@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/guangshinhaha/shinfactory/config"
 	"github.com/guangshinhaha/shinfactory/mise"
 	loopruntime "github.com/guangshinhaha/shinfactory/runtime"
 )
@@ -23,7 +22,7 @@ func BenchmarkPlanCycleSpawnsScale(b *testing.B) {
 				orders.Orders = append(orders.Orders, testOrder(fmt.Sprintf("bench-%d", i), "execute", "execute", "claude", "claude-opus-4-6"))
 			}
 
-			l := New(b.TempDir(), "noodle", config.DefaultConfig(), Dependencies{
+			l := New(b.TempDir(), "noodle", localLandingConfig(), Dependencies{
 				Runtimes: map[string]loopruntime.Runtime{"process": newMockRuntime()},
 				Worktree: &fakeWorktree{},
 				Adapter:  &fakeAdapterRunner{},
@@ -68,7 +67,7 @@ func benchCycleDispatch(b *testing.B, orderCount int) {
 		b.Fatalf("write orders: %v", err)
 	}
 
-	cfg := config.DefaultConfig()
+	cfg := localLandingConfig()
 	cfg.Concurrency.MaxConcurrency = orderCount
 	cfg.Runtime.Process.MaxConcurrent = orderCount
 

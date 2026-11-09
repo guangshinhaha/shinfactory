@@ -143,3 +143,56 @@ func TestRoleWithProviderButNoModelIsFatal(t *testing.T) {
 		t.Errorf("expected fatal for role without model: %+v", got.Diagnostics)
 	}
 }
+
+func TestCodexDefaultsWithoutModelIsFatalNotClaudeModel(t *testing.T) {
+	cfg := parseRouting(t, "[routing.defaults]\nprovider = \"codex\"\n")
+	if cfg.Routing.Defaults.Provider != "codex" || cfg.Routing.Defaults.Model != "" {
+		t.Fatalf("defaults = %+v, want codex with no model", cfg.Routing.Defaults)
+	}
+	got := Validate(cfg)
+	if !hasCode(got, DiagnosticCodeRoutingDefaultsMissing) {
+		t.Fatalf("expected fatal routing_defaults_missing, got %+v", got.Diagnostics)
+	}
+	for _, d := range got.Diagnostics {
+		if d.Code == DiagnosticCodeRoutingDefaultsMissing && d.FieldPath != "routing.defaults" {
+			t.Errorf("one missing model should report once, also got %+v", d)
+		}
+	}
+}
+
+func TestClaudeDefaultsWithoutModelGetDefaultModel(t *testing.T) {
+	cfg := parseRouting(t, "[routing.defaults]\nprovider = \"claude\"\n")
+	if cfg.Routing.Defaults.Model != "claude-sonnet-5-5" {
+		t.Errorf("model = %q", cfg.Routing.Defaults.Model)
+	}
+}
+
+func TestValidateStageProviderOnSensitiveRepo(t *testing.T) {
+	cfg := parseRouting(t, "[routing]\nsensitive = true\n")
+	if err := cfg.ValidateStageProvider("codex"); err == nil {
+		t.Error("codex stage on a sensitive claude repo should be rejected")
+	}
+	for _, ok := range []string{"", "claude", " Claude "} {
+		if err := cfg.ValidateStageProvider(ok); err != nil {
+			t.Errorf("provider %q: %v", ok, err)
+		}
+	}
+	open := parseRouting(t, "")
+	if err := open.ValidateStageProvider("codex"); err != nil {
+		t.Errorf("non-sensitive repo should not reject: %v", err)
+	}
+}
+
+func TestForeignProvidersOnlyOnSensitiveRepo(t *testing.T) {
+	cfg := parseRouting(t, "[routing]\nsensitive = true\n")
+	if got := cfg.ForeignProviders("claude"); len(got) != 1 || got[0] != "codex" {
+		t.Errorf("sensitive claude repo: foreign = %v, want [codex]", got)
+	}
+	if got := cfg.ForeignProviders("codex"); len(got) != 1 || got[0] != "claude" {
+		t.Errorf("sensitive codex stage: foreign = %v, want [claude]", got)
+	}
+	cfg.Routing.Sensitive = false
+	if got := cfg.ForeignProviders("claude"); got != nil {
+		t.Errorf("non-sensitive repo: foreign = %v, want none", got)
+	}
+}

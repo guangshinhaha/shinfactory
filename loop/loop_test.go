@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/guangshinhaha/shinfactory/adapter"
-	"github.com/guangshinhaha/shinfactory/config"
 	"github.com/guangshinhaha/shinfactory/internal/failure"
 	"github.com/guangshinhaha/shinfactory/internal/state"
 	"github.com/guangshinhaha/shinfactory/internal/statusfile"
@@ -144,7 +143,7 @@ func processSingleControlCommand(t *testing.T, commandJSON string) ControlAck {
 		t.Fatalf("write control command: %v", err)
 	}
 
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes: map[string]loopruntime.Runtime{"process": newMockRuntime()},
 		Worktree: &fakeWorktree{},
 		Adapter:  &fakeAdapterRunner{},
@@ -196,7 +195,7 @@ func TestCycleSpawnsCookFromOrders(t *testing.T) {
 	rt := newMockRuntime()
 	wt := &fakeWorktree{}
 	ar := &fakeAdapterRunner{}
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"process": rt},
 		Worktree:   wt,
 		Adapter:    ar,
@@ -237,7 +236,7 @@ func TestCycleReusesExistingWorktree(t *testing.T) {
 
 	rt := newMockRuntime()
 	wt := &fakeWorktree{}
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes: map[string]loopruntime.Runtime{"process": rt},
 		Worktree: wt,
 		Adapter:  &fakeAdapterRunner{},
@@ -276,7 +275,7 @@ func TestCycleIgnoresDuplicateWorktreeCreateError(t *testing.T) {
 	existingWorktree := filepath.Join(projectDir, ".worktrees", "42")
 	rt := newMockRuntime()
 	wt := &fakeWorktree{createErr: errors.New("worktree '42' already exists at " + existingWorktree)}
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes: map[string]loopruntime.Runtime{"process": rt},
 		Worktree: wt,
 		Adapter:  &fakeAdapterRunner{},
@@ -316,7 +315,7 @@ func TestCycleSpawnFailureDoesNotCleanupReusedWorktree(t *testing.T) {
 	rt := newMockRuntime()
 	rt.dispatchErr = errors.New("spawn failed")
 	wt := &fakeWorktree{}
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes: map[string]loopruntime.Runtime{"process": rt},
 		Worktree: wt,
 		Adapter:  &fakeAdapterRunner{},
@@ -364,7 +363,7 @@ func TestCycleSpawnFailureCleansUpNewWorktree(t *testing.T) {
 	rt := newMockRuntime()
 	rt.dispatchErr = errors.New("spawn failed")
 	wt := &fakeWorktree{}
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes: map[string]loopruntime.Runtime{"process": rt},
 		Worktree: wt,
 		Adapter:  &fakeAdapterRunner{},
@@ -442,7 +441,7 @@ func TestCycleDispatchFailureMarksStageFailed(t *testing.T) {
 	spritesRT := newMockRuntime()
 	spritesRT.dispatchErr = errors.New("sprites runtime unavailable")
 	wt := &fakeWorktree{}
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"sprites": spritesRT},
 		Worktree:   wt,
 		Adapter:    &fakeAdapterRunner{},
@@ -487,7 +486,7 @@ func TestCycleCompletesCookAndMarksDone(t *testing.T) {
 	wt := &fakeWorktree{}
 	ar := &fakeAdapterRunner{}
 	briefWithPlans := mise.Brief{Backlog: []adapter.BacklogItem{{ID: "1", Title: "test", Status: "open"}}}
-	cfg := config.DefaultConfig()
+	cfg := localLandingConfig()
 	cfg.Mode = "auto"
 	l := New(projectDir, "noodle", cfg, Dependencies{
 		Runtimes: map[string]loopruntime.Runtime{"process": rt},
@@ -540,7 +539,7 @@ func TestCycleMergeFailureForwardsToSchedulerWithoutCrashing(t *testing.T) {
 	wt := &fakeWorktree{
 		mergeErr: errors.New("merge 20-0-execute: root checkout has uncommitted changes — commit or stash before merging"),
 	}
-	cfg := config.DefaultConfig()
+	cfg := localLandingConfig()
 	cfg.Mode = "auto"
 	l := New(projectDir, "noodle", cfg, Dependencies{
 		Runtimes: map[string]loopruntime.Runtime{"process": rt},
@@ -640,7 +639,7 @@ func TestCycleEntersIdleWhenNoPlansRemain(t *testing.T) {
 	}
 
 	rt := newMockRuntime()
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes: map[string]loopruntime.Runtime{"process": rt},
 		Worktree: &fakeWorktree{},
 		Adapter:  &fakeAdapterRunner{},
@@ -679,7 +678,7 @@ func TestCycleIdleWakesWhenPlansAppear(t *testing.T) {
 
 	fm := &fakeMise{}
 	rt := newMockRuntime()
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes: map[string]loopruntime.Runtime{"process": rt},
 		Worktree: &fakeWorktree{},
 		Adapter:  &fakeAdapterRunner{},
@@ -726,7 +725,7 @@ func TestCycleBootstrapsScheduleUsesRegistrySkill(t *testing.T) {
 	rt := newMockRuntime()
 	wt := &fakeWorktree{}
 	briefWithPlans := mise.Brief{Backlog: []adapter.BacklogItem{{ID: "1", Title: "test", Status: "open"}}}
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"process": rt},
 		Worktree:   wt,
 		Adapter:    &fakeAdapterRunner{},
@@ -815,7 +814,7 @@ func TestProcessControlCommandsPauseAndAck(t *testing.T) {
 		t.Fatalf("write control: %v", err)
 	}
 
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes: map[string]loopruntime.Runtime{"process": newMockRuntime()},
 		Worktree: &fakeWorktree{},
 		Adapter:  &fakeAdapterRunner{},
@@ -901,7 +900,7 @@ func TestProcessControlCommandsMissingStopTargetUsesFailureStateMessage(t *testi
 
 func TestRemoveOrderMissingIDUsesFailureStateMessage(t *testing.T) {
 	projectDir := t.TempDir()
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes: map[string]loopruntime.Runtime{"process": newMockRuntime()},
 		Worktree: &fakeWorktree{},
 		Adapter:  &fakeAdapterRunner{},
@@ -930,7 +929,7 @@ func TestRemoveOrderDeletesCanonicalOrder(t *testing.T) {
 	ordersPath := filepath.Join(runtimeDir, "orders.json")
 	orders := OrdersFile{
 		Orders: []Order{
-			scheduleOrder(config.DefaultConfig(), ""),
+			scheduleOrder(localLandingConfig(), ""),
 			testOrder("42", "execute", "execute", "claude", "claude-opus-4-6"),
 		},
 	}
@@ -938,7 +937,7 @@ func TestRemoveOrderDeletesCanonicalOrder(t *testing.T) {
 		t.Fatalf("write orders: %v", err)
 	}
 
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"process": newMockRuntime()},
 		Worktree:   &fakeWorktree{},
 		Adapter:    &fakeAdapterRunner{},
@@ -983,7 +982,7 @@ func TestSteerScheduleRegeneratesOrdersWithPromptRationale(t *testing.T) {
 	}
 	ordersPath := filepath.Join(runtimeDir, "orders.json")
 
-	l := New(projectDir, "noodle", config.DefaultConfig(), Dependencies{
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes: map[string]loopruntime.Runtime{"process": newMockRuntime()},
 		Worktree: &fakeWorktree{},
 		Adapter:  &fakeAdapterRunner{},
@@ -1033,8 +1032,10 @@ func TestCookBaseName(t *testing.T) {
 
 func TestCookBaseNameDasherizesUnsafeTokens(t *testing.T) {
 	name := cookBaseName("Plan 49/Phase:10", 2, "Request Changes")
-	if name != "plan-49-phase-10-2-request-changes" {
-		t.Fatalf("cookBaseName = %q, want plan-49-phase-10-2-request-changes", name)
+	// An ID that needs sanitising gets a hash of the original, so two IDs
+	// that sanitise alike do not share a branch.
+	if !strings.HasPrefix(name, "plan-49-phase-10-") || !strings.HasSuffix(name, "-2-request-changes") {
+		t.Fatalf("cookBaseName = %q, want plan-49-phase-10-<hash>-2-request-changes", name)
 	}
 }
 
@@ -1127,7 +1128,7 @@ func TestCycleRemovesStaleAdoptedSlotsBeforeScheduling(t *testing.T) {
 		t.Fatalf("write orders: %v", err)
 	}
 
-	cfg := config.DefaultConfig()
+	cfg := localLandingConfig()
 	cfg.Concurrency.MaxConcurrency = 1
 	rt := newMockRuntime()
 	l := New(projectDir, "noodle", cfg, Dependencies{
@@ -1164,7 +1165,7 @@ func TestCycleStampsLoopStateWhenPaused(t *testing.T) {
 		t.Fatalf("write orders: %v", err)
 	}
 
-	cfg := config.DefaultConfig()
+	cfg := localLandingConfig()
 	cfg.Mode = "supervised"
 	l := New(projectDir, "noodle", cfg, Dependencies{
 		Runtimes: map[string]loopruntime.Runtime{"process": newMockRuntime()},
@@ -1203,7 +1204,7 @@ func TestCycleStampsLoopStateWhenDraining(t *testing.T) {
 		t.Fatalf("write orders: %v", err)
 	}
 
-	cfg := config.DefaultConfig()
+	cfg := localLandingConfig()
 	cfg.Mode = "auto"
 	l := New(projectDir, "noodle", cfg, Dependencies{
 		Runtimes: map[string]loopruntime.Runtime{"process": newMockRuntime()},
@@ -1268,7 +1269,7 @@ func TestCycleCompletesAdoptedCookFromMetaState(t *testing.T) {
 	briefWithPlans := mise.Brief{Backlog: []adapter.BacklogItem{{ID: "42", Title: "test", Status: "open"}}}
 	wt := &fakeWorktree{}
 	ar := &fakeAdapterRunner{}
-	cfg := config.DefaultConfig()
+	cfg := localLandingConfig()
 	cfg.Mode = "auto"
 	l := New(projectDir, "noodle", cfg, Dependencies{
 		Runtimes: map[string]loopruntime.Runtime{"process": newMockRuntime()},

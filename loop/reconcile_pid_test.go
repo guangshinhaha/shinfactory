@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/guangshinhaha/shinfactory/config"
 	loopruntime "github.com/guangshinhaha/shinfactory/runtime"
 )
 
@@ -42,7 +41,7 @@ func TestRefreshAdoptedTargetsPrunesDeadPIDs(t *testing.T) {
 	l := &Loop{
 		projectDir: projectDir,
 		runtimeDir: runtimeDir,
-		config:     config.DefaultConfig(),
+		config:     localLandingConfig(),
 		logger:     slog.New(slog.NewTextHandler(os.Stderr, nil)),
 		deps: Dependencies{
 			Runtimes: map[string]loopruntime.Runtime{"process": newMockRuntime()},

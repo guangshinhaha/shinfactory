@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/guangshinhaha/shinfactory/adapter"
 	"github.com/guangshinhaha/shinfactory/config"
 	"github.com/guangshinhaha/shinfactory/internal/orderx"
 	"github.com/guangshinhaha/shinfactory/internal/taskreg"
@@ -291,6 +292,9 @@ type mergeResult struct {
 	Orders         OrdersFile
 	Promoted       bool
 	EmptyPromotion bool
+	// Unbuildable lists IDs of proposed orders dropped because they name no
+	// ready backlog item.
+	Unbuildable []string
 }
 
 // Reads and validates orders-next.json, merges into the provided orders, and
@@ -299,7 +303,7 @@ type mergeResult struct {
 // re-promotes idempotently — duplicate order IDs across the two files are
 // skipped (not rejected), except when replacing a failed order with a new
 // active proposal for explicit restart.
-func consumeOrdersNext(nextPath string, existing OrdersFile) (mergeResult, error) {
+func consumeOrdersNext(nextPath string, existing OrdersFile, backlog []adapter.BacklogItem) (mergeResult, error) {
 	nextData, err := os.ReadFile(nextPath)
 	if os.IsNotExist(err) {
 		return mergeResult{}, nil
@@ -323,6 +327,11 @@ func consumeOrdersNext(nextPath string, existing OrdersFile) (mergeResult, error
 		return mergeResult{}, ordersNextRejectedError{cause: cause}
 	}
 
+	// Every order builds a backlog item, and the backlog holds only issues a
+	// person marked ready. Anything else the scheduler proposes is dropped.
+	buildable, unbuildable := splitBuildableOrders(incoming.Orders, backlog)
+	incoming.Orders = buildable
+
 	emptyPromotion := len(incoming.Orders) == 0
 
 	// Build index of existing order IDs for dedup/replacement decisions.
@@ -339,6 +348,11 @@ func consumeOrdersNext(nextPath string, existing OrdersFile) (mergeResult, error
 		idx, exists := existingIndex[order.ID]
 		if exists {
 			if shouldReplaceFailedOrder(existing.Orders[idx], order) {
+				// A rewrite must not reset the fix-round cap or lower the tier.
+				order.Round = existing.Orders[idx].Round
+				if existing.Orders[idx].Tier != "" {
+					order.Tier = existing.Orders[idx].Tier
+				}
 				existing.Orders[idx] = order
 				continue
 			}
@@ -356,7 +370,25 @@ func consumeOrdersNext(nextPath string, existing OrdersFile) (mergeResult, error
 		Orders:         existing,
 		Promoted:       true,
 		EmptyPromotion: emptyPromotion,
+		Unbuildable:    unbuildable,
 	}, nil
+}
+
+// splitBuildableOrders keeps orders whose ID is a backlog item ID, plus the
+// schedule order itself. Dropped IDs are returned so the loop can say why.
+func splitBuildableOrders(orders []Order, backlog []adapter.BacklogItem) (keep []Order, dropped []string) {
+	ids := make(map[string]struct{}, len(backlog))
+	for _, item := range backlog {
+		ids[strings.TrimSpace(item.ID)] = struct{}{}
+	}
+	for _, order := range orders {
+		if _, ok := ids[strings.TrimSpace(order.ID)]; ok || isScheduleOrder(order) {
+			keep = append(keep, order)
+			continue
+		}
+		dropped = append(dropped, order.ID)
+	}
+	return keep, dropped
 }
 
 func shouldReplaceFailedOrder(existing Order, incoming Order) bool {
@@ -390,6 +422,12 @@ func mergeAmendedActiveOrder(existing Order, incoming Order) (Order, bool) {
 		return existing, false
 	}
 	merged.Status = existing.Status
+	// The loop owns the fix-round count, and an amendment can't lower a tier
+	// the order already carries.
+	merged.Round = existing.Round
+	if existing.Tier != "" {
+		merged.Tier = existing.Tier
+	}
 	if reflect.DeepEqual(existing, merged) {
 		return existing, false
 	}
@@ -424,12 +462,14 @@ func sameStageDefinition(a Stage, b Stage) bool {
 	return reflect.DeepEqual(a, b)
 }
 
+// stageRouting returns the provider and model a stage runs on, for display and
+// events. Stages keep no resolved routing of their own, so this resolves it.
+func (l *Loop) stageRouting(stage Stage) (provider, model string) {
+	return l.config.ResolveStageRouting(nonEmpty(stage.TaskKey, stage.Skill), stage.Provider, stage.Model)
+}
+
 // NormalizeAndValidateOrders delegates to orderx.
 func NormalizeAndValidateOrders(of OrdersFile, reg taskreg.Registry, cfg config.Config) (OrdersFile, bool, error) {
 	return orderx.NormalizeAndValidateOrders(of, reg, cfg)
 }
 
-// ApplyOrderRoutingDefaults delegates to orderx.
-func ApplyOrderRoutingDefaults(of OrdersFile, reg taskreg.Registry, cfg config.Config) (OrdersFile, bool) {
-	return orderx.ApplyOrderRoutingDefaults(of, reg, cfg)
-}

@@ -16,13 +16,44 @@ import (
 	"github.com/guangshinhaha/shinfactory/skill"
 )
 
+// cycleUntil runs Cycle until done reports true. A session's completion
+// reaches the loop through its watcher goroutine, so the first Cycle after
+// session.complete can run before the result is enqueued, most often under
+// load. Polling makes the tests wait for that hand-off instead of racing it.
+func cycleUntil(t *testing.T, l *Loop, what string, done func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		if err := l.Cycle(context.Background()); err != nil {
+			t.Fatalf("cycle while waiting for %s: %v", what, err)
+		}
+		if done() {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting for %s", what)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
+// cycleUntilBootstrapFailureCollected cycles until the loop has counted one
+// more failed bootstrap than it had on entry.
+func cycleUntilBootstrapFailureCollected(t *testing.T, l *Loop) {
+	t.Helper()
+	want := l.bootstrapAttempts + 1
+	cycleUntil(t, l, "failed bootstrap to be collected", func() bool {
+		return l.bootstrapAttempts >= want
+	})
+}
+
 // testRegistryWithoutSchedule returns a registry that has execute but no
 // schedule skill — simulating the "missing schedule" scenario.
 func testRegistryWithoutSchedule() taskreg.Registry {
 	return taskreg.NewFromSkills([]skill.SkillMeta{
 		{
-			Name: "execute",
-			Path: "/skills/execute",
+			Name:        "execute",
+			Path:        "/skills/execute",
 			Frontmatter: skill.Frontmatter{Schedule: "When a planned item is ready"},
 		},
 	})
@@ -63,7 +94,7 @@ You are a bootstrap agent. Read history from {{history_dirs}}.
 
 // bootstrapConfig returns a config with skill search paths pointing to the fixture.
 func bootstrapConfig(skillSearchPath string) config.Config {
-	cfg := config.DefaultConfig()
+	cfg := localLandingConfig()
 	cfg.Skills.Paths = []string{skillSearchPath}
 	return cfg
 }
@@ -78,13 +109,13 @@ func TestMissingScheduleSkillTriggersBootstrap(t *testing.T) {
 
 	rt := newMockRuntime()
 	l := New(projectDir, "noodle", bootstrapConfig(skillPath), Dependencies{
-		Runtimes:   map[string]loopruntime.Runtime{"process": rt},
-		Worktree:   &fakeWorktree{},
-		Adapter:    &fakeAdapterRunner{},
-		Mise:       bootstrapMise(),
-		Monitor:    fakeMonitor{},
-		Registry:   testRegistryWithoutSchedule(),
-		Now:        time.Now,
+		Runtimes: map[string]loopruntime.Runtime{"process": rt},
+		Worktree: &fakeWorktree{},
+		Adapter:  &fakeAdapterRunner{},
+		Mise:     bootstrapMise(),
+		Monitor:  fakeMonitor{},
+		Registry: testRegistryWithoutSchedule(),
+		Now:      time.Now,
 	})
 
 	if err := l.Cycle(context.Background()); err != nil {
@@ -134,13 +165,13 @@ func TestBootstrapSessionUsesSystemPromptNotSkill(t *testing.T) {
 
 	rt := newMockRuntime()
 	l := New(projectDir, "noodle", bootstrapConfig(skillPath), Dependencies{
-		Runtimes:   map[string]loopruntime.Runtime{"process": rt},
-		Worktree:   &fakeWorktree{},
-		Adapter:    &fakeAdapterRunner{},
-		Mise:       bootstrapMise(),
-		Monitor:    fakeMonitor{},
-		Registry:   testRegistryWithoutSchedule(),
-		Now:        time.Now,
+		Runtimes: map[string]loopruntime.Runtime{"process": rt},
+		Worktree: &fakeWorktree{},
+		Adapter:  &fakeAdapterRunner{},
+		Mise:     bootstrapMise(),
+		Monitor:  fakeMonitor{},
+		Registry: testRegistryWithoutSchedule(),
+		Now:      time.Now,
 	})
 
 	if err := l.Cycle(context.Background()); err != nil {
@@ -173,13 +204,13 @@ func TestFailedBootstrapIncrements(t *testing.T) {
 
 	rt := newMockRuntime()
 	l := New(projectDir, "noodle", bootstrapConfig(skillPath), Dependencies{
-		Runtimes:   map[string]loopruntime.Runtime{"process": rt},
-		Worktree:   &fakeWorktree{},
-		Adapter:    &fakeAdapterRunner{},
-		Mise:       bootstrapMise(),
-		Monitor:    fakeMonitor{},
-		Registry:   testRegistryWithoutSchedule(),
-		Now:        time.Now,
+		Runtimes: map[string]loopruntime.Runtime{"process": rt},
+		Worktree: &fakeWorktree{},
+		Adapter:  &fakeAdapterRunner{},
+		Mise:     bootstrapMise(),
+		Monitor:  fakeMonitor{},
+		Registry: testRegistryWithoutSchedule(),
+		Now:      time.Now,
 	})
 
 	// First cycle: bootstrap dispatched.
@@ -196,9 +227,7 @@ func TestFailedBootstrapIncrements(t *testing.T) {
 
 	// Second cycle: collects failed bootstrap (attempt 1), then the cycle
 	// continues and re-dispatches a new bootstrap (attempt < 3).
-	if err := l.Cycle(context.Background()); err != nil {
-		t.Fatalf("cycle 2: %v", err)
-	}
+	cycleUntilBootstrapFailureCollected(t, l)
 	if l.bootstrapAttempts != 1 {
 		t.Fatalf("bootstrapAttempts = %d, want 1", l.bootstrapAttempts)
 	}
@@ -221,13 +250,13 @@ func TestBootstrapExhaustedAfterThreeFailures(t *testing.T) {
 
 	rt := newMockRuntime()
 	l := New(projectDir, "noodle", bootstrapConfig(skillPath), Dependencies{
-		Runtimes:   map[string]loopruntime.Runtime{"process": rt},
-		Worktree:   &fakeWorktree{},
-		Adapter:    &fakeAdapterRunner{},
-		Mise:       bootstrapMise(),
-		Monitor:    fakeMonitor{},
-		Registry:   testRegistryWithoutSchedule(),
-		Now:        time.Now,
+		Runtimes: map[string]loopruntime.Runtime{"process": rt},
+		Worktree: &fakeWorktree{},
+		Adapter:  &fakeAdapterRunner{},
+		Mise:     bootstrapMise(),
+		Monitor:  fakeMonitor{},
+		Registry: testRegistryWithoutSchedule(),
+		Now:      time.Now,
 	})
 
 	for i := 0; i < 3; i++ {
@@ -247,9 +276,7 @@ func TestBootstrapExhaustedAfterThreeFailures(t *testing.T) {
 		session.complete("failed")
 
 		// Cycle to collect failure.
-		if err := l.Cycle(context.Background()); err != nil {
-			t.Fatalf("collect cycle %d: %v", i, err)
-		}
+		cycleUntilBootstrapFailureCollected(t, l)
 	}
 
 	if !l.bootstrapExhausted {
@@ -270,13 +297,13 @@ func TestBootstrapExhaustionEmitsFeedEvent(t *testing.T) {
 
 	rt := newMockRuntime()
 	l := New(projectDir, "noodle", bootstrapConfig(skillPath), Dependencies{
-		Runtimes:   map[string]loopruntime.Runtime{"process": rt},
-		Worktree:   &fakeWorktree{},
-		Adapter:    &fakeAdapterRunner{},
-		Mise:       bootstrapMise(),
-		Monitor:    fakeMonitor{},
-		Registry:   testRegistryWithoutSchedule(),
-		Now:        time.Now,
+		Runtimes: map[string]loopruntime.Runtime{"process": rt},
+		Worktree: &fakeWorktree{},
+		Adapter:  &fakeAdapterRunner{},
+		Mise:     bootstrapMise(),
+		Monitor:  fakeMonitor{},
+		Registry: testRegistryWithoutSchedule(),
+		Now:      time.Now,
 	})
 
 	// Exhaust bootstrap attempts.
@@ -292,9 +319,7 @@ func TestBootstrapExhaustionEmitsFeedEvent(t *testing.T) {
 		}
 		session := rt.sessions[len(rt.sessions)-1]
 		session.complete("failed")
-		if err := l.Cycle(context.Background()); err != nil {
-			t.Fatalf("collect cycle %d: %v", i, err)
-		}
+		cycleUntilBootstrapFailureCollected(t, l)
 	}
 
 	if !l.bootstrapExhausted {
@@ -329,13 +354,13 @@ func TestSuccessfulBootstrapTriggersRebuild(t *testing.T) {
 
 	rt := newMockRuntime()
 	l := New(projectDir, "noodle", bootstrapConfig(skillPath), Dependencies{
-		Runtimes:   map[string]loopruntime.Runtime{"process": rt},
-		Worktree:   &fakeWorktree{},
-		Adapter:    &fakeAdapterRunner{},
-		Mise:       bootstrapMise(),
-		Monitor:    fakeMonitor{},
-		Registry:   testRegistryWithoutSchedule(),
-		Now:        time.Now,
+		Runtimes: map[string]loopruntime.Runtime{"process": rt},
+		Worktree: &fakeWorktree{},
+		Adapter:  &fakeAdapterRunner{},
+		Mise:     bootstrapMise(),
+		Monitor:  fakeMonitor{},
+		Registry: testRegistryWithoutSchedule(),
+		Now:      time.Now,
 	})
 
 	// Dispatch bootstrap.
@@ -352,9 +377,11 @@ func TestSuccessfulBootstrapTriggersRebuild(t *testing.T) {
 
 	// Collect completion — the cycle will also try to re-dispatch schedule
 	// (still missing on disk) which triggers another bootstrap.
-	if err := l.Cycle(context.Background()); err != nil {
-		t.Fatalf("cycle 2: %v", err)
-	}
+	eventsPath := filepath.Join(runtimeDir, "loop-events.ndjson")
+	cycleUntil(t, l, "bootstrap.completed event", func() bool {
+		data, err := os.ReadFile(eventsPath)
+		return err == nil && strings.Contains(string(data), "bootstrap.completed")
+	})
 
 	// Success should not increment the failure counter.
 	if l.bootstrapAttempts != 0 {
@@ -362,16 +389,6 @@ func TestSuccessfulBootstrapTriggersRebuild(t *testing.T) {
 	}
 	if l.bootstrapExhausted {
 		t.Fatal("should not be exhausted after successful bootstrap")
-	}
-
-	// Verify bootstrap.completed event was written.
-	eventsPath := filepath.Join(runtimeDir, "loop-events.ndjson")
-	data, err := os.ReadFile(eventsPath)
-	if err != nil {
-		t.Fatalf("read events: %v", err)
-	}
-	if !strings.Contains(string(data), "bootstrap.completed") {
-		t.Fatal("expected bootstrap.completed event in loop-events.ndjson")
 	}
 }
 

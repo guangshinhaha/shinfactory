@@ -11,7 +11,7 @@ schedule: "After cook sessions that produce large diffs (200+ lines), implement 
 # Adversarial Review
 
 Spawn reviewers on the **opposite model** to challenge work. Reviewers attack from distinct
-lenses grounded in shinstack principles. The deliverable is a synthesized verdict — do NOT make
+lenses grounded in principles (shinstack's when installed, otherwise the built-in three in Step 1). The deliverable is a synthesized verdict — do NOT make
 changes.
 
 **Hard constraint:** Sensitive data never goes to another provider. Run the data check in Step 3
@@ -23,8 +23,11 @@ reviewers — those run on *your own* model, which defeats the purpose.
 
 ## Step 1 — Load Principles
 
-Load the `shinstack:craft` skill and read the principles its router lists for this work, in full.
-These govern reviewer judgments. Apply shinstack `interrogate`'s rule to every finding: it
+If the `shinstack:craft` skill is in your skill list, load it and read the principles its router lists for this work, in full. These govern reviewer judgments. If shinstack is not installed, don't try to load it; use these as the lenses' frame, and tell each reviewer to apply them:
+- **prove-it-works:** a claim counts only when it was run or shown.
+- **laziness-protocol:** flag layers, flags and options nobody asked for.
+- **fix-root-causes:** flag a fix that hides the symptom while the cause remains.
+Apply shinstack `interrogate`'s rule to every finding, with or without the plugin: it
 counts only if the reviewer can show it (a failing run, a concrete input, a cited line), not
 assert it.
 
@@ -117,8 +120,8 @@ Produce a single verdict using the format in `references/verdict-format.md`.
 
 ## Step 5 — Render Judgment
 
-After synthesizing the reviewers, apply your own judgment. Using the stated intent and shinstack
-principles as your frame, state which findings you would accept and which you would reject —
+After synthesizing the reviewers, apply your own judgment. Using the stated intent and the principles from Step 1
+as your frame, state which findings you would accept and which you would reject —
 and why. Reviewers are adversarial by design; not every finding warrants action. Call out
 false positives, overreach, and findings that mistake style for substance.
 

@@ -28,13 +28,18 @@ type Config struct {
 
 // LandingConfig controls how finished work reaches the default branch.
 type LandingConfig struct {
-	// Mode is "local" (default: merge each stage's worktree into the local
-	// default branch) or "pr" (one branch per order; push and open a draft PR
-	// after the first stage with commits, mark it ready and merge it when the
-	// last stage completes).
+	// Mode is "pr" (one branch per order; push and open a draft PR after the
+	// first stage with commits, mark it ready and merge it when the last stage
+	// completes) or "local" (merge each stage's worktree into the local default
+	// branch). Empty means unset: the loop picks "pr" when the project has a
+	// GitHub remote and "local" when it has none. An explicit value always wins.
 	Mode string `toml:"mode"`
 	// Base is the PR base branch; empty means the repository default.
 	Base string `toml:"base"`
+	// CloseIssues puts "Closes #<order id>" in the PR body, so merging the PR
+	// closes the order's GitHub issue. Set it only when the backlog is this
+	// repository's GitHub issues, where an order ID is an issue number.
+	CloseIssues bool `toml:"close_issues"`
 }
 
 // PR reports whether work lands through a pull request.
@@ -129,6 +134,7 @@ type SpritesConfig struct {
 // workers. It is available only when this table is set and the orca CLI exists.
 type OrcaConfig struct {
 	Bin               string `toml:"bin"`                 // orca CLI; empty = "orca" on PATH
+	RunID             string `toml:"run_id"`              // Orca run for factory workers; empty = the factory creates and remembers its own
 	MaxConcurrent     int    `toml:"max_concurrent"`      // 0 = unlimited
 	LimitRetrySeconds int    `toml:"limit_retry_seconds"` // pause after a usage-limit failure before the next launch attempt
 }
@@ -250,7 +256,7 @@ func DefaultConfig() Config {
 		},
 		Mode: defaultMode,
 		Concurrency: ConcurrencyConfig{
-			MaxConcurrency: 4,
+			MaxConcurrency: 2,
 		},
 		Agents: AgentsConfig{},
 		Runtime: RuntimeConfig{

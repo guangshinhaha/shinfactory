@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/guangshinhaha/shinfactory/config"
 	"github.com/guangshinhaha/shinfactory/event"
 	"github.com/guangshinhaha/shinfactory/internal/taskreg"
 	"github.com/guangshinhaha/shinfactory/mise"
@@ -25,7 +24,7 @@ func TestRegistryErrorResilience(t *testing.T) {
 		t.Fatalf("mkdir: %v", err)
 	}
 
-	cfg := config.DefaultConfig()
+	cfg := localLandingConfig()
 	registryErr := errors.New("task type discovery failed: network error")
 
 	l := &Loop{
@@ -108,7 +107,7 @@ func TestRegistryErrorResetOnRebuild(t *testing.T) {
 		t.Fatalf("write SKILL.md: %v", err)
 	}
 
-	cfg := config.DefaultConfig()
+	cfg := localLandingConfig()
 	cfg.Skills.Paths = []string{"~/.noodle/skills"}
 
 	l := &Loop{
@@ -164,7 +163,7 @@ func TestPrepareOrdersRescanRecoversMissingSkill(t *testing.T) {
 		t.Fatalf("write orders: %v", err)
 	}
 
-	cfg := config.DefaultConfig()
+	cfg := localLandingConfig()
 
 	l := &Loop{
 		projectDir: projectDir,
@@ -260,7 +259,7 @@ func TestPrepareOrdersRescanDropsGenuinelyUnknown(t *testing.T) {
 		}
 	}
 
-	cfg := config.DefaultConfig()
+	cfg := localLandingConfig()
 	cfg.Skills.Paths = []string{"~/.noodle/skills"}
 
 	l := &Loop{
@@ -328,7 +327,7 @@ func TestEnsureSkillFreshExistingSkill(t *testing.T) {
 	l := &Loop{
 		projectDir: projectDir,
 		runtimeDir: runtimeDir,
-		config:     config.DefaultConfig(),
+		config:     localLandingConfig(),
 		registry:   testLoopRegistry(),
 		deps: Dependencies{
 			Mise: &fakeMise{},
@@ -350,7 +349,7 @@ func TestEnsureSkillFreshMissingSkill(t *testing.T) {
 		t.Fatalf("mkdir: %v", err)
 	}
 
-	cfg := config.DefaultConfig()
+	cfg := localLandingConfig()
 	cfg.Skills.Paths = []string{"~/.noodle/skills"}
 
 	l := &Loop{
@@ -443,7 +442,7 @@ func TestAuditOrdersPreservesScheduleOrderWhenScheduleTaskTypeMissing(t *testing
 	l := &Loop{
 		projectDir: projectDir,
 		runtimeDir: runtimeDir,
-		config:     config.DefaultConfig(),
+		config:     localLandingConfig(),
 		registry:   reg,
 		events:     event.NewLoopEventWriter(filepath.Join(runtimeDir, "loop-events.ndjson")),
 		deps: Dependencies{

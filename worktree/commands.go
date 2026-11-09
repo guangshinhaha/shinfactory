@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 )
 
 // CreateOpts holds optional parameters for Create.
@@ -39,6 +40,11 @@ func (a *App) Create(name string, opts ...CreateOpts) error {
 	a.info(fmt.Sprintf("Creating worktree at %s...", wtPath))
 	addArgs := []string{"worktree", "add", wtPath, "-b", name}
 	if o.From != "" {
+		if strings.HasPrefix(o.From, "refs/remotes/") {
+			// The order branch must not track the base: its upstream is set
+			// when it is first pushed.
+			addArgs = append(addArgs, "--no-track")
+		}
 		addArgs = append(addArgs, o.From)
 	}
 	if err := a.gitRunWithDetails(addArgs...); err != nil {

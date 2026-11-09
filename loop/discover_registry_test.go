@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/guangshinhaha/shinfactory/config"
 )
 
 func TestDiscoverRegistryExpandsHomeSkillPath(t *testing.T) {
@@ -27,7 +26,7 @@ schedule: "After execute succeeds"
 		t.Fatalf("write SKILL.md: %v", err)
 	}
 
-	cfg := config.DefaultConfig()
+	cfg := localLandingConfig()
 	cfg.Skills.Paths = []string{"~/.noodle/skills"}
 
 	registry, err := discoverRegistry(t.TempDir(), cfg)

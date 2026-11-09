@@ -388,3 +388,18 @@ func assertFailureStateMessage(t *testing.T, message string) {
 		}
 	}
 }
+
+func TestRepairRefusesSecondProviderOnSensitiveRepo(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.Routing.Sensitive = true
+	if err := checkRepairProvider(cfg, "codex"); err == nil || !strings.Contains(err.Error(), "routing.sensitive") {
+		t.Fatalf("err = %v, want routing.sensitive rejection", err)
+	}
+	if err := checkRepairProvider(cfg, "claude"); err != nil {
+		t.Fatalf("default provider rejected: %v", err)
+	}
+	req := repairDispatchRequest(cfg, "r", "synthetic", "claude", "/w")
+	if len(req.DenyProviders) != 1 || req.DenyProviders[0] != "codex" {
+		t.Errorf("repair DenyProviders = %v, want [codex]", req.DenyProviders)
+	}
+}

@@ -46,7 +46,7 @@ func Validate(config Config) ValidationResult {
 		policy := config.Routing.Roles[name]
 		field := "routing.roles." + name + ".provider"
 		switch {
-		case strings.TrimSpace(policy.Model) == "":
+		case strings.TrimSpace(policy.Model) == "" && strings.TrimSpace(config.Routing.Defaults.Model) != "":
 			result.Diagnostics = append(result.Diagnostics, ConfigDiagnostic{
 				FieldPath: "routing.roles." + name + ".model",
 				Message:   fmt.Sprintf("role names provider %q but no model", policy.Provider),

@@ -16,6 +16,7 @@ import (
 	"github.com/guangshinhaha/shinfactory/dispatcher"
 	"github.com/guangshinhaha/shinfactory/event"
 	"github.com/guangshinhaha/shinfactory/internal/shellx"
+	"github.com/guangshinhaha/shinfactory/internal/state"
 	"github.com/guangshinhaha/shinfactory/internal/taskreg"
 	"github.com/guangshinhaha/shinfactory/internal/testutil/fakeorca"
 	"github.com/guangshinhaha/shinfactory/mise"
@@ -54,6 +55,7 @@ type orcaEnv struct {
 	fake  *fakeorca.Fake
 	clock time.Time
 	wts   *gitWorktrees
+	cfg   config.Config
 }
 
 func orcaRegistry() taskreg.Registry {
@@ -83,35 +85,52 @@ func newOrcaEnv(t *testing.T, orders OrdersFile) *orcaEnv {
 		t.Fatal(err)
 	}
 
-	cfg := config.DefaultConfig()
+	cfg := localLandingConfig()
 	cfg.Mode = "auto"
 	cfg.Runtime.Default = "orca"
 	cfg.Runtime.Orca.LimitRetrySeconds = 60
 
+	wts := &gitWorktrees{projectDir: projectDir}
+	env := &orcaEnv{fake: fake, clock: time.Now(), wts: wts, cfg: cfg}
+	env.integrationEnv = &integrationEnv{wt: &wts.fakeWorktree, ordersPath: ordersPath, runtimeDir: runtimeDir, projectDir: projectDir}
+	env.loop = env.newLoop()
+	return env
+}
+
+// newLoop builds a loop over the env's directories with a fresh orca
+// dispatcher, the way a restarted factory process would.
+func (e *orcaEnv) newLoop() *Loop {
 	od := dispatcher.NewOrcaDispatcher(dispatcher.OrcaDispatcherConfig{
-		ProjectDir:   projectDir,
-		RuntimeDir:   runtimeDir,
-		Bin:          fake.Bin,
+		ProjectDir:   e.projectDir,
+		RuntimeDir:   e.runtimeDir,
+		Bin:          e.fake.Bin,
+		RunID:        e.cfg.Runtime.Orca.RunID,
 		PollInterval: 5 * time.Millisecond,
 	})
-	wts := &gitWorktrees{projectDir: projectDir}
-	env := &orcaEnv{fake: fake, clock: time.Now(), wts: wts}
-	l := New(projectDir, "noodle", cfg, Dependencies{
+	return New(e.projectDir, "noodle", e.cfg, Dependencies{
 		Runtimes: map[string]loopruntime.Runtime{
 			"process": newMockRuntime(),
-			"orca":    loopruntime.NewDispatcherRuntime("orca", od, runtimeDir),
+			"orca":    loopruntime.NewOrcaRuntime(od, e.runtimeDir, 0),
 		},
-		Worktree:       wts,
+		Worktree:       e.wts,
 		Adapter:        &fakeAdapterRunner{},
-		Mise:           &fakeMise{brief: mise.Brief{Backlog: []adapter.BacklogItem{{ID: "1", Title: "t", Status: "open"}}}},
+		Mise:           &fakeMise{brief: mise.Brief{Backlog: []adapter.BacklogItem{{ID: "42", Title: "t", Status: "open"}}}},
 		Monitor:        fakeMonitor{},
 		Registry:       orcaRegistry(),
-		Now:            func() time.Time { return env.clock },
-		OrdersFile:     ordersPath,
-		OrdersNextFile: filepath.Join(runtimeDir, "orders-next.json"),
+		Now:            func() time.Time { return e.clock },
+		OrdersFile:     e.ordersPath,
+		OrdersNextFile: filepath.Join(e.runtimeDir, "orders-next.json"),
 	})
-	env.integrationEnv = &integrationEnv{loop: l, wt: &wts.fakeWorktree, ordersPath: ordersPath, runtimeDir: runtimeDir, projectDir: projectDir}
-	return env
+}
+
+// restart replaces the loop with a new one over the same project and runs the
+// startup reconcile, as a restarted factory process does.
+func (e *orcaEnv) restart(t *testing.T) {
+	t.Helper()
+	e.loop = e.newLoop()
+	if err := e.loop.reconcile(context.Background()); err != nil {
+		t.Fatalf("reconcile after restart: %v", err)
+	}
 }
 
 // cycleUntil runs loop cycles until cond holds. Orca workers settle on a
@@ -180,7 +199,7 @@ func (e *orcaEnv) emitSessionEvent(t *testing.T, sessionID string, typ event.Eve
 }
 
 func scheduleOnlyOrders() OrdersFile {
-	return OrdersFile{Orders: []Order{scheduleOrder(config.DefaultConfig(), "")}}
+	return OrdersFile{Orders: []Order{scheduleOrder(localLandingConfig(), "")}}
 }
 
 // settleLatest ends the most recently launched fake worker.
@@ -306,7 +325,7 @@ func TestOrcaRuntimeRequeuesStageWhoseWorkerDiedOnLimit(t *testing.T) {
 
 	env.cycleUntil(t, "execute started", func() bool { return len(env.fake.Starts()) == 1 })
 	id := env.fake.LastDispatch(t)
-	env.fake.SetTranscript(t, id, "Claude usage limit reached. Your limit will reset at 3pm.")
+	env.fake.SetTranscript(t, id, "Claude usage limit reached.")
 	env.fake.Settle(t, id, "failed")
 
 	env.cycleUntil(t, "stage requeued", func() bool {
@@ -342,7 +361,7 @@ func wtOf(startCall string) string {
 // defaults to orca resolves to process and orca is not offered.
 func TestOrcaRuntimeAbsentFallsBackToProcess(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
-	cfg := config.DefaultConfig()
+	cfg := localLandingConfig()
 	cfg.Runtime.Default = "orca"
 	for _, name := range cfg.AvailableRuntimes() {
 		if name == "orca" {
@@ -363,7 +382,7 @@ func TestOrcaRuntimeAbsentFallsBackToProcess(t *testing.T) {
 // stage without a runtime on process, as before.
 func TestStageRuntimeKeepsLegacyDefaultsForOtherRuntimes(t *testing.T) {
 	for _, def := range []string{"", "process", "sprites", "cursor"} {
-		cfg := config.DefaultConfig()
+		cfg := localLandingConfig()
 		cfg.Runtime.Default = def
 		l := &Loop{config: cfg, deps: Dependencies{Runtimes: map[string]loopruntime.Runtime{"process": newMockRuntime()}}}
 		if got := l.stageRuntime(""); got != "process" {
@@ -393,5 +412,213 @@ func TestOrcaRuntimeCrashMentioningLimitWordFailsTheStage(t *testing.T) {
 	})
 	if _, held := env.loop.limitHolds.heldUntil("orca", env.clock); held {
 		t.Fatal("runtime held after an ordinary crash")
+	}
+}
+
+func oneStageOrder() OrdersFile {
+	return OrdersFile{Orders: []Order{{
+		ID: "42", Title: "one stage", Status: OrderStatusActive,
+		Stages: []Stage{{TaskKey: "execute", Skill: "execute", Provider: "claude", Model: "claude-sonnet-5-5", Status: StageStatusPending}},
+	}}}
+}
+
+// Done when 1: the factory uses its own Orca run. It creates one, passes it on
+// every worker-start, and follows its workers inside that run only.
+func TestOrcaRuntimeUsesItsOwnRun(t *testing.T) {
+	env := newOrcaEnv(t, scheduleOnlyOrders())
+	env.cycleUntil(t, "schedule worker started", func() bool { return len(env.fake.Starts()) == 1 })
+	env.writeOrdersNext(t, "execute")
+	env.settleLatest(t, "succeeded")
+	env.cycleUntil(t, "execute worker started", func() bool { return len(env.fake.Starts()) == 2 })
+	env.settleLatest(t, "succeeded")
+	env.cycleUntil(t, "order completed", func() bool { return env.orderStages(t, "42") == nil })
+
+	runs := env.fake.Runs()
+	if len(runs) != 1 {
+		t.Fatalf("runs created = %v, want exactly one for the whole loop", runs)
+	}
+	for _, start := range env.fake.Starts() {
+		if !strings.Contains(start, "--run "+runs[0]+" ") {
+			t.Errorf("worker-start = %q, want --run %s", start, runs[0])
+		}
+	}
+	for _, call := range env.fake.Calls() {
+		if strings.HasPrefix(call, "orchestration worker-list") && !strings.Contains(call, "--run "+runs[0]) {
+			t.Errorf("worker-list = %q, want it scoped to --run %s", call, runs[0])
+		}
+	}
+}
+
+// A run id in .noodle.toml is used as given: nothing is created.
+func TestOrcaRuntimeUsesConfiguredRun(t *testing.T) {
+	env := newOrcaEnv(t, oneStageOrder())
+	env.cfg.Runtime.Orca.RunID = "run_from_config"
+	env.loop = env.newLoop()
+	env.cycleUntil(t, "worker started", func() bool { return len(env.fake.Starts()) == 1 })
+	if got := env.fake.Starts()[0]; !strings.Contains(got, "--run run_from_config ") {
+		t.Fatalf("worker-start = %q, want --run run_from_config", got)
+	}
+	if runs := env.fake.Runs(); len(runs) != 0 {
+		t.Fatalf("runs created = %v, want none when run_id is configured", runs)
+	}
+}
+
+// Done when 2: a restarted loop stops the worker its previous process left
+// running, relaunches the stage in the same worktree and the same run, and
+// does not create a second run.
+func TestOrcaRuntimeRestartStopsOrphanedWorker(t *testing.T) {
+	env := newOrcaEnv(t, oneStageOrder())
+	// The restart injects the schedule order; room for it beside the stage.
+	env.cfg.Concurrency.MaxConcurrency = 3
+	env.loop = env.newLoop()
+	env.cycleUntil(t, "worker started", func() bool { return len(env.fake.Starts()) == 1 })
+	orphan := env.fake.LastDispatch(t)
+	if got := env.fake.Worker(t, orphan); got != "in_progress" {
+		t.Fatalf("worker %s = %q before restart, want in_progress", orphan, got)
+	}
+
+	// The factory process dies and a new one starts over the same project.
+	env.restart(t)
+	stageStarts := func() []string {
+		var out []string
+		for _, start := range env.fake.Starts() {
+			if strings.Contains(start, ".worktrees/42-0-execute") {
+				out = append(out, start)
+			}
+		}
+		return out
+	}
+	env.cycleUntil(t, "stage relaunched", func() bool { return len(stageStarts()) == 2 })
+
+	if got := env.fake.Worker(t, orphan); got == "in_progress" {
+		t.Fatalf("orphaned worker %s still running after restart", orphan)
+	}
+	first, second := stageStarts()[0], stageStarts()[1]
+	if wtOf(first) != wtOf(second) {
+		t.Fatalf("relaunch worktree = %q, want the kept worktree %q", wtOf(second), wtOf(first))
+	}
+	if runs := env.fake.Runs(); len(runs) != 1 || !strings.Contains(second, "--run "+runs[0]+" ") {
+		t.Fatalf("runs = %v, relaunch = %q; want the one run reused", runs, second)
+	}
+}
+
+// Recovery only touches workers the factory launched: a worker someone else
+// started in a shared, configured run is left running.
+func TestOrcaRuntimeRestartLeavesForeignWorkersAlone(t *testing.T) {
+	env := newOrcaEnv(t, oneStageOrder())
+	env.cfg.Runtime.Orca.RunID = "run_shared"
+	env.cfg.Concurrency.MaxConcurrency = 3 // the restart injects the schedule order; room for it beside the stage
+	env.loop = env.newLoop()
+	env.cycleUntil(t, "worker started", func() bool { return len(env.fake.Starts()) == 1 })
+	ours := env.fake.LastDispatch(t)
+	if out, err := exec.Command(env.fake.Bin, "orchestration", "worker-start", "--run", "run_shared").CombinedOutput(); err != nil {
+		t.Fatalf("start foreign worker: %v: %s", err, out)
+	}
+	foreign := env.fake.LastDispatch(t)
+
+	env.restart(t)
+	env.cycleUntil(t, "stage relaunched", func() bool {
+		n := 0
+		for _, start := range env.fake.Starts() {
+			if strings.Contains(start, ".worktrees/42-0-execute") {
+				n++
+			}
+		}
+		return n == 2
+	})
+	if got := env.fake.Worker(t, ours); got == "in_progress" {
+		t.Fatalf("our orphan %s still running", ours)
+	}
+	if got := env.fake.Worker(t, foreign); got != "in_progress" {
+		t.Fatalf("foreign worker %s = %q, want untouched", foreign, got)
+	}
+}
+
+// Done when 3: the hold waits until the reset time in the error, not the retry
+// interval, and the first launch after that clears it.
+func TestOrcaRuntimeHoldWaitsUntilParsedResetTime(t *testing.T) {
+	env := newOrcaEnv(t, oneStageOrder())
+	env.clock = time.Date(2026, 11, 9, 10, 0, 0, 0, time.UTC)
+	env.fake.SetLimitMessage(t, true, "Claude usage limit reached. Your limit will reset at 3pm (UTC).")
+
+	for i := 0; i < 2; i++ {
+		if err := env.loop.Cycle(context.Background()); err != nil {
+			t.Fatalf("cycle: %v", err)
+		}
+	}
+	until, held := env.loop.limitHolds.heldUntil("orca", env.clock)
+	want := time.Date(2026, 11, 9, 15, 0, 0, 0, time.UTC).Add(usageLimitResetSlack)
+	if !held || !until.Equal(want) {
+		t.Fatalf("hold until %v (held=%v), want %v from the 3pm in the error", until, held, want)
+	}
+
+	// Past the 60s retry interval but before the reset: still no launch attempt.
+	env.clock = env.clock.Add(4 * time.Hour)
+	env.fake.SetLimit(t, false)
+	for i := 0; i < 3; i++ {
+		_ = env.loop.Cycle(context.Background())
+	}
+	if n := len(env.fake.Starts()); n != 1 {
+		t.Fatalf("worker-start attempts before the reset = %d, want 1", n)
+	}
+
+	env.clock = env.clock.Add(time.Hour + 2*time.Minute)
+	env.cycleUntil(t, "launch after reset", func() bool { return len(env.fake.Starts()) == 2 })
+	if _, held := env.loop.limitHolds.heldUntil("orca", env.clock); held {
+		t.Fatal("hold still set after a successful launch")
+	}
+}
+
+// Done when 4: a relaunch after a usage limit starts a clean attempt. The
+// cancelled run's completion time and error don't carry over.
+func TestOrcaRuntimeRelaunchClearsStaleAttemptFields(t *testing.T) {
+	env := newOrcaEnv(t, oneStageOrder())
+	env.cycleUntil(t, "execute started", func() bool { return len(env.fake.Starts()) == 1 })
+	id := env.fake.LastDispatch(t)
+	env.fake.SetTranscript(t, id, "Claude usage limit reached.")
+	env.fake.Settle(t, id, "failed")
+	env.cycleUntil(t, "stage requeued", func() bool {
+		got := env.orderStages(t, "42")
+		return len(got) == 1 && got[0] == "execute:pending" && env.loop.cooks.activeCooksByOrder["42"] == nil
+	})
+	cancelled := env.loop.canonical.Orders["42"].Stages[0].Attempts[0]
+	if cancelled.Error == "" || cancelled.CompletedAt.IsZero() {
+		t.Fatalf("cancelled attempt = %+v, want error and completion time set (the fixture's premise)", cancelled)
+	}
+
+	env.clock = env.clock.Add(2 * time.Minute)
+	env.cycleUntil(t, "stage relaunched", func() bool { return len(env.fake.Starts()) == 2 })
+	attempts := env.loop.canonical.Orders["42"].Stages[0].Attempts
+	if len(attempts) != 1 {
+		t.Fatalf("attempts = %+v, want the relaunch to reuse the attempt record", attempts)
+	}
+	got := attempts[0]
+	if got.Error != "" || !got.CompletedAt.IsZero() || got.ExitCode != nil || got.Status != state.AttemptRunning {
+		t.Fatalf("relaunched attempt = %+v, want running with no stale error, completion time or exit code", got)
+	}
+}
+
+// Done when 5: a worker that finished successfully but printed a usage-limit
+// message is a success. It holds nothing and the next stage launches at once.
+func TestOrcaRuntimeSucceededWorkerPrintingLimitIsNotHeld(t *testing.T) {
+	orders := OrdersFile{Orders: []Order{{
+		ID: "42", Title: "mentions limits", Status: OrderStatusActive,
+		Stages: []Stage{
+			{TaskKey: "execute", Skill: "execute", Provider: "claude", Model: "claude-sonnet-5-5", Status: StageStatusPending},
+			{TaskKey: "quality", Skill: "quality", Provider: "claude", Model: "claude-sonnet-5-5", Status: StageStatusPending},
+		},
+	}}}
+	env := newOrcaEnv(t, orders)
+	env.cycleUntil(t, "execute started", func() bool { return len(env.fake.Starts()) == 1 })
+	id := env.fake.LastDispatch(t)
+	env.fake.SetTranscript(t, id, "Done. Note: a teammate saw Claude usage limit reached. Your limit will reset at 3pm (UTC) earlier.")
+	env.fake.Settle(t, id, "succeeded")
+
+	env.cycleUntil(t, "quality started with no clock advance", func() bool { return len(env.fake.Starts()) == 2 })
+	if _, held := env.loop.limitHolds.heldUntil("orca", env.clock); held {
+		t.Fatal("runtime held after a successful worker")
+	}
+	if got := env.orderStages(t, "42"); got[0] != "execute:completed" {
+		t.Fatalf("stages = %v, want execute completed", got)
 	}
 }

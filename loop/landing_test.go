@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -20,6 +21,8 @@ type fakeLander struct {
 	merged   []PullRequest
 	pushErr  error
 	mergeErr error
+	deadline bool // the last MarkReadyAndMerge context had a deadline
+	pending  int  // MarkReadyAndMerge returns ErrChecksPending this many times first
 }
 
 func (f *fakeLander) PushAndEnsureDraft(_ context.Context, dir string, spec PRSpec) (PullRequest, error) {
@@ -28,10 +31,15 @@ func (f *fakeLander) PushAndEnsureDraft(_ context.Context, dir string, spec PRSp
 	if f.pushErr != nil {
 		return PullRequest{}, f.pushErr
 	}
-	return PullRequest{URL: "https://example.test/pr/1", Branch: "b", IsDraft: len(f.merged) == 0}, nil
+	return PullRequest{URL: "https://example.test/pr/1", Branch: spec.Branch, IsDraft: len(f.merged) == 0}, nil
 }
 
-func (f *fakeLander) MarkReadyAndMerge(_ context.Context, _ string, pr PullRequest) error {
+func (f *fakeLander) MarkReadyAndMerge(ctx context.Context, _ string, pr PullRequest) error {
+	_, f.deadline = ctx.Deadline()
+	if f.pending > 0 {
+		f.pending--
+		return ErrChecksPending
+	}
 	if f.mergeErr != nil {
 		return f.mergeErr
 	}
@@ -56,6 +64,7 @@ func newLandingHarness(t *testing.T, runMode string, stages int) *landingHarness
 	}
 	order := testOrder("42", "execute", "execute", "claude", "claude-opus-4-6")
 	order.Title = "Land through a PR"
+	order.Tier = "none" // these tests are about landing, not the review gate
 	for i := 1; i < stages; i++ {
 		order.Stages = append(order.Stages, Stage{TaskKey: "reflect", Skill: "reflect", Provider: "claude", Model: "claude-opus-4-6", Status: StageStatusPending})
 	}
@@ -64,6 +73,7 @@ func newLandingHarness(t *testing.T, runMode string, stages int) *landingHarness
 	cfg := config.DefaultConfig()
 	cfg.Mode = runMode
 	cfg.Landing.Mode = config.LandingModePR
+	cfg.Landing.CloseIssues = true
 	h.l = New(projectDir, "noodle", cfg, Dependencies{
 		Runtimes:   map[string]loopruntime.Runtime{"process": h.rt},
 		Worktree:   h.wt,
@@ -130,12 +140,12 @@ func TestPRLandingPushesDraftAfterExecuteAndMergesAfterLastStage(t *testing.T) {
 		t.Fatalf("backlog done calls = %#v", h.ar.doneCalls)
 	}
 	if h.specs0Closes(t) == false {
-		t.Fatal("PR body should reference the numeric issue")
+		t.Fatal("PR body should close the numeric GitHub issue")
 	}
 }
 
 func (h *landingHarness) specs0Closes(t *testing.T) bool {
-	return len(h.ln.specs) > 0 && contains(h.ln.specs[0].Body, "Refs #42")
+	return len(h.ln.specs) > 0 && contains(h.ln.specs[0].Body, "Closes #42")
 }
 
 func contains(s, sub string) bool {
@@ -201,6 +211,86 @@ func TestPRLandingMergeRefusedFailsStageWithoutDone(t *testing.T) {
 	}
 }
 
+// Gantry's checks start on the final push. The order must wait for them, not
+// fail, and the loop merges by itself once they pass.
+func TestPRLandingWaitsForChecksThenMerges(t *testing.T) {
+	h := newLandingHarness(t, "auto", 1)
+	h.ln.pending = 2
+
+	h.runStage(t, 1)
+	review, parked := h.l.cooks.pendingReview["42"]
+	if !parked || !strings.HasPrefix(review.reason, awaitingChecksPrefix) {
+		t.Fatalf("pending review = %+v (parked=%v), want parked waiting for checks", review, parked)
+	}
+	if len(h.ar.doneCalls) != 0 || len(h.wt.cleaned) != 0 {
+		t.Fatalf("order finished while checks were pending: done=%v cleaned=%v", h.ar.doneCalls, h.wt.cleaned)
+	}
+	if o, _ := h.l.orderByID("42"); o.Status == OrderStatusFailed {
+		t.Fatal("order failed while checks were pending")
+	}
+
+	// Within the poll interval nothing is retried.
+	h.l.lastChecksPoll = time.Now()
+	if err := h.l.Cycle(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if h.ln.pending != 1 {
+		t.Fatalf("retried inside the poll interval: pending left = %d", h.ln.pending)
+	}
+
+	// Checks still running: stays parked.
+	h.l.lastChecksPoll = time.Time{}
+	if err := h.l.Cycle(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if _, still := h.l.cooks.pendingReview["42"]; !still || len(h.ln.merged) != 0 {
+		t.Fatalf("parked=%v merged=%d, want still waiting", still, len(h.ln.merged))
+	}
+
+	// Checks pass: the loop merges and finishes the order unasked.
+	h.l.lastChecksPoll = time.Time{}
+	if err := h.l.Cycle(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(h.ln.merged) != 1 {
+		t.Fatalf("merges = %d, want 1 once checks passed", len(h.ln.merged))
+	}
+	if _, still := h.l.cooks.pendingReview["42"]; still {
+		t.Fatal("still parked after merging")
+	}
+	if len(h.ar.doneCalls) != 1 || len(h.wt.cleaned) != 1 {
+		t.Fatalf("done=%v cleaned=%v, want both once merged", h.ar.doneCalls, h.wt.cleaned)
+	}
+}
+
+func TestPRLandingWaitingPRRefusedAfterChecksStaysParkedWithReason(t *testing.T) {
+	h := newLandingHarness(t, "auto", 1)
+	h.ln.pending = 1
+	h.runStage(t, 1)
+
+	h.ln.mergeErr = errors.New("a required check failed")
+	h.l.lastChecksPoll = time.Time{}
+	if err := h.l.Cycle(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	review, parked := h.l.cooks.pendingReview["42"]
+	if !parked || !strings.Contains(review.reason, "a required check failed") {
+		t.Fatalf("pending review = %+v (parked=%v), want parked with the refusal", review, parked)
+	}
+	if len(h.ar.doneCalls) != 0 {
+		t.Fatal("order marked done though the merge was refused")
+	}
+	// A refusal is not retried by itself: a human decides.
+	h.ln.mergeErr = nil
+	h.l.lastChecksPoll = time.Time{}
+	if err := h.l.Cycle(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(h.ln.merged) != 0 {
+		t.Fatal("retried a refused merge without a human")
+	}
+}
+
 func TestLocalLandingStillMergesLocally(t *testing.T) {
 	h := newLandingHarness(t, "auto", 1)
 	h.l.config.Landing.Mode = config.LandingModeLocal
@@ -225,4 +315,12 @@ func TestPRLandingApprovingNonFinalStageDoesNotShip(t *testing.T) {
 	if len(h.ln.merged) != 0 || len(h.wt.cleaned) != 0 {
 		t.Fatalf("non-final approval shipped: merged=%d cleaned=%v", len(h.ln.merged), h.wt.cleaned)
 	}
+}
+
+// localLandingConfig is the default config with landing mode "local". Most
+// loop tests exercise the local merge pipeline; PR landing tests set "pr".
+func localLandingConfig() config.Config {
+	cfg := config.DefaultConfig()
+	cfg.Landing.Mode = config.LandingModeLocal
+	return cfg
 }

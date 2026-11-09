@@ -82,7 +82,15 @@ func (l *Loop) spawnCook(ctx context.Context, cand dispatchCandidate, order Orde
 			resumePrompt = stringx.JoinNonEmpty("\n\n", hint, resumePrompt)
 		}
 	}
-	prompt := buildCookPrompt(cand.OrderID, stage, order.Plan, order.Title, order.Rationale, resumePrompt)
+	if l.config.Landing.PR() {
+		l.clearGateFile(order, stage)
+	}
+	resumePrompt = stringx.JoinNonEmpty("\n\n", l.gateNote(order, stage), resumePrompt)
+	rationale := order.Rationale
+	if gateStageKey(stage) == gateVerifyKey && l.config.Landing.PR() {
+		rationale = "" // a verifier works from the issue, not the scheduler's reasoning
+	}
+	prompt := buildCookPrompt(cand.OrderID, stage, order.Plan, order.Title, rationale, resumePrompt)
 
 	taskType, _ := l.registry.ByKey(stage.TaskKey)
 	stageProvider, stageModel := l.config.ResolveStageRouting(nonEmpty(stage.TaskKey, stage.Skill), stage.Provider, stage.Model)
@@ -176,6 +184,8 @@ func (l *Loop) dispatchSession(ctx context.Context, req loopruntime.DispatchRequ
 	}
 
 	req.Runtime = runtimeName
+	// Every launch passes here, so the deny list cannot be skipped by a new call site.
+	req.DenyProviders = l.config.ForeignProviders(req.Provider)
 	session, err := runtime.Dispatch(ctx, req)
 	if err == nil {
 		l.releaseRuntime(runtimeName)
@@ -297,7 +307,17 @@ func (l *Loop) ensureWorktree(name string) (bool, error) {
 		return false, fmt.Errorf("stat worktree path %s: %w", path, err)
 	}
 
-	if err := l.deps.Worktree.Create(name); err != nil {
+	var createOpts []worktree.CreateOpts
+	if l.config.Landing.PR() {
+		// Branch from the remote's current default branch, not local main,
+		// which is stale once an earlier order's PR has merged.
+		from, err := fetchBase(l.projectDir, l.config.Landing.Base)
+		if err != nil {
+			return false, err
+		}
+		createOpts = append(createOpts, worktree.CreateOpts{From: from})
+	}
+	if err := l.deps.Worktree.Create(name, createOpts...); err != nil {
 		if isWorktreeAlreadyExistsError(err) {
 			return false, nil
 		}

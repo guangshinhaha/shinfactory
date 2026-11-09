@@ -26,7 +26,7 @@ Signals opens the task and stops. shinfactory decides when that task runs and wh
 
 Full reasoning: [the decision record](https://github.com/guangshinhaha/shinstack/blob/main/docs/decisions/shinstack-vs-shinfactory.md).
 
-Today, the `execute`, `plan`, `quality` and `adversarial-review` skills still rely on shinstack. See [#17](https://github.com/guangshinhaha/shinfactory/issues/17).
+Each tool works without the other two and stays compatible when they are present. shinfactory's skills use shinstack when it is installed (they load `shinstack:craft`, read its principles and write friction notes to its file) and carry a short built-in fallback when it isn't, so a stage never fails on a missing skill.
 
 ## Install
 
