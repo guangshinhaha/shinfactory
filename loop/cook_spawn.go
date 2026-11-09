@@ -130,6 +130,9 @@ func (l *Loop) spawnCook(ctx context.Context, cand dispatchCandidate, order Orde
 		dispatchedRuntime = "process"
 	}
 
+	// The running cook records what it was dispatched on; the queued stage in
+	// orders keeps no resolved routing.
+	stage.Provider, stage.Model = stageProvider, stageModel
 	cook := &cookHandle{
 		cookIdentity: cookIdentity{
 			orderID:    cand.OrderID,

@@ -78,6 +78,9 @@ func (l *Loop) controlAddStage(cmd ControlCommand) error {
 	if taskKey == "" {
 		return fmt.Errorf("add-stage requires task_key")
 	}
+	if err := l.config.ValidateStageProvider(cmd.Provider); err != nil {
+		return err
+	}
 
 	return l.mutateOrdersState(func(orders *OrdersFile) (bool, error) {
 		for i := range orders.Orders {

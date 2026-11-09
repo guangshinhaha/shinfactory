@@ -42,4 +42,8 @@ Without that line, a stage asking for `codex` runs on its role's Claude model.
 sensitive = true
 ```
 
-Every stage stays on `routing.defaults.provider`. A role that names another provider is a fatal config error, and the loop overrides any stage that asks for one.
+Every stage stays on `routing.defaults.provider`. A role that names another provider is a fatal config error. An order or control command whose stage names another provider is rejected when it is read, instead of being rerouted silently.
+
+Routing resolves when a stage is dispatched, so editing `[routing.roles]` also changes stages already queued. A stage that names its own model keeps it.
+
+A `routing.defaults` with `provider = "codex"` needs its own `model`; the claude default model is not filled in for it.

@@ -42,10 +42,59 @@ func TestIntegrationStagesDispatchWithRoleModel(t *testing.T) {
 	}
 }
 
-func TestScheduleOrderUsesSchedulerRole(t *testing.T) {
+// Routing resolves at dispatch only: a queued stage keeps no provider or model
+// of its own, so editing [routing.roles] reaches orders already in the queue.
+func TestQueuedStagesKeepNoResolvedRouting(t *testing.T) {
+	orders := OrdersFile{Orders: []Order{
+		{ID: "first", Title: "first", Status: OrderStatusActive,
+			Stages: []Stage{{TaskKey: "execute", Skill: "execute", Status: StageStatusPending}}},
+		{ID: "queued", Title: "queued", Status: OrderStatusActive,
+			Stages: []Stage{{TaskKey: "execute", Skill: "execute", Status: StageStatusPending}}},
+	}}
+	env := newIntegrationEnv(t, orders, func(ic *integrationCfg) {
+		ic.cfg.Mode = "auto"
+		ic.cfg.Concurrency.MaxConcurrency = 1
+	})
+	seedCanonicalFromOrders(env.loop, orders)
+	if err := env.loop.Cycle(context.Background()); err != nil {
+		t.Fatalf("cycle: %v", err)
+	}
+	got, err := env.loop.currentOrders()
+	if err != nil {
+		t.Fatalf("read orders: %v", err)
+	}
+	for _, o := range got.Orders {
+		for _, st := range o.Stages {
+			if st.Provider != "" || st.Model != "" {
+				t.Errorf("order %s stage %s persisted routing %s/%s, want none", o.ID, st.TaskKey, st.Provider, st.Model)
+			}
+		}
+	}
+	if len(env.rt.calls) != 1 || env.rt.calls[0].Model != "claude-sonnet-5-5" {
+		t.Fatalf("dispatch calls = %+v, want one on the builder role model", env.rt.calls)
+	}
+
+	// Edit the role after the first dispatch; the still-queued stage resolves
+	// against the new table.
+	env.loop.config.Routing.Roles["builder"] = config.ModelPolicy{Provider: "claude", Model: "claude-haiku-5-5"}
+	var queued Stage
+	for _, o := range got.Orders {
+		if o.ID == "queued" {
+			queued = o.Stages[0]
+		}
+	}
+	if _, model := env.loop.config.ResolveStageRouting(queued.TaskKey, queued.Provider, queued.Model); model != "claude-haiku-5-5" {
+		t.Errorf("queued stage resolved to %q after role edit, want claude-haiku-5-5", model)
+	}
+}
+
+func TestScheduleOrderResolvesSchedulerRoleAtDispatch(t *testing.T) {
 	cfg := config.DefaultConfig()
 	stage := scheduleOrder(cfg, "").Stages[0]
-	if stage.Provider != "claude" || stage.Model != "claude-haiku-5-5" {
-		t.Fatalf("scheduler stage = %s/%s, want claude/claude-haiku-5-5", stage.Provider, stage.Model)
+	if stage.Provider != "" || stage.Model != "" {
+		t.Fatalf("schedule stage persisted %s/%s, want none", stage.Provider, stage.Model)
+	}
+	if p, m := cfg.ResolveStageRouting(stage.TaskKey, stage.Provider, stage.Model); p != "claude" || m != "claude-haiku-5-5" {
+		t.Fatalf("schedule stage resolves to %s/%s, want claude/claude-haiku-5-5", p, m)
 	}
 }

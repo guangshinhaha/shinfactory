@@ -914,3 +914,31 @@ func TestFailedOrderRequiresRequeueBeforeDispatch(t *testing.T) {
 		t.Fatalf("candidates = %d, want 1 after requeue", len(candidates))
 	}
 }
+
+func TestControlRejectsStageProviderOnSensitiveRepo(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.Routing.Sensitive = true
+	projectDir := t.TempDir()
+	ordersPath := filepath.Join(projectDir, ".noodle", "orders.json")
+	if err := writeOrdersAtomic(ordersPath, OrdersFile{Orders: []Order{}}); err != nil {
+		t.Fatalf("write orders: %v", err)
+	}
+	l := New(projectDir, "noodle", cfg, Dependencies{
+		Runtimes:   map[string]loopruntime.Runtime{"process": newMockRuntime()},
+		Worktree:   &fakeWorktree{},
+		Adapter:    &fakeAdapterRunner{},
+		Mise:       &fakeMise{},
+		Monitor:    fakeMonitor{},
+		Registry:   testLoopRegistry(),
+		Now:        time.Now,
+		OrdersFile: ordersPath,
+	})
+	err := l.controlEnqueue(ControlCommand{Action: "enqueue", OrderID: "t", TaskKey: "execute", Provider: "codex", Model: "gpt-5.4"})
+	if err == nil || !strings.Contains(err.Error(), "routing.sensitive") {
+		t.Fatalf("enqueue err = %v, want routing.sensitive rejection", err)
+	}
+	got, _ := readOrders(ordersPath)
+	if len(got.Orders) != 0 {
+		t.Errorf("rejected enqueue still wrote %d orders", len(got.Orders))
+	}
+}

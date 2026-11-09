@@ -429,7 +429,3 @@ func NormalizeAndValidateOrders(of OrdersFile, reg taskreg.Registry, cfg config.
 	return orderx.NormalizeAndValidateOrders(of, reg, cfg)
 }
 
-// ApplyOrderRoutingDefaults delegates to orderx.
-func ApplyOrderRoutingDefaults(of OrdersFile, reg taskreg.Registry, cfg config.Config) (OrdersFile, bool) {
-	return orderx.ApplyOrderRoutingDefaults(of, reg, cfg)
-}
