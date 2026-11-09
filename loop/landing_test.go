@@ -21,7 +21,8 @@ type fakeLander struct {
 	merged   []PullRequest
 	pushErr  error
 	mergeErr error
-	pending  int // MarkReadyAndMerge returns ErrChecksPending this many times first
+	deadline bool // the last MarkReadyAndMerge context had a deadline
+	pending  int  // MarkReadyAndMerge returns ErrChecksPending this many times first
 }
 
 func (f *fakeLander) PushAndEnsureDraft(_ context.Context, dir string, spec PRSpec) (PullRequest, error) {
@@ -33,7 +34,8 @@ func (f *fakeLander) PushAndEnsureDraft(_ context.Context, dir string, spec PRSp
 	return PullRequest{URL: "https://example.test/pr/1", Branch: spec.Branch, IsDraft: len(f.merged) == 0}, nil
 }
 
-func (f *fakeLander) MarkReadyAndMerge(_ context.Context, _ string, pr PullRequest) error {
+func (f *fakeLander) MarkReadyAndMerge(ctx context.Context, _ string, pr PullRequest) error {
+	_, f.deadline = ctx.Deadline()
 	if f.pending > 0 {
 		f.pending--
 		return ErrChecksPending

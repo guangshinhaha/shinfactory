@@ -2,6 +2,7 @@ package loop
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -137,5 +138,37 @@ func TestGHLanderDoesNotOpenAnotherPRForABranchAlreadyMerged(t *testing.T) {
 	}
 	if err := (ghLander{}).MarkReadyAndMerge(context.Background(), work, pr); err != nil {
 		t.Fatalf("a merged PR must count as shipped: %v", err)
+	}
+}
+
+// No checks reported yet and the PR BLOCKED is how a fresh push looks; it is
+// waiting, not refused.
+func TestGHLanderTreatsABlockedPRWithNoChecksYetAsPending(t *testing.T) {
+	t.Setenv("SHINFACTORY_ALLOW_REAL_GH", "1")
+	bin := t.TempDir()
+	logPath := filepath.Join(t.TempDir(), "calls.log")
+	script := "#!/bin/sh\necho \"$*\" >> \"" + logPath + "\"\n" +
+		"case \"$1 $2\" in\n" +
+		"\"pr view\") echo '{\"headRefName\":\"42-0-task\",\"state\":\"OPEN\",\"isDraft\":false,\"isCrossRepository\":false,\"mergeStateStatus\":\"BLOCKED\",\"statusCheckRollup\":[]}' ;;\n" +
+		"*) echo refused >&2; exit 1 ;;\nesac\n"
+	if err := os.WriteFile(filepath.Join(bin, "gh"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	err := (ghLander{}).MarkReadyAndMerge(context.Background(), t.TempDir(), PullRequest{URL: "https://github.test/o/r/pull/7", Branch: "42-0-task"})
+	if !errors.Is(err, ErrChecksPending) {
+		t.Fatalf("err = %v, want ErrChecksPending", err)
+	}
+	if strings.Contains(ghCalls(logPath), "pr merge") {
+		t.Fatal("tried to merge a PR that had no checks yet")
+	}
+}
+
+// A hung gh must not stall Cycle: every ship attempt has a deadline.
+func TestShipAttemptHasADeadline(t *testing.T) {
+	h := newLandingHarness(t, "auto", 1)
+	h.runStage(t, 1)
+	if !h.ln.deadline {
+		t.Fatal("MarkReadyAndMerge ran without a deadline")
 	}
 }

@@ -189,6 +189,12 @@ func (p prState) checksPending() bool {
 	if p.MergeStateStatus == "UNKNOWN" {
 		return true
 	}
+	// Right after a push GitHub reports no checks yet and the PR as BLOCKED
+	// by the ruleset that is about to attach them. Wait; a PR blocked for
+	// another reason (a review) stays parked for a human, never failed.
+	if p.MergeStateStatus == "BLOCKED" && len(p.StatusCheckRollup) == 0 {
+		return true
+	}
 	for _, c := range p.StatusCheckRollup {
 		if c.Status != "" && c.Status != "COMPLETED" {
 			return true
@@ -383,6 +389,9 @@ func (l *Loop) completeWithPR(ctx context.Context, cook *cookHandle, hasCommits 
 // shipPR marks the PR ready and merges it through the repository's checks,
 // then removes the order's worktree.
 func (l *Loop) shipPR(ctx context.Context, cook *cookHandle, pr PullRequest) error {
+	// A hung gh must not stall the loop: this runs inside Cycle.
+	ctx, cancel := context.WithTimeout(ctx, shipTimeout)
+	defer cancel()
 	if err := l.lander().MarkReadyAndMerge(ctx, cook.worktreePath, pr); err != nil {
 		return err
 	}
@@ -394,6 +403,9 @@ func (l *Loop) shipPR(ctx context.Context, cook *cookHandle, pr PullRequest) err
 // awaitingChecksPrefix marks a parked final stage whose PR waits for checks.
 // The loop merges it by itself once they pass; no human approval is needed.
 const awaitingChecksPrefix = "waiting for required checks"
+
+// shipTimeout bounds one ready-and-merge attempt.
+const shipTimeout = 2 * time.Minute
 
 // checksPollInterval is how often a waiting PR is re-checked.
 const checksPollInterval = 30 * time.Second
@@ -430,7 +442,7 @@ func (l *Loop) retryAwaitingChecks(ctx context.Context) error {
 			worktreePath: pending.worktreePath,
 			session:      &adoptedSession{id: pending.sessionID, status: "completed"},
 		}
-		err := l.shipParkedPR(cook, "required checks passed")
+		err := l.shipParkedPR(ctx, cook, "required checks passed")
 		switch {
 		case err == nil, errors.Is(err, ErrChecksPending):
 		default:
@@ -447,13 +459,12 @@ func (l *Loop) retryAwaitingChecks(ctx context.Context) error {
 // approvePRShip is controlMerge in landing mode "pr": the human approved the
 // parked final stage, so ready and merge its PR, then finish the order.
 func (l *Loop) approvePRShip(cook *cookHandle) error {
-	return l.shipParkedPR(cook, "approved by user")
+	return l.shipParkedPR(context.Background(), cook, "approved by user")
 }
 
 // shipParkedPR ships the parked final stage's PR and finishes the order.
 // reason is recorded on the review approval.
-func (l *Loop) shipParkedPR(cook *cookHandle, reason string) error {
-	ctx := context.Background()
+func (l *Loop) shipParkedPR(ctx context.Context, cook *cookHandle, reason string) error {
 	if !l.isFinalStage(cook) {
 		// A parked non-final stage (e.g. a blocking stage message): approving
 		// it moves the order on; only the last stage ships the PR.

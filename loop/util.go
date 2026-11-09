@@ -1,6 +1,8 @@
 package loop
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -58,6 +60,12 @@ func nonEmpty(value, fallback string) string {
 // Tokens are dasherized so branch/worktree names stay git- and fs-safe.
 func cookBaseName(orderID string, stageIndex int, taskKey string) string {
 	orderToken := shellx.SanitizeToken(orderID, "order")
+	if orderToken != orderID {
+		// Sanitising is lossy ("feat/x" and "Feat-X" collapse, long IDs are cut),
+		// and two orders must never share a branch, and so a PR.
+		sum := sha256.Sum256([]byte(orderID))
+		orderToken = truncateToken(orderToken, 32) + "-" + hex.EncodeToString(sum[:4])
+	}
 	taskToken := shellx.SanitizeToken(taskKey, "task")
 	return fmt.Sprintf("%s-%d-%s", orderToken, stageIndex, taskToken)
 }

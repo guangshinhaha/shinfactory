@@ -1032,8 +1032,10 @@ func TestCookBaseName(t *testing.T) {
 
 func TestCookBaseNameDasherizesUnsafeTokens(t *testing.T) {
 	name := cookBaseName("Plan 49/Phase:10", 2, "Request Changes")
-	if name != "plan-49-phase-10-2-request-changes" {
-		t.Fatalf("cookBaseName = %q, want plan-49-phase-10-2-request-changes", name)
+	// An ID that needs sanitising gets a hash of the original, so two IDs
+	// that sanitise alike do not share a branch.
+	if !strings.HasPrefix(name, "plan-49-phase-10-") || !strings.HasSuffix(name, "-2-request-changes") {
+		t.Fatalf("cookBaseName = %q, want plan-49-phase-10-<hash>-2-request-changes", name)
 	}
 }
 
