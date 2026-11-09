@@ -175,6 +175,7 @@ func (g ghLander) find(ctx context.Context, dir, branch, base string) (PullReque
 // prState is the slice of `gh pr view` the ship step decides on.
 type prState struct {
 	HeadRefName       string `json:"headRefName"`
+	HeadRefOid        string `json:"headRefOid"`
 	State             string `json:"state"`
 	IsDraft           bool   `json:"isDraft"`
 	IsCrossRepository bool   `json:"isCrossRepository"`
@@ -207,7 +208,7 @@ func (p prState) checksPending() bool {
 }
 
 func (g ghLander) view(ctx context.Context, dir string, pr PullRequest) (prState, error) {
-	out, err := g.run(ctx, dir, "gh", "pr", "view", pr.URL, "--json", "headRefName,state,isDraft,isCrossRepository,mergeStateStatus,statusCheckRollup")
+	out, err := g.run(ctx, dir, "gh", "pr", "view", pr.URL, "--json", "headRefName,headRefOid,state,isDraft,isCrossRepository,mergeStateStatus,statusCheckRollup")
 	if err != nil {
 		return prState{}, err
 	}
@@ -245,10 +246,19 @@ func (g ghLander) MarkReadyAndMerge(ctx context.Context, dir string, pr PullRequ
 	if st.checksPending() {
 		return fmt.Errorf("%w on %s", ErrChecksPending, pr.URL)
 	}
+	// GitHub can lag a push: merging a stale head would ship without the final
+	// commits. Merge exactly the commit this worktree holds.
+	head, err := g.run(ctx, dir, "git", "rev-parse", "HEAD")
+	if err != nil {
+		return err
+	}
+	if st.HeadRefOid != head {
+		return fmt.Errorf("%w: %s shows head %.12s, not the pushed %.12s", ErrChecksPending, pr.URL, st.HeadRefOid, head)
+	}
 	// A plain merge: GitHub refuses it while a required check is failing, and
 	// the order is then parked with that reason. --auto would return success
 	// while only queueing the merge. There is deliberately no --admin.
-	if _, err := g.run(ctx, dir, "gh", "pr", "merge", pr.URL, "--squash"); err != nil {
+	if _, err := g.run(ctx, dir, "gh", "pr", "merge", pr.URL, "--squash", "--match-head-commit", head); err != nil {
 		return err
 	}
 	// A merge queue can accept the merge and return before it lands.
@@ -465,6 +475,9 @@ func (l *Loop) approvePRShip(cook *cookHandle) error {
 // shipParkedPR ships the parked final stage's PR and finishes the order.
 // reason is recorded on the review approval.
 func (l *Loop) shipParkedPR(ctx context.Context, cook *cookHandle, reason string) error {
+	// Covers the push and PR lookup too: a hung gh must not stall Cycle.
+	ctx, cancel := context.WithTimeout(ctx, shipTimeout)
+	defer cancel()
 	if !l.isFinalStage(cook) {
 		// A parked non-final stage (e.g. a blocking stage message): approving
 		// it moves the order on; only the last stage ships the PR.

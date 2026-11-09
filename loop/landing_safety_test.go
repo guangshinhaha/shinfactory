@@ -172,3 +172,27 @@ func TestShipAttemptHasADeadline(t *testing.T) {
 		t.Fatal("MarkReadyAndMerge ran without a deadline")
 	}
 }
+
+// GitHub can still show the previous head right after a push. Merging then
+// would ship without the final stage's commits.
+func TestGHLanderWaitsWhenThePRHeadIsBehindTheWorktree(t *testing.T) {
+	t.Setenv("SHINFACTORY_ALLOW_REAL_GH", "1")
+	work := newOrderRepo(t, "42-0-task")
+	bin := t.TempDir()
+	logPath := filepath.Join(t.TempDir(), "calls.log")
+	script := "#!/bin/sh\necho \"$*\" >> \"" + logPath + "\"\n" +
+		"case \"$1 $2\" in\n" +
+		"\"pr view\") echo '{\"headRefName\":\"42-0-task\",\"headRefOid\":\"0000000000000000000000000000000000000000\",\"state\":\"OPEN\",\"isDraft\":false,\"isCrossRepository\":false,\"mergeStateStatus\":\"CLEAN\",\"statusCheckRollup\":[{\"status\":\"COMPLETED\"}]}' ;;\n" +
+		"*) exit 0 ;;\nesac\n"
+	if err := os.WriteFile(filepath.Join(bin, "gh"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	err := (ghLander{}).MarkReadyAndMerge(context.Background(), work, PullRequest{URL: "https://github.test/o/r/pull/7", Branch: "42-0-task"})
+	if !errors.Is(err, ErrChecksPending) {
+		t.Fatalf("err = %v, want ErrChecksPending while GitHub shows an older head", err)
+	}
+	if strings.Contains(ghCalls(logPath), "pr merge") {
+		t.Fatal("merged a PR whose head is not the worktree's HEAD")
+	}
+}
