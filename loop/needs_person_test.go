@@ -241,3 +241,77 @@ func TestStopForPersonKeepsDetailOutOfCommentsForSensitiveRepos(t *testing.T) {
 		t.Fatalf("sensitive stop still has to comment and label:\n%s", log)
 	}
 }
+
+// spendCapEnv sets up a pending order 7 whose stage the cycle would launch,
+// with caps from tweak and the real backlog-stop script on a stub gh.
+func spendCapEnv(t *testing.T, tweak func(*config.SpendConfig)) (*integrationEnv, string) {
+	t.Helper()
+	logPath := stubStopGH(t)
+	orders := OrdersFile{Orders: []Order{{
+		ID: "7", Title: "runaway", Status: OrderStatusActive,
+		Stages: []Stage{{TaskKey: "execute", Skill: "execute", Provider: "claude", Model: "claude-opus-4-6", Status: StageStatusPending}},
+	}}}
+	env := newIntegrationEnv(t, orders, func(ic *integrationCfg) {
+		ic.cfg.Mode = "auto"
+		tweak(&ic.cfg.Spend)
+	})
+	env.loop.deps.Adapter = githubStopRunner(t, env.projectDir)
+	seedCanonicalFromOrders(env.loop, orders)
+	return env, logPath
+}
+
+func assertSpendStop(t *testing.T, env *integrationEnv, logPath, wantReason string) {
+	t.Helper()
+	log := ghLog(t, logPath)
+	if strings.Count(log, "issue comment 7") != 1 || !strings.Contains(log, wantReason) || !strings.Contains(log, "Spending cap reached") {
+		t.Fatalf("want one comment on issue 7 saying %q:\n%s", wantReason, log)
+	}
+	if !strings.Contains(log, "issue edit 7 --remove-label ready --add-label needs-shin") {
+		t.Fatalf("issue 7 not labelled needs-shin:\n%s", log)
+	}
+	if got := mustOrder(t, env.loop.deps.OrdersFile).Status; got != OrderStatusFailed {
+		t.Fatalf("order status = %q, want failed", got)
+	}
+	if got := len(env.loop.cooks.activeCooksByOrder); got != 0 {
+		t.Fatalf("active cooks = %d, want 0: the capped stage must not launch", got)
+	}
+}
+
+// Cap 1: an order that already ran its stage max_attempts times stops.
+func TestOrderStopsAtTheAttemptCap(t *testing.T) {
+	env, logPath := spendCapEnv(t, func(s *config.SpendConfig) { s.MaxAttempts = 3; s.MaxCostUSD = 1000 })
+	for i := 0; i < 3; i++ {
+		env.loop.recordStageLaunch("7", "execute")
+	}
+	if err := env.loop.Cycle(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	assertSpendStop(t, env, logPath, `it already ran the "execute" stage 3 times (cap 3)`)
+}
+
+// Cap 2: an order whose finished stages cost the ceiling stops.
+func TestOrderStopsAtTheCostCap(t *testing.T) {
+	env, logPath := spendCapEnv(t, func(s *config.SpendConfig) { s.MaxAttempts = 10; s.MaxCostUSD = 5 })
+	env.loop.recordStageCost("7", 3.25)
+	env.loop.recordStageCost("7", 2)
+	if err := env.loop.Cycle(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	assertSpendStop(t, env, logPath, "its stages already cost $5.25 (cap $5.00)")
+}
+
+// Under both caps the stage launches and the ledger counts the attempt.
+func TestOrderUnderTheCapsLaunches(t *testing.T) {
+	env, logPath := spendCapEnv(t, func(s *config.SpendConfig) { s.MaxAttempts = 3; s.MaxCostUSD = 5 })
+	env.loop.recordStageLaunch("7", "execute")
+	env.loop.recordStageCost("7", 1)
+	if err := env.loop.Cycle(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if log := ghLog(t, logPath); log != "" {
+		t.Fatalf("an order under its caps reached a person:\n%s", log)
+	}
+	if got := env.loop.orderSpendOf("7").Attempts["execute"]; got != 2 {
+		t.Fatalf("execute attempts = %d, want 2 after the launch", got)
+	}
+}

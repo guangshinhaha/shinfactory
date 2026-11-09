@@ -51,6 +51,9 @@ func (l *Loop) spawnCook(ctx context.Context, cand dispatchCandidate, order Orde
 	if l.runtimeHeld(runtimeName) {
 		return nil // out of usage: the stage stays pending until a launch can succeed
 	}
+	if why := l.overSpendCap(cand.OrderID, spendTaskKey(stage)); why != "" {
+		return l.stopOverCap(ctx, cand, stage, why)
+	}
 
 	// Belt-and-suspenders: give the registry one last chance to pick up
 	// the skill before dispatch, in case fsnotify missed an event.
@@ -155,6 +158,7 @@ func (l *Loop) spawnCook(ctx context.Context, cand dispatchCandidate, order Orde
 		dispatchedRuntime: dispatchedRuntime,
 	}
 	l.trackCookStarted(cook)
+	l.recordStageLaunch(cand.OrderID, spendTaskKey(stage))
 	l.cooks.activeCooksByOrder[cand.OrderID] = cook
 	l.startSessionWatcher(ctx, cook, false)
 
