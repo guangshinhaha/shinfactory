@@ -104,8 +104,10 @@ func (l *Loop) processControlCommands() error {
 	if len(acks) > 0 {
 		// A caller reads status.json the moment it sees the ack, so the file
 		// must already show what the commands changed.
+		// Best effort: the commands are applied, so a failed stamp must not
+		// keep the acks back. The cycle's own stamp retries.
 		if err := l.stampStatus(); err != nil {
-			return fmt.Errorf("stamp status after control commands: %w", err)
+			l.logger.Warn("could not stamp status after control commands", "error", err)
 		}
 	}
 	if l.TestControlAckBarrier != nil {

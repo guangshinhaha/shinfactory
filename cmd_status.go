@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/guangshinhaha/shinfactory/adapter"
 	"github.com/guangshinhaha/shinfactory/cmdmeta"
@@ -51,7 +52,9 @@ func runStatusJSON(app *App, w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	stopped, err := app.backlogStopped(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), stoppedTimeout)
+	defer cancel()
+	stopped, err := app.backlogStopped(ctx)
 	if err != nil {
 		return err
 	}
@@ -61,6 +64,9 @@ func runStatusJSON(app *App, w io.Writer) error {
 	return enc.Encode(report)
 }
 
+// stoppedTimeout bounds the backlog call so a hung gh cannot hang status.
+const stoppedTimeout = 30 * time.Second
+
 // backlogStopped asks the backlog adapter which items wait on a person. A
 // backlog with no `stopped` script has nothing to add; a script that fails is
 // an error, because an empty needs_shin would read as "nobody is waiting".
@@ -69,7 +75,7 @@ func (a *App) backlogStopped(ctx context.Context) ([]linestatus.NeedsShin, error
 	if err != nil {
 		return nil, err
 	}
-	if a.Config.Adapters["backlog"].Scripts["stopped"] == "" {
+	if strings.TrimSpace(a.Config.Adapters["backlog"].Scripts["stopped"]) == "" {
 		return nil, nil
 	}
 	out, err := adapter.NewRunner(projectDir, a.Config).Run(ctx, "backlog", "stopped", adapter.RunOptions{})

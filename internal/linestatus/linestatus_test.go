@@ -122,3 +122,23 @@ func TestReadTreatsAnEmptySnapshotAsAnIdleLine(t *testing.T) {
 		t.Fatalf("rep = %+v, err = %v", rep, err)
 	}
 }
+
+func TestMergeNeedsShinBacklogIsAuthoritative(t *testing.T) {
+	rep := Report{NeedsShin: []NeedsShin{
+		{Order: "7", Reason: "two rounds failed"},
+		{Order: "9", Reason: "settled by a person"},
+	}}
+	rep.MergeNeedsShin([]NeedsShin{
+		{Order: "16", Title: "refused", URL: "u16"},
+		{Order: "7", Title: "seven", URL: "u7"},
+	})
+	if len(rep.NeedsShin) != 2 {
+		t.Fatalf("needs_shin = %+v, want 7 and 16 only", rep.NeedsShin)
+	}
+	if got := rep.NeedsShin[0]; got.Order != "7" || got.Reason != "two rounds failed" || got.Title != "seven" || got.URL != "u7" {
+		t.Fatalf("recorded entry = %+v, want its reason plus the backlog title and url", got)
+	}
+	if got := rep.NeedsShin[1]; got.Order != "16" || got.Title != "refused" {
+		t.Fatalf("backlog-only entry = %+v", got)
+	}
+}
