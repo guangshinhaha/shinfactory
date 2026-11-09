@@ -72,7 +72,6 @@ func (l *Loop) handlePromotionResult(result mergeResult, err error) error {
 	if len(result.Unbuildable) > 0 {
 		l.droppedOrderIDs = appendUnique(l.droppedOrderIDs, result.Unbuildable)
 		l.logger.Warn("dropped orders that name no ready issue", "orders", strings.Join(result.Unbuildable, ", "))
-		_ = l.events.Emit(LoopEventOrdersUnready, OrdersUnreadyPayload{OrderIDs: result.Unbuildable})
 	}
 	if result.EmptyPromotion {
 		l.scheduleNothingUntil = l.deps.Now().Add(5 * time.Minute)
@@ -100,6 +99,11 @@ func (l *Loop) handlePromotionResult(result mergeResult, err error) error {
 		return nil
 	}
 	l.emitPromotedOrders()
+	if len(result.Unbuildable) > 0 {
+		// Emit once the promotion is persisted: a failed step above leaves
+		// orders-next.json in place and the retry would emit it again.
+		_ = l.events.Emit(LoopEventOrdersUnready, OrdersUnreadyPayload{OrderIDs: result.Unbuildable})
+	}
 	return nil
 }
 

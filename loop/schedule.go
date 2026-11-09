@@ -157,7 +157,6 @@ func (l *Loop) spawnSchedule(ctx context.Context, order Order, attempt int, resu
 	promotionError := l.lastPromotionError
 	l.lastPromotionError = ""
 	droppedOrders := l.droppedOrderIDs
-	l.droppedOrderIDs = nil
 	failures := l.reconciledFailures
 	stageProvider, stageModel := l.config.ResolveStageRouting("schedule", stage.Provider, stage.Model)
 	req := loopruntime.DispatchRequest{
@@ -192,6 +191,7 @@ func (l *Loop) spawnSchedule(ctx context.Context, order Order, attempt int, resu
 			"error", err)
 	}
 	l.reconciledFailures = nil // clear only after successful dispatch
+	l.droppedOrderIDs = nil    // the prompt carried them; a failed dispatch keeps them for the retry
 	cook := &cookHandle{
 		cookIdentity: cookIdentity{
 			orderID:    order.ID,
