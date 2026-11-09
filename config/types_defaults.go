@@ -256,7 +256,7 @@ func DefaultConfig() Config {
 		},
 		Mode: defaultMode,
 		Concurrency: ConcurrencyConfig{
-			MaxConcurrency: 4,
+			MaxConcurrency: 2,
 		},
 		Agents: AgentsConfig{},
 		Runtime: RuntimeConfig{

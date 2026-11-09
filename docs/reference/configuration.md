@@ -29,6 +29,8 @@ Controls human oversight level.
 mode = "supervised"
 ```
 
+When the project's `CLAUDE.md` declares `shinstack-mode: auto`, `supervised` or `manual`, the factory runs in that mode and the `mode` setting is only the fallback for a repo that declares none. `auto` merges once the gate passes; `supervised` stops at the PR for your yes.
+
 ---
 
 ### `[routing]`
@@ -73,15 +75,15 @@ Controls parallel execution limits.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `max_concurrency` | int | `4` | Maximum number of concurrent agent sessions |
+| `max_concurrency` | int | `2` | Maximum number of concurrent agent sessions |
 
 ```toml
 [concurrency]
-max_concurrency = 4
+max_concurrency = 2
 ```
 
 ::: warning Cost
-Each agent consumes tokens independently. `max_concurrency = 4` means up to four concurrent API sessions. Start with `max_concurrency = 1` or `2` while you're learning the system, then scale up once you've seen the cost per session on your workload.
+Each agent consumes tokens independently. `max_concurrency = 4` means up to four concurrent API sessions. New repos start at 2; raise it with `set-max-concurrency` or `.noodle.toml` once you have seen the cost per session on your workload.
 :::
 
 ---

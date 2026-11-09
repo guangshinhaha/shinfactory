@@ -15,7 +15,7 @@ const (
 	defaultRoutingProvider = "claude"
 	defaultRoutingModel    = modelStandard
 	defaultMode            = string(state.RunModeSupervised)
-	defaultMaxConcurrency  = 4
+	defaultMaxConcurrency  = 2
 	defaultRuntimeName     = "process"
 	defaultServerPort      = 3000
 )
