@@ -159,6 +159,8 @@ func projectOrders(s state.State) []OrderProjection {
 			Title:     order.Title,
 			Plan:      append([]string(nil), order.Plan...),
 			Rationale: order.Rationale,
+			Tier:      order.Tier,
+			Round:     order.Round,
 			Stages:    projectStages(order.Stages),
 			Status:    projectOrderStatus(order.Status),
 		})
@@ -314,6 +316,8 @@ func cloneOrderProjections(orders []OrderProjection) []OrderProjection {
 			Title:     order.Title,
 			Plan:      append([]string(nil), order.Plan...),
 			Rationale: order.Rationale,
+			Tier:      order.Tier,
+			Round:     order.Round,
 			Stages:    stageCopy,
 			Status:    order.Status,
 		})
@@ -372,6 +376,8 @@ func legacyOrdersFileProjection(bundle ProjectionBundle) orderx.OrdersFile {
 			Title:     order.Title,
 			Plan:      append([]string(nil), order.Plan...),
 			Rationale: order.Rationale,
+			Tier:      order.Tier,
+			Round:     order.Round,
 			Stages:    stages,
 			Status:    legacyOrderStatus(order.Status),
 		})

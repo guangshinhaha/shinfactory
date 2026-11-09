@@ -348,6 +348,11 @@ func consumeOrdersNext(nextPath string, existing OrdersFile, backlog []adapter.B
 		idx, exists := existingIndex[order.ID]
 		if exists {
 			if shouldReplaceFailedOrder(existing.Orders[idx], order) {
+				// A rewrite must not reset the fix-round cap or lower the tier.
+				order.Round = existing.Orders[idx].Round
+				if existing.Orders[idx].Tier != "" {
+					order.Tier = existing.Orders[idx].Tier
+				}
 				existing.Orders[idx] = order
 				continue
 			}
@@ -417,6 +422,12 @@ func mergeAmendedActiveOrder(existing Order, incoming Order) (Order, bool) {
 		return existing, false
 	}
 	merged.Status = existing.Status
+	// The loop owns the fix-round count, and an amendment can't lower a tier
+	// the order already carries.
+	merged.Round = existing.Round
+	if existing.Tier != "" {
+		merged.Tier = existing.Tier
+	}
 	if reflect.DeepEqual(existing, merged) {
 		return existing, false
 	}

@@ -56,6 +56,17 @@ You test the work; the cook doesn't get to mark its own. Skip this step only for
 - If the plan phase specifies runtime checks, verify they were performed.
 - "It compiles" is not verification.
 
+## Gated orders
+
+If your stage prompt names a findings file (`.../review.md`), the order runs the review gate. Don't emit `stage_message` or `stage_fail` for the verdict; write that file instead, then exit:
+
+```
+Covered: <the diff or files you read, the review level, the kinds of problem you checked>
+Findings: none
+```
+
+or `Findings:` followed by a list, one proven finding per line starting with `- `. Review at the depth for the order's tier: none, no review; low, `/code-review low`; medium, `/code-review medium`; high, `/shinstack:blast-radius` then `/shinstack:interrogate` (when shinstack is installed). An empty file, or one with no `Covered:` line, counts as not run and fails the stage. Findings send the order back to execute on the same branch, at most 2 times; after that the order stops for a person.
+
 ## Verdict
 
 **Accept**: Emit a `stage_message` with `blocking: false`. The pipeline continues and the scheduler sees the green light.

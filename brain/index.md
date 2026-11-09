@@ -22,6 +22,7 @@
 - [[codebase/orders-must-name-a-ready-issue]]
 - [[codebase/needs-shin-stop-path]]
 - [[codebase/pr-landing-mode]]
+- [[codebase/review-gate]]
 - [[codebase/provider-routing-must-fail-loudly]]
 - [[codebase/projection-owns-snapshot-active-order-ids]]
 - [[codebase/routing-resolves-at-dispatch-only]]

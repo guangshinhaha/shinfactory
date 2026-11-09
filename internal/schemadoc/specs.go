@@ -94,6 +94,7 @@ var schemaTargets = []targetSpec{
 			"orders[].title":                 {Description: "brief order description"},
 			"orders[].plan[]":                {Description: "linked plan path(s), e.g. plans/15-bootstrap-onboarding/overview"},
 			"orders[].rationale":             {Description: "placement reason citing a rule or principle"},
+			"orders[].tier":                  {Description: "risk tier: none, low, medium (default) or high; sets the review gate (quality after execute, plus verify for high)"},
 			"orders[].stages[].do":           {Description: "task key (must match a task_types[].key from mise)"},
 			"orders[].stages[].with":         {Description: "provider for this stage (optional; the loop fills it from the stage's role in routing.roles)"},
 			"orders[].stages[].model":        {Description: "model for this stage (optional; the loop fills it from the stage's role in routing.roles)"},

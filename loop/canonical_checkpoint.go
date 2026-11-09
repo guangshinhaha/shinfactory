@@ -312,6 +312,8 @@ func (l *Loop) syncCanonicalOrderFromLegacyAt(order Order, sequence int) {
 	node.Title = strings.TrimSpace(order.Title)
 	node.Plan = slices.Clone(order.Plan)
 	node.Rationale = strings.TrimSpace(order.Rationale)
+	node.Tier = order.Tier
+	node.Round = order.Round
 	node.Status = legacyOrderStatusToCanonical(order.Status)
 	now := timeNowUTC(l.deps.Now)
 	node.UpdatedAt = now

@@ -25,6 +25,7 @@ type CompactOrder struct {
 	Title     string         `json:"title,omitempty"`
 	Plan      []string       `json:"plan,omitempty"`
 	Rationale string         `json:"rationale,omitempty"`
+	Tier      string         `json:"tier,omitempty"`
 	Stages    []CompactStage `json:"stages"`
 }
 
@@ -50,6 +51,9 @@ func ParseCompactOrders(data []byte) (CompactOrdersFile, error) {
 	}
 
 	for i, order := range compact.Orders {
+		if err := ValidateTier(order.Tier); err != nil {
+			return CompactOrdersFile{}, fmt.Errorf("order %d: %w", i, err)
+		}
 		for j, stage := range order.Stages {
 			if err := validateCompactStage(stage, i, j); err != nil {
 				return CompactOrdersFile{}, err
@@ -93,6 +97,7 @@ func ExpandCompactOrders(compact CompactOrdersFile) (OrdersFile, error) {
 			Title:     order.Title,
 			Plan:      order.Plan,
 			Rationale: order.Rationale,
+			Tier:      order.Tier,
 			Stages:    stages,
 			Status:    OrderStatusActive,
 		})

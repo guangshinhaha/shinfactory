@@ -95,6 +95,8 @@ type OrderNode struct {
 	Title     string               `json:"title"`
 	Plan      []string             `json:"plan"`
 	Rationale string               `json:"rationale"`
+	Tier      string               `json:"tier,omitempty"`
+	Round     int                  `json:"round,omitempty"`
 	Status    OrderLifecycleStatus `json:"status"`
 	Stages    []StageNode          `json:"stages"`
 	CreatedAt time.Time            `json:"created_at"`

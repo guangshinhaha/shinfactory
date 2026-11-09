@@ -57,6 +57,7 @@ An order is a unit of work with one or more stages. The scheduling agent writes 
 | `title`     | Human-readable summary                 |
 | `rationale` | Why the scheduler chose this work      |
 | `plan`      | Optional list of linked plan paths     |
+| `tier`      | `none`, `low`, `medium` (default) or `high`. Sets the review gate: `quality` after `execute`, plus `verify` for `high` |
 | `stages`    | Pipeline of stages to execute          |
 
 ## Stages
