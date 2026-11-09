@@ -1,0 +1,7 @@
+# Execute stage evidence
+
+- **Work type** (`bug`, `feature`, `refactor`) is `Order.WorkType`, wire field `work_type`, set by the scheduler from the issue's label or text. Empty = the stage runs on its own skill text. Plumbed like `Tier` (orderx, state, projection, canonical checkpoint, amendment merge).
+- **Playbook injection:** `playbookNote` (loop/stage_evidence.go) adds shinstack's `bug-fix.md` / `feature.md` / `refactoring.md` to the execute prompt. Looked up in `$SHINSTACK_DIR/playbooks`, then the newest `~/.claude/plugins/cache/shinstack/shinstack/<version>/playbooks`. Not installed = nothing added.
+- **Evidence before accepting execute** (`checkExecuteEvidence`, called in `handleCompletion`, both landing modes, so `stage_yield` is covered): run the commands under `Before a PR:` in the worktree's CLAUDE.md (none declared = none run); for a `bug`, `checkTestFirst` needs a test-only commit before the first commit touching non-test files. Failure = `failStage` + `noteRejectedStage` (same path as an agent `stage_fail`).
+- **Branch commits** come from `git rev-list HEAD --not <other branches>`. `--exclude` globs are relative to the `--branches`/`--remotes` namespace (`order-42`, not `refs/heads/order-42`); the wrong form silently excludes nothing and the list comes back empty.
+- Tests: `loop/stage_evidence_test.go`. Swap `shinstackRoots`, `runRepoCheck`, `branchCommits`; the evidence harness uses tier `none` so gate shape stays out of the way.

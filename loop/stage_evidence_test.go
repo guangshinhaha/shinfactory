@@ -1,0 +1,302 @@
+package loop
+
+import (
+	"context"
+	"errors"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/guangshinhaha/shinfactory/internal/orderx"
+)
+
+// evidenceHarness is a PR-mode order of the given work type whose execute
+// stage runs in a real directory, so the repo's CLAUDE.md can name its checks.
+func evidenceHarness(t *testing.T, workType, claudeMD string, keys ...string) *gateHarness {
+	t.Helper()
+	if len(keys) == 0 {
+		keys = []string{"execute"}
+	}
+	h := newGateHarness(t, "none", keys...)
+	if err := h.l.mutateOrdersState(func(o *OrdersFile) (bool, error) {
+		o.Orders[0].WorkType = workType
+		return true, nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	dir := h.l.worktreePath(h.l.cookWorktreeName("42", 0, "execute"))
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if claudeMD != "" {
+		if err := os.WriteFile(filepath.Join(dir, "CLAUDE.md"), []byte(claudeMD), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	oldCommits := branchCommits
+	t.Cleanup(func() { branchCommits = oldCommits })
+	return h
+}
+
+func withPlaybooks(t *testing.T, files map[string]string) {
+	t.Helper()
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "playbooks"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for name, body := range files {
+		if err := os.WriteFile(filepath.Join(root, "playbooks", name), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	old := shinstackRoots
+	shinstackRoots = func() []string { return []string{root} }
+	t.Cleanup(func() { shinstackRoots = old })
+}
+
+// shipped asserts the single-stage order was accepted and merged.
+func (h *gateHarness) shipped(t *testing.T) {
+	t.Helper()
+	if len(h.ln.merged) != 1 {
+		t.Fatalf("merges = %d, want 1: the stage should have been accepted", len(h.ln.merged))
+	}
+}
+
+const checksMD = "# X\n## shinstack\nBefore a PR:\n- `pnpm check`\n\nDecisions: none\n"
+
+func TestExecutePromptCarriesThePlaybookForItsWorkType(t *testing.T) {
+	withPlaybooks(t, map[string]string{
+		"bug-fix.md":     "BUG PLAYBOOK: reproduce first",
+		"feature.md":     "FEATURE PLAYBOOK: slices",
+		"refactoring.md": "REFACTOR PLAYBOOK: keep behaviour",
+	})
+	for workType, want := range map[string]string{
+		orderx.WorkTypeBug:      "BUG PLAYBOOK",
+		orderx.WorkTypeFeature:  "FEATURE PLAYBOOK",
+		orderx.WorkTypeRefactor: "REFACTOR PLAYBOOK",
+	} {
+		t.Run(workType, func(t *testing.T) {
+			h := evidenceHarness(t, workType, "")
+			branchCommits = func(string) ([]commitFiles, error) {
+				return []commitFiles{{SHA: "a1", Files: []string{"x_test.go"}}, {SHA: "b2", Files: []string{"x.go"}}}, nil
+			}
+			if p := h.next(t); !strings.Contains(p, want) {
+				t.Fatalf("execute prompt lacks the %s playbook: %s", workType, p)
+			}
+		})
+	}
+}
+
+func TestPlaybookOnlyGoesToExecuteWhenShinstackAndWorkTypeExist(t *testing.T) {
+	withPlaybooks(t, map[string]string{"feature.md": "FEATURE PLAYBOOK"})
+
+	h := evidenceHarness(t, "feature", "", "execute", "quality")
+	h.next(t)
+	h.review(t, 0, "none")
+	if qp := h.next(t); strings.Contains(qp, "FEATURE PLAYBOOK") {
+		t.Fatalf("quality stage got the playbook: %s", qp)
+	}
+
+	if p := evidenceHarness(t, "", "").next(t); strings.Contains(p, "PLAYBOOK") {
+		t.Fatalf("order with no work type got a playbook: %s", p)
+	}
+
+	old := shinstackRoots
+	shinstackRoots = func() []string { return nil } // shinstack not installed
+	t.Cleanup(func() { shinstackRoots = old })
+	if p := evidenceHarness(t, "feature", "").next(t); strings.Contains(p, "PLAYBOOK") || !strings.Contains(p, "Use Skill(execute)") {
+		t.Fatalf("without shinstack the stage should run on its own skill text: %s", p)
+	}
+}
+
+func TestFailingRepoChecksRejectTheExecuteStage(t *testing.T) {
+	h := evidenceHarness(t, "feature", checksMD)
+	var ran []string
+	old := runRepoCheck
+	runRepoCheck = func(_ context.Context, dir, cmd string) (string, error) {
+		ran = append(ran, cmd)
+		return "FAIL: TestThing", errors.New("exit status 1")
+	}
+	t.Cleanup(func() { runRepoCheck = old })
+
+	h.next(t)
+	if len(ran) != 1 || ran[0] != "pnpm check" {
+		t.Fatalf("checks run = %v, want [pnpm check]", ran)
+	}
+	h.failedWith(t, "failing checks")
+	if len(h.ln.pushes) != 0 {
+		t.Fatal("a stage with failing checks was pushed")
+	}
+}
+
+func TestPassingRepoChecksLetTheStageThrough(t *testing.T) {
+	h := evidenceHarness(t, "feature", checksMD)
+	old := runRepoCheck
+	runRepoCheck = func(context.Context, string, string) (string, error) { return "ok", nil }
+	t.Cleanup(func() { runRepoCheck = old })
+
+	h.next(t)
+	h.shipped(t)
+}
+
+func TestRealFailingCheckCommandRejectsTheStage(t *testing.T) {
+	h := evidenceHarness(t, "feature", "Before a PR:\n- `exit 3`\n")
+	h.next(t)
+	h.failedWith(t, "a check command that exits non-zero")
+}
+
+func TestBugWithoutTestFirstCommitIsRejected(t *testing.T) {
+	h := evidenceHarness(t, "bug", "")
+	branchCommits = func(string) ([]commitFiles, error) {
+		return []commitFiles{{SHA: "aaaa1111", Files: []string{"loop/x.go", "loop/x_test.go"}}}, nil
+	}
+	h.next(t)
+	h.failedWith(t, "bug without a test-first commit")
+}
+
+func TestBugWithTestFirstCommitShips(t *testing.T) {
+	h := evidenceHarness(t, "bug", "")
+	branchCommits = func(string) ([]commitFiles, error) {
+		return []commitFiles{
+			{SHA: "aaaa1111", Files: []string{"loop/x_test.go"}},
+			{SHA: "bbbb2222", Files: []string{"loop/x.go"}},
+		}, nil
+	}
+	h.next(t)
+	h.shipped(t)
+}
+
+func TestFeatureNeedsNoTestFirstCommit(t *testing.T) {
+	h := evidenceHarness(t, "feature", "")
+	branchCommits = func(string) ([]commitFiles, error) {
+		t.Fatal("feature order asked for the test-first check")
+		return nil, nil
+	}
+	h.next(t)
+	h.shipped(t)
+}
+
+func TestRepoChecksParse(t *testing.T) {
+	cases := map[string]struct {
+		md   string
+		want []string
+	}{
+		"one":        {"Before a PR:\n- `pnpm check`\n", []string{"pnpm check"}},
+		"several":    {"x\nBefore a PR:\n- `a`\n* `b c`\n\nlater\n- `d`\n", []string{"a", "b c"}},
+		"none":       {"# nothing\n", nil},
+		"in a fence": {"```\nBefore a PR:\n- `a`\n```\n", nil},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			if err := os.WriteFile(filepath.Join(dir, "CLAUDE.md"), []byte(tc.md), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			got := repoChecks(dir)
+			if strings.Join(got, "|") != strings.Join(tc.want, "|") {
+				t.Fatalf("repoChecks = %v, want %v", got, tc.want)
+			}
+		})
+	}
+	if got := repoChecks(t.TempDir()); got != nil {
+		t.Fatalf("repoChecks without CLAUDE.md = %v, want none", got)
+	}
+}
+
+func TestCheckTestFirst(t *testing.T) {
+	c := func(sha string, files ...string) commitFiles { return commitFiles{SHA: sha, Files: files} }
+	cases := []struct {
+		name    string
+		commits []commitFiles
+		ok      bool
+	}{
+		{"tests then fix", []commitFiles{c("a", "x_test.go"), c("b", "x.go")}, true},
+		{"fix commit carrying its test is not test-only", []commitFiles{c("a", "x.go", "x_test.go")}, false},
+		{"fix then test", []commitFiles{c("a", "x.go"), c("b", "x_test.go")}, false},
+		{"only tests", []commitFiles{c("a", "x_test.go")}, false},
+		{"no commits", nil, false},
+		{"tests, docs, fix", []commitFiles{c("a", "web/app.spec.ts"), c("b", "README.md"), c("c", "x.go")}, true},
+		{"testdata counts as test", []commitFiles{c("a", "pkg/testdata/in.json"), c("b", "x.go")}, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := checkTestFirst(tc.commits); (err == nil) != tc.ok {
+				t.Fatalf("checkTestFirst err = %v, want ok=%v", err, tc.ok)
+			}
+		})
+	}
+}
+
+func TestBranchCommitsListsOnlyTheBranchsOwnCommitsOldestFirst(t *testing.T) {
+	dir := t.TempDir()
+	git := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", append([]string{"-C", dir, "-c", "user.name=t", "-c", "user.email=t@t"}, args...)...)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	write := func(name string) {
+		t.Helper()
+		p := filepath.Join(dir, name)
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(name), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	git("init", "-b", "main")
+	write("base.go")
+	git("add", "-A")
+	git("commit", "-m", "base")
+	git("checkout", "-b", "order-42")
+	write("x_test.go")
+	git("add", "-A")
+	git("commit", "-m", "test")
+	write("x.go")
+	git("add", "-A")
+	git("commit", "-m", "fix")
+
+	commits, err := gitBranchCommits(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(commits) != 2 || commits[0].Files[0] != "x_test.go" || commits[1].Files[0] != "x.go" {
+		t.Fatalf("commits = %+v, want the test commit then the fix commit", commits)
+	}
+	if err := checkTestFirst(commits); err != nil {
+		t.Fatalf("real branch rejected: %v", err)
+	}
+}
+
+func TestVersionLessOrdersNumerically(t *testing.T) {
+	if !versionLess("0.9.0", "0.10.0") || versionLess("0.22.1", "0.22.0") || versionLess("1.0", "1.0.0") {
+		t.Fatal("versionLess misorders dotted versions")
+	}
+}
+
+func TestWorkTypeRoundTripsAndRejectsUnknown(t *testing.T) {
+	file, err := orderx.ParseCompactOrders([]byte(`{"orders":[{"id":"1","work_type":"bug","stages":[{"do":"execute"}]}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	exp, err := orderx.ExpandCompactOrders(file)
+	if err != nil || exp.Orders[0].WorkType != "bug" {
+		t.Fatalf("expanded work type = %q, err %v", exp.Orders[0].WorkType, err)
+	}
+	if _, err := orderx.ParseCompactOrders([]byte(`{"orders":[{"id":"1","work_type":"chore","stages":[{"do":"execute"}]}]}`)); err == nil {
+		t.Fatal("unknown work_type accepted")
+	}
+}
+
+func TestWorkTypeSurvivesAnAmendment(t *testing.T) {
+	existing := Order{ID: "1", Status: OrderStatusActive, WorkType: "bug", Stages: []Stage{{TaskKey: "execute", Status: StageStatusActive}}}
+	incoming := Order{ID: "1", Status: OrderStatusActive, Stages: []Stage{{TaskKey: "execute", Status: StageStatusPending}, {TaskKey: "quality", Status: StageStatusPending}}}
+	merged, changed := mergeAmendedActiveOrder(existing, incoming)
+	if !changed || merged.WorkType != "bug" {
+		t.Fatalf("merged work type = %q (changed %v), want bug kept", merged.WorkType, changed)
+	}
+}

@@ -41,6 +41,7 @@ type OrderProjection struct {
 	Plan      []string          `json:"plan,omitempty"`
 	Rationale string            `json:"rationale,omitempty"`
 	Tier      string            `json:"tier,omitempty"`
+	WorkType  string            `json:"work_type,omitempty"`
 	Round     int               `json:"round,omitempty"`
 	Stages    []StageProjection `json:"stages"`
 	Status    string            `json:"status"`

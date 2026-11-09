@@ -36,6 +36,10 @@ Set `"tier"` on every order that builds a backlog item: `none` (docs or inert co
 
 Nothing merges before the order's last stage. Findings from `quality` or a `FAIL` from `verify` send the order back to `execute` on the same branch, at most 2 times, then the order stops and lands in `action_needed`. Don't add stages to answer a rejection yourself.
 
+### Work type
+
+Set `"work_type"` on every order that builds a backlog item: `bug` (something broken), `feature` (new behaviour) or `refactor` (restructuring with no behaviour change). Take it from the item's labels first (`bug`, `feature`/`enhancement`, `refactor`), then from its title and description. Leave it off if you can't tell; don't guess. The loop gives the `execute` stage the matching shinstack playbook when shinstack is installed. Before it accepts `execute` it runs the repo's checks (the `Before a PR:` list in the repo's CLAUDE.md) and, for a `bug`, requires a commit that touches only tests before the fix commit. A failure there stops the stage; don't add stages to answer it.
+
 ## Task Types
 
 Read `task_types` from mise to discover every schedulable task type and its `schedule` hint. Any registered task type can be a stage within an order. Use `do` on each stage to bind it to a task type.

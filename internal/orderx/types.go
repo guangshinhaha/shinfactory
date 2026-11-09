@@ -50,6 +50,11 @@ type Order struct {
 	// Tier is the order's risk tier: none, low, medium or high. Empty means
 	// medium. It sets how deep review goes and whether verify runs.
 	Tier string `json:"tier,omitempty"`
+	// WorkType is the kind of work the order does: bug, feature or refactor.
+	// Empty means the scheduler could not tell, and the stage runs on its own
+	// skill text. It picks the playbook an execute stage follows and the
+	// evidence the loop checks before accepting it.
+	WorkType string `json:"work_type,omitempty"`
 	// Round counts the fix rounds a failed review or verify has sent back to
 	// execute. Only the loop writes it.
 	Round  int         `json:"round,omitempty"`
@@ -72,6 +77,22 @@ func ValidateTier(tier string) error {
 		return nil
 	}
 	return fmt.Errorf("unknown tier %q (want none, low, medium or high)", tier)
+}
+
+// Work types an order can carry.
+const (
+	WorkTypeBug      = "bug"
+	WorkTypeFeature  = "feature"
+	WorkTypeRefactor = "refactor"
+)
+
+// ValidateWorkType returns an error if workType is not empty or a known type.
+func ValidateWorkType(workType string) error {
+	switch workType {
+	case "", WorkTypeBug, WorkTypeFeature, WorkTypeRefactor:
+		return nil
+	}
+	return fmt.Errorf("unknown work_type %q (want bug, feature or refactor)", workType)
 }
 
 // OrdersFile is the top-level orders.json structure (serialization type).

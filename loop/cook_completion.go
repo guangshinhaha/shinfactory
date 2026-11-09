@@ -137,6 +137,16 @@ func (l *Loop) handleCompletion(ctx context.Context, cook *cookHandle, resultSta
 		if isScheduleStage(cook.stage) {
 			return l.handleScheduleCompletion(cook)
 		}
+		if order, ok := l.orderByID(cook.orderID); ok && !isScheduleOrder(order) {
+			if err := l.checkExecuteEvidence(ctx, order, cook); err != nil {
+				reason := err.Error()
+				if ferr := l.failStage(ctx, cook, reason); ferr != nil {
+					return ferr
+				}
+				l.noteRejectedStage(ctx, cook.orderID, reason)
+				return nil
+			}
+		}
 		if l.config.Landing.PR() {
 			// Before the stage message: a blocking message parks the stage, and
 			// approving it later must not skip the review or verify check.
