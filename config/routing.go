@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 
@@ -90,6 +91,21 @@ func RoleForTask(taskKey string) (Role, bool) {
 		return RoleDebrief, true
 	}
 	return "", false
+}
+
+// UnroutedTasks lists bundled task types that deliberately have no role and run
+// on routing.defaults. A task type in neither this list nor RoleForTask fails
+// the registry test, so a new skill cannot fall back by accident.
+var UnroutedTasks = []string{"meditate"}
+
+// ValidateStageProvider rejects a stage-level provider that routing.sensitive
+// forbids. An empty provider means "the role decides" and always passes.
+func (c Config) ValidateStageProvider(provider string) error {
+	provider = stringx.Normalize(provider)
+	if !c.Routing.Sensitive || provider == "" || provider == stringx.Normalize(c.Routing.Defaults.Provider) {
+		return nil
+	}
+	return fmt.Errorf("stage provider %q not allowed: routing.sensitive keeps every stage on %q", provider, c.Routing.Defaults.Provider)
 }
 
 // PolicyForRole returns the configured provider and model for a role.
