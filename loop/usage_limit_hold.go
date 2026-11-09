@@ -143,7 +143,7 @@ func (l *Loop) requeueAfterUsageLimit(cook *cookHandle) error {
 	reason := nonEmpty(cook.session.Outcome().Reason, "usage limit reached")
 	l.holdRuntime(runtimeName, reason)
 	if n := l.limitRequeues.bump(cook.orderID, cook.stageIndex); n > maxUsageLimitRequeues {
-		return l.failStage(nil, cook, fmt.Sprintf("stage hit the usage limit %d times in a row: %s", n, reason))
+		return l.failStage(nil, cook, fmt.Sprintf("stage was requeued after the usage limit %d times: %s", n, reason))
 	}
 	if err := l.resetStageToPending(cook.orderID, cook.stageIndex, reason); err != nil {
 		return err
