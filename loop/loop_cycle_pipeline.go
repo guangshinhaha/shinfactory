@@ -32,12 +32,12 @@ func (l *Loop) buildCycleBrief(ctx context.Context) (mise.Brief, []string, bool,
 // current orders. Returns whether promotion occurred and whether the incoming
 // orders array was empty. Does NOT handle promotion side effects (cooldown,
 // canonical emission, failure classification).
-func (l *Loop) mergeOrdersNext() (mergeResult, error) {
+func (l *Loop) mergeOrdersNext(brief mise.Brief) (mergeResult, error) {
 	orders, err := l.currentOrders()
 	if err != nil {
 		return mergeResult{}, err
 	}
-	return consumeOrdersNext(l.deps.OrdersNextFile, orders)
+	return consumeOrdersNext(l.deps.OrdersNextFile, orders, brief.Backlog)
 }
 
 // handlePromotionResult processes the side effects of an orders-next
@@ -55,6 +55,10 @@ func (l *Loop) handlePromotionResult(result mergeResult, err error) error {
 	l.logger.Info("orders-next promoted")
 	l.schedulePromoted = true
 	l.lastPromotionError = ""
+	if len(result.Unbuildable) > 0 {
+		l.lastPromotionError = "dropped orders that name no ready issue: " + strings.Join(result.Unbuildable, ", ")
+		l.logger.Warn(l.lastPromotionError)
+	}
 	if result.EmptyPromotion {
 		l.scheduleNothingUntil = l.deps.Now().Add(5 * time.Minute)
 		l.logger.Info("schedule produced no orders, entering cooldown")
@@ -244,7 +248,7 @@ func (l *Loop) bootstrapScheduleIfEmpty(brief mise.Brief, orders *OrdersFile) (i
 }
 
 func (l *Loop) prepareOrdersForCycle(brief mise.Brief, warnings []string, miseChanged bool) (OrdersFile, bool, error) {
-	result, err := l.mergeOrdersNext()
+	result, err := l.mergeOrdersNext(brief)
 	if err := l.handlePromotionResult(result, err); err != nil {
 		return OrdersFile{}, false, err
 	}

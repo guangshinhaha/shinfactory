@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/guangshinhaha/shinfactory/adapter"
 	"github.com/guangshinhaha/shinfactory/internal/orderx"
 	"github.com/guangshinhaha/shinfactory/internal/taskreg"
 	"github.com/guangshinhaha/shinfactory/skill"
@@ -25,6 +26,32 @@ func writeCompactOrders(t *testing.T, path string, compact orderx.CompactOrdersF
 	}
 }
 
+// backlogForProposal returns a backlog naming every order in the proposal, so
+// tests of merge behaviour aren't also tests of the ready filter.
+func backlogForProposal(t *testing.T, nextPath string) []adapter.BacklogItem {
+	t.Helper()
+	data, err := os.ReadFile(nextPath)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		t.Fatalf("read proposal: %v", err)
+	}
+	var proposal struct {
+		Orders []struct {
+			ID string `json:"id"`
+		} `json:"orders"`
+	}
+	if err := json.Unmarshal(data, &proposal); err != nil {
+		return nil
+	}
+	var backlog []adapter.BacklogItem
+	for _, o := range proposal.Orders {
+		backlog = append(backlog, adapter.BacklogItem{ID: o.ID})
+	}
+	return backlog
+}
+
 func consumeOrdersNextAndPersist(t *testing.T, nextPath, ordersPath string) mergeResult {
 	t.Helper()
 
@@ -32,7 +59,7 @@ func consumeOrdersNextAndPersist(t *testing.T, nextPath, ordersPath string) merg
 	if err != nil {
 		t.Fatalf("read existing orders: %v", err)
 	}
-	result, err := consumeOrdersNext(nextPath, existing)
+	result, err := consumeOrdersNext(nextPath, existing, backlogForProposal(t, nextPath))
 	if err != nil {
 		t.Fatalf("consumeOrdersNext: %v", err)
 	}
@@ -199,7 +226,7 @@ func TestConsumeOrdersNextMissingReturnsNoop(t *testing.T) {
 	dir := t.TempDir()
 	nextPath := filepath.Join(dir, "orders-next.json")
 
-	result, err := consumeOrdersNext(nextPath, orderx.OrdersFile{})
+	result, err := consumeOrdersNext(nextPath, orderx.OrdersFile{}, nil)
 	if err != nil {
 		t.Fatalf("consumeOrdersNext: %v", err)
 	}
@@ -491,7 +518,7 @@ func TestConsumeOrdersNextInvalidNextJSON(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result, err := consumeOrdersNext(nextPath, orderx.OrdersFile{})
+	result, err := consumeOrdersNext(nextPath, orderx.OrdersFile{}, nil)
 	if err == nil {
 		t.Fatal("expected error for invalid JSON")
 	}
@@ -1096,5 +1123,47 @@ func TestOrdersFileCloneRoundTrip(t *testing.T) {
 	}
 	if string(s.Extra["key"]) != `"value"` {
 		t.Errorf("Extra lost in clone round-trip")
+	}
+}
+
+func TestConsumeOrdersNextDropsOrdersWithNoReadyIssue(t *testing.T) {
+	dir := t.TempDir()
+	nextPath := filepath.Join(dir, "orders-next.json")
+	writeCompactOrders(t, nextPath, orderx.CompactOrdersFile{Orders: []orderx.CompactOrder{
+		{ID: "16", Stages: []orderx.CompactStage{{Do: "execute"}}},
+		{ID: "chore-gitignore-tally-bin", Stages: []orderx.CompactStage{{Do: "execute"}}},
+		{ID: "fix-backlog-done-standalone-ids", Stages: []orderx.CompactStage{{Do: "execute"}}},
+		{ID: "schedule", Stages: []orderx.CompactStage{{Do: "schedule"}}},
+	}})
+
+	result, err := consumeOrdersNext(nextPath, orderx.OrdersFile{}, []adapter.BacklogItem{{ID: "16"}})
+	if err != nil {
+		t.Fatalf("consumeOrdersNext: %v", err)
+	}
+	var ids []string
+	for _, o := range result.Orders.Orders {
+		ids = append(ids, o.ID)
+	}
+	if strings.Join(ids, ",") != "16,schedule" {
+		t.Fatalf("promoted orders = %v, want [16 schedule]", ids)
+	}
+	if got := strings.Join(result.Unbuildable, ","); got != "chore-gitignore-tally-bin,fix-backlog-done-standalone-ids" {
+		t.Fatalf("unbuildable = %q", got)
+	}
+}
+
+func TestConsumeOrdersNextOnlyUnreadyOrdersIsEmptyPromotion(t *testing.T) {
+	dir := t.TempDir()
+	nextPath := filepath.Join(dir, "orders-next.json")
+	writeCompactOrders(t, nextPath, orderx.CompactOrdersFile{Orders: []orderx.CompactOrder{
+		{ID: "chore-side-note", Stages: []orderx.CompactStage{{Do: "execute"}}},
+	}})
+
+	result, err := consumeOrdersNext(nextPath, orderx.OrdersFile{}, nil)
+	if err != nil {
+		t.Fatalf("consumeOrdersNext: %v", err)
+	}
+	if !result.EmptyPromotion || len(result.Orders.Orders) != 0 {
+		t.Fatalf("want empty promotion (cooldown, no hot loop), got %+v", result)
 	}
 }

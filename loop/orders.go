@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/guangshinhaha/shinfactory/adapter"
 	"github.com/guangshinhaha/shinfactory/config"
 	"github.com/guangshinhaha/shinfactory/internal/orderx"
 	"github.com/guangshinhaha/shinfactory/internal/taskreg"
@@ -291,6 +292,9 @@ type mergeResult struct {
 	Orders         OrdersFile
 	Promoted       bool
 	EmptyPromotion bool
+	// Unbuildable lists IDs of proposed orders dropped because they name no
+	// ready backlog item.
+	Unbuildable []string
 }
 
 // Reads and validates orders-next.json, merges into the provided orders, and
@@ -299,7 +303,7 @@ type mergeResult struct {
 // re-promotes idempotently — duplicate order IDs across the two files are
 // skipped (not rejected), except when replacing a failed order with a new
 // active proposal for explicit restart.
-func consumeOrdersNext(nextPath string, existing OrdersFile) (mergeResult, error) {
+func consumeOrdersNext(nextPath string, existing OrdersFile, backlog []adapter.BacklogItem) (mergeResult, error) {
 	nextData, err := os.ReadFile(nextPath)
 	if os.IsNotExist(err) {
 		return mergeResult{}, nil
@@ -322,6 +326,11 @@ func consumeOrdersNext(nextPath string, existing OrdersFile) (mergeResult, error
 		cause := fmt.Errorf("invalid orders-next.json (renamed to .bad): %w", err)
 		return mergeResult{}, ordersNextRejectedError{cause: cause}
 	}
+
+	// Every order builds a backlog item, and the backlog holds only issues a
+	// person marked ready. Anything else the scheduler proposes is dropped.
+	buildable, unbuildable := splitBuildableOrders(incoming.Orders, backlog)
+	incoming.Orders = buildable
 
 	emptyPromotion := len(incoming.Orders) == 0
 
@@ -356,7 +365,25 @@ func consumeOrdersNext(nextPath string, existing OrdersFile) (mergeResult, error
 		Orders:         existing,
 		Promoted:       true,
 		EmptyPromotion: emptyPromotion,
+		Unbuildable:    unbuildable,
 	}, nil
+}
+
+// splitBuildableOrders keeps orders whose ID is a backlog item ID, plus the
+// schedule order itself. Dropped IDs are returned so the loop can say why.
+func splitBuildableOrders(orders []Order, backlog []adapter.BacklogItem) (keep []Order, dropped []string) {
+	ids := make(map[string]struct{}, len(backlog))
+	for _, item := range backlog {
+		ids[strings.TrimSpace(item.ID)] = struct{}{}
+	}
+	for _, order := range orders {
+		if _, ok := ids[strings.TrimSpace(order.ID)]; ok || isScheduleOrder(order) {
+			keep = append(keep, order)
+			continue
+		}
+		dropped = append(dropped, order.ID)
+	}
+	return keep, dropped
 }
 
 func shouldReplaceFailedOrder(existing Order, incoming Order) bool {
