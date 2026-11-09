@@ -2,6 +2,7 @@ package monitor
 
 import (
 	"context"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -22,7 +23,7 @@ func checkOrcaMeta(t *testing.T, outcome string, want SessionStatus) {
 	t.Helper()
 	fake := fakeorca.New(t)
 	dir := t.TempDir()
-	rt := dir + "/.noodle"
+	rt := filepath.Join(dir, ".noodle")
 	d := dispatcher.NewOrcaDispatcher(dispatcher.OrcaDispatcherConfig{
 		ProjectDir: dir, RuntimeDir: rt, Bin: fake.Bin, PollInterval: 5 * time.Millisecond,
 	})

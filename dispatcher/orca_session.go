@@ -240,8 +240,8 @@ func (s *orcaSession) finish(outcome SessionOutcome) {
 		s.status = outcome.Status.String()
 		s.outcome = outcome
 		s.mu.Unlock()
-		s.closeStreamDone()
 		s.recordTerminal(outcome)
+		s.closeStreamDone()
 		close(s.done)
 	})
 }
@@ -270,8 +270,13 @@ func (s *orcaSession) appendCanonical(kind parse.EventType, message string) {
 		s.publish(SessionEvent{Type: "warning", Message: "write canonical event: " + err.Error(), Timestamp: nowUTC()})
 		return
 	}
-	defer f.Close()
-	_, _ = f.Write(append(line, '\n'))
+	_, werr := f.Write(append(line, '\n'))
+	if cerr := f.Close(); werr == nil {
+		werr = cerr
+	}
+	if werr != nil {
+		s.publish(SessionEvent{Type: "warning", Message: "write canonical event: " + werr.Error(), Timestamp: nowUTC()})
+	}
 }
 
 func (s *orcaSession) Terminate() error {
