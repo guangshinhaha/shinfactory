@@ -79,6 +79,11 @@ func (l *Loop) trackCookCompleted(cook *cookHandle, result StageResult) {
 	if cook == nil {
 		return
 	}
+	// Every way a stage ends (done, killed, cancelled, steered) passes here, so
+	// its cost reaches the order's spend ledger whichever way it ended.
+	if cook.session != nil && !isScheduleStage(cook.stage) {
+		l.recordStageCost(cook.orderID, cook.session.TotalCost())
+	}
 	taskKey := strings.TrimSpace(cook.stage.TaskKey)
 	if taskKey == "" {
 		taskKey = "unknown"

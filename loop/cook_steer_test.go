@@ -476,7 +476,7 @@ func TestSteerRespawnOnTheLastAllowedAttemptIsNotStoppedByTheSpendCap(t *testing
 	rt := newMockRuntime()
 	l := newSteerTestLoop(t, rt)
 	for i := 0; i < l.config.Spend.MaxAttempts; i++ {
-		l.recordStageLaunch("order-2", "execute")
+		l.recordStageLaunch("order-2", "execute", 0)
 	}
 
 	sess := &mockSession{id: "sess-last", status: "running", done: make(chan struct{})}

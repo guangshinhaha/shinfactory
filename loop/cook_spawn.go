@@ -52,7 +52,7 @@ func (l *Loop) spawnCook(ctx context.Context, cand dispatchCandidate, order Orde
 	if l.runtimeHeld(runtimeName) {
 		return nil // out of usage: the stage stays pending until a launch can succeed
 	}
-	if why := l.overSpendCap(cand.OrderID, spendTaskKey(stage)); why != "" && !opts.steered {
+	if why := l.overSpendCap(cand.OrderID, spendTaskKey(stage), order.Round); why != "" && !opts.steered {
 		return l.stopOverCap(ctx, cand, stage, why)
 	}
 
@@ -160,7 +160,7 @@ func (l *Loop) spawnCook(ctx context.Context, cand dispatchCandidate, order Orde
 	}
 	l.trackCookStarted(cook)
 	if !opts.steered {
-		l.recordStageLaunch(cand.OrderID, spendTaskKey(stage))
+		l.recordStageLaunch(cand.OrderID, spendTaskKey(stage), order.Round)
 	}
 	l.cooks.activeCooksByOrder[cand.OrderID] = cook
 	l.startSessionWatcher(ctx, cook, false)

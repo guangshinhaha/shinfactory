@@ -164,7 +164,6 @@ func (l *Loop) steerRespawn(cook *cookHandle, prompt string) error {
 		Status:      StageResultCancelled,
 		CompletedAt: l.deps.Now(),
 	})
-	l.recordStageCost(cook.orderID, cook.session.TotalCost())
 	delete(l.cooks.activeCooksByOrder, cook.orderID)
 	cand := dispatchCandidate{
 		OrderID:    cook.orderID,

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/guangshinhaha/shinfactory/adapter"
+	"github.com/guangshinhaha/shinfactory/internal/filex"
 	"github.com/guangshinhaha/shinfactory/internal/linestatus"
 )
 
@@ -98,7 +99,7 @@ func (l *Loop) readFailedRounds() map[string]int {
 func (l *Loop) writeFailedRounds(counts map[string]int) {
 	data, err := json.Marshal(counts)
 	if err == nil {
-		err = os.WriteFile(l.failedRoundsFile(), data, 0o644)
+		err = filex.WriteFileAtomic(l.failedRoundsFile(), data)
 	}
 	if err != nil {
 		l.logger.Warn("could not record failed rounds", "error", err)

@@ -9,13 +9,18 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/guangshinhaha/shinfactory/internal/filex"
 	"github.com/guangshinhaha/shinfactory/internal/ingest"
 )
 
 // orderSpend is what one order has used so far. A retry is a fresh order with
 // the same ID, so the ledger lives beside orders.json, keyed by order ID.
 type orderSpend struct {
-	// Attempts counts launches per stage task key.
+	// Round is the fix round Attempts counts in. A quality reject sends the
+	// order back for a new round (capped by maxFixRounds), which starts the
+	// attempt count over so the loop does not eat the failure-retry cap.
+	Round int `json:"round"`
+	// Attempts counts launches per stage task key within Round.
 	Attempts map[string]int `json:"attempts"`
 	// CostUSD sums the cost of the order's finished stages.
 	CostUSD float64 `json:"cost_usd"`
@@ -52,7 +57,7 @@ func (l *Loop) readOrderSpend() map[string]orderSpend {
 func (l *Loop) writeOrderSpend(ledger map[string]orderSpend) {
 	data, err := json.Marshal(ledger)
 	if err == nil {
-		err = os.WriteFile(l.orderSpendFile(), data, 0o644)
+		err = filex.WriteFileAtomic(l.orderSpendFile(), data)
 	}
 	if err != nil {
 		l.logger.Warn("could not record order spend", "error", err)
@@ -65,14 +70,16 @@ func (l *Loop) orderSpendOf(orderID string) orderSpend {
 	return l.readOrderSpend()[orderID]
 }
 
-// recordStageLaunch counts one launch of the stage's task key against the order.
-func (l *Loop) recordStageLaunch(orderID, taskKey string) {
+// recordStageLaunch counts one launch of the stage's task key against the
+// order in its current fix round.
+func (l *Loop) recordStageLaunch(orderID, taskKey string, round int) {
 	orderSpendMu.Lock()
 	defer orderSpendMu.Unlock()
 	ledger := l.readOrderSpend()
 	spend := ledger[orderID]
-	if spend.Attempts == nil {
+	if spend.Attempts == nil || round > spend.Round {
 		spend.Attempts = map[string]int{}
+		spend.Round = round
 	}
 	spend.Attempts[taskKey]++
 	ledger[orderID] = spend
@@ -87,7 +94,12 @@ func (l *Loop) recordStageCost(orderID string, costUSD float64) {
 	orderSpendMu.Lock()
 	defer orderSpendMu.Unlock()
 	ledger := l.readOrderSpend()
-	spend := ledger[orderID]
+	spend, ok := ledger[orderID]
+	if !ok {
+		// No launch is on record: the order was cleared (skipped, stopped or
+		// done) while this stage ran. Do not resurrect its entry.
+		return
+	}
 	spend.CostUSD += costUSD
 	ledger[orderID] = spend
 	l.writeOrderSpend(ledger)
@@ -107,11 +119,15 @@ func (l *Loop) clearOrderSpend(orderID string) {
 // overSpendCap reports why the order may not launch another attempt of the
 // stage, or "" when it may. A cap of zero or less is off; config normalizes a configured zero to the
 // default, so only an unconfigured Config value reaches that case.
-func (l *Loop) overSpendCap(orderID, taskKey string) string {
+func (l *Loop) overSpendCap(orderID, taskKey string, round int) string {
 	spend := l.orderSpendOf(orderID)
 	caps := l.config.Spend
-	if caps.MaxAttempts > 0 && spend.Attempts[taskKey] >= caps.MaxAttempts {
-		return fmt.Sprintf("it already ran the %q stage %d times (cap %d)", taskKey, spend.Attempts[taskKey], caps.MaxAttempts)
+	attempts := 0
+	if round <= spend.Round {
+		attempts = spend.Attempts[taskKey]
+	}
+	if caps.MaxAttempts > 0 && attempts >= caps.MaxAttempts {
+		return fmt.Sprintf("it already ran the %q stage %d times this round (cap %d)", taskKey, attempts, caps.MaxAttempts)
 	}
 	if caps.MaxCostUSD > 0 && spend.CostUSD >= caps.MaxCostUSD {
 		return fmt.Sprintf("its stages already cost $%.2f (cap $%.2f)", spend.CostUSD, caps.MaxCostUSD)
