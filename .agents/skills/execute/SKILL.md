@@ -105,5 +105,6 @@ Same job, built in:
 - **Smallest change.** Meet the Done when and nothing else. No new layers, flags or options nobody asked for.
 - **Slices.** Build in small steps that each end in a passing state; run the repo's checks after each, then commit.
 - **Validate at the edge.** Check input where it enters; inside, trust the types.
+- **Commit and yield.** Never push, open a PR or comment on issues from a factory stage; the loop owns those.
 - **Prove it.** Run the real thing, not only the tests, and paste the output into your stage message. A self-report is not proof.
 - **Language.** Go: wrap errors with context (`fmt.Errorf("doing X: %w", err)`), accept interfaces and return structs, table-driven tests, no goroutine without an owner that waits for it. TypeScript/React: no `any`, derive state instead of syncing it, effects only for external systems, test what a user sees.

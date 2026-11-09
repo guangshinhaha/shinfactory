@@ -73,5 +73,6 @@ Follow-up work that can't be done during the debrief — bugs, non-trivial rewri
 - Skills: [skill files modified, one-line each]
 - Structural: [rules/scripts/checks added]
 - Todos: [follow-up items filed]
-- Shinstack friction: [lines appended, one each; or "General lessons" for the human when shinstack is absent]
+- Shinstack friction: [lines appended, one each; omit when shinstack is not installed]
+- General lessons: [only when shinstack is not installed: lessons for the human to carry upstream]
 ```

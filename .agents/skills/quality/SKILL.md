@@ -82,7 +82,7 @@ From shinstack, when installed: prove-it-works, test-behavior-not-implementation
 
 ## Without shinstack
 
-Judge by these three:
+Block only on what you can show: a failing run, a bug a user would hit, a failed gate, a missed Done when, or a doc line the change made wrong. Everything else is a non-blocking issue. Judge by these three:
 - **Prove it works.** Trust runs and artifacts, not the cook's self-report. Run the change yourself against the Done when.
 - **Test behavior, not implementation.** A test that only restates the code proves nothing; a good one fails when behavior breaks.
 - **Fix root causes.** A fix that hides the symptom (a retry, a swallowed error, a special case) is a blocker when you can show the cause is still there.
