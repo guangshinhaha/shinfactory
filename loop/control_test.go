@@ -92,6 +92,34 @@ func TestControlMergeRemovesPendingAfterSuccess(t *testing.T) {
 	}
 }
 
+// A rejected order is abandoned, so its spend entry goes with it.
+func TestControlRejectClearsOrderSpend(t *testing.T) {
+	l := newControlTestLoop(t, &fakeWorktree{}, newMockRuntime())
+	l.recordStageLaunch("42", "execute", 0)
+	l.recordStageCost("42", 3)
+
+	if err := l.controlReject("42"); err != nil {
+		t.Fatalf("controlReject: %v", err)
+	}
+	if spend := l.orderSpendOf("42"); spend.CostUSD != 0 || spend.totalAttempts() != 0 {
+		t.Fatalf("spend after reject = %+v, want empty", spend)
+	}
+}
+
+// Cost recorded before a restart is read back by the next loop on the same
+// project directory.
+func TestOrderSpendSurvivesLoopRestart(t *testing.T) {
+	l := newControlTestLoop(t, &fakeWorktree{}, newMockRuntime())
+	l.recordStageLaunch("42", "execute", 0)
+	l.recordStageCost("42", 3.5)
+
+	restarted := New(l.projectDir, "noodle", localLandingConfig(), l.deps)
+	spend := restarted.orderSpendOf("42")
+	if spend.CostUSD != 3.5 || spend.Attempts["execute"] != 1 {
+		t.Fatalf("spend after restart = %+v, want cost 3.5 and 1 execute attempt", spend)
+	}
+}
+
 func TestControlRejectRemovesPendingAfterSuccess(t *testing.T) {
 	l := newControlTestLoop(t, &fakeWorktree{}, newMockRuntime())
 

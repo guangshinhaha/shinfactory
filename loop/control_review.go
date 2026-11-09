@@ -113,6 +113,8 @@ func (l *Loop) controlReject(orderID string) error {
 		session:      &adoptedSession{id: pending.sessionID, status: "completed"},
 	}
 	l.recordStageFailure(cook, "rejected by user", OrderFailureClassOrderTerminal, &mistake)
+	// A rejected order is abandoned, like a skipped one: its spend goes with it.
+	l.clearOrderSpend(orderID)
 	l.classifyCookMistake(
 		"control.review_reject",
 		OrderFailureClassOrderTerminal,
