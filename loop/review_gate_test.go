@@ -21,7 +21,8 @@ const fixtureHead = "abc123def456"
 
 type gateHarness struct {
 	*landingHarness
-	n int // sessions completed so far
+	n       int // sessions completed so far
+	pending []func()
 }
 
 // newGateHarness builds a PR-mode loop whose order runs the given stages.
@@ -76,6 +77,11 @@ func (h *gateHarness) next(t *testing.T) string {
 		t.Fatalf("sessions = %d, want %d (nothing dispatched)", len(h.rt.sessions), h.n+1)
 	}
 	prompt := h.rt.calls[h.n].Prompt
+	// The stage's agent writes its file while it runs, after dispatch.
+	for _, w := range h.pending {
+		w()
+	}
+	h.pending = nil
 	h.rt.sessions[h.n].complete("completed")
 	h.n++
 	if err := h.l.Cycle(context.Background()); err != nil {
@@ -93,7 +99,12 @@ func (h *gateHarness) order(t *testing.T) Order {
 	return o
 }
 
+// write queues a gate file for the stage that dispatches next.
 func (h *gateHarness) write(t *testing.T, round int, name, body string) {
+	h.pending = append(h.pending, func() { h.writeNow(t, round, name, body) })
+}
+
+func (h *gateHarness) writeNow(t *testing.T, round int, name, body string) {
 	t.Helper()
 	dir := h.l.gateDir("42", round)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -369,5 +380,112 @@ func TestHighOrderThroughStubGHMergesOnlyAfterVerifyAtHead(t *testing.T) {
 	if merges() != 1 {
 		data, _ := os.ReadFile(logPath)
 		t.Fatalf("gh pr merge ran %d times, want 1 after verify at head\n%s", merges(), data)
+	}
+}
+
+func TestTierAndRoundSurviveOnDiskAndRestart(t *testing.T) {
+	h := newGateHarness(t, "high", "execute", "quality", "verify")
+	h.next(t)
+	h.review(t, 0, "none")
+	h.next(t)
+	h.verdict(t, 0, VerdictFail, fixtureHead)
+	h.next(t)
+
+	orders, err := readOrders(h.l.deps.OrdersFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := orders.Orders[0]; got.Tier != "high" || got.Round != 1 {
+		t.Fatalf("orders.json has tier=%q round=%d, want high and 1", got.Tier, got.Round)
+	}
+	if node := h.l.canonical.Orders["42"]; node.Tier != "high" || node.Round != 1 {
+		t.Fatalf("canonical order has tier=%q round=%d, want high and 1", node.Tier, node.Round)
+	}
+}
+
+func TestStaleReviewFileIsNotThisStagesReview(t *testing.T) {
+	h := newGateHarness(t, "medium", "execute", "quality")
+	h.writeNow(t, 0, reviewFileName, "Covered: an earlier run\nFindings: none\n")
+	h.next(t)
+	h.next(t) // the reviewer writes nothing
+	h.failedWith(t, "stale review")
+}
+
+func TestGateDirIsPerOrder(t *testing.T) {
+	h := newGateHarness(t, "none", "execute")
+	a, b := h.l.gateDir("a/b", 0), h.l.gateDir("a_b", 0)
+	if a == b {
+		t.Fatalf("orders a/b and a_b share %s", a)
+	}
+	for _, id := range []string{"..", "a/../..", "a/b"} {
+		d := h.l.gateDir(id, 0)
+		if !strings.HasPrefix(d, filepath.Join(h.l.runtimeDir, "gate")+string(filepath.Separator)) || filepath.Dir(filepath.Dir(d)) != filepath.Join(h.l.runtimeDir, "gate") {
+			t.Fatalf("gateDir(%q) = %s, want a direct child of .noodle/gate", id, d)
+		}
+	}
+}
+
+func TestParseReview(t *testing.T) {
+	clean := []string{
+		"Covered: diff\nFindings: none",
+		"Covered: diff\nFindings: None.",
+		"Covered: diff\n**Findings:** none",
+		"Covered: diff\nFindings: (none)",
+		"Covered: diff\nFindings:\nnone",
+		"Findings: none\nCovered: diff",
+		"Covered: diff\r\nFindings: none\r\n",
+	}
+	for _, c := range clean {
+		if r, err := parseReview([]byte(c)); err != nil || !r.Clean {
+			t.Errorf("%q: clean=%v err=%v, want clean", c, r.Clean, err)
+		}
+	}
+	dirty := []string{
+		"Covered: diff\nFindings:\n- bug",
+		"Covered: diff\nFindings: none\n- bug",
+		"Covered: diff\nFindings: none\n+ bug",
+		"Covered: diff\nFindings: none\nThe auth check is missing.",
+		"Covered: diff\nFindings: none\n" + strings.Repeat("x", 70000) + "\n- real bug",
+		"Covered: diff\nFindings: the login is broken",
+	}
+	for _, c := range dirty {
+		if r, err := parseReview([]byte(c)); err != nil || r.Clean {
+			t.Errorf("%.60q: clean=%v err=%v, want findings", c, r.Clean, err)
+		}
+	}
+	for _, bad := range []string{"", "Findings: none", "Covered: diff", "Covered: d\nFindings: none\nFindings: none"} {
+		if _, err := parseReview([]byte(bad)); err == nil {
+			t.Errorf("%q parsed, want an error (not a review)", bad)
+		}
+	}
+}
+
+func TestCommitsAfterReviewDoNotShip(t *testing.T) {
+	h := newGateHarness(t, "medium", "execute", "quality", "reflect")
+	h.next(t)
+	h.review(t, 0, "none")
+	h.next(t)
+	headSHA = func(string) (string, error) { return "commit-after-review", nil }
+	h.next(t)
+	h.failedWith(t, "head moved after review")
+}
+
+func TestMissingReviewFileFailsBeforeAnyStageMessageCanPark(t *testing.T) {
+	h := newGateHarness(t, "medium", "execute", "quality")
+	h.next(t)
+	// The reviewer's blocking stage message would park the stage; the gate has
+	// to run first, so a missing review file fails before anything parks.
+	h.next(t)
+	h.failedWith(t, "no review file")
+}
+
+func TestAmendKeepsRoundAndTier(t *testing.T) {
+	existing := Order{ID: "42", Tier: "high", Round: 2, Status: OrderStatusActive,
+		Stages: []Stage{{TaskKey: "execute", Skill: "execute", Status: StageStatusPending}}}
+	incoming := Order{ID: "42", Tier: "none", Status: OrderStatusActive,
+		Stages: []Stage{{TaskKey: "execute", Skill: "execute", Status: StageStatusPending}, {TaskKey: "reflect", Skill: "reflect", Status: StageStatusPending}}}
+	merged, ok := mergeAmendedActiveOrder(existing, incoming)
+	if !ok || merged.Tier != "high" || merged.Round != 2 {
+		t.Fatalf("amended order tier=%q round=%d ok=%v, want high, 2", merged.Tier, merged.Round, ok)
 	}
 }

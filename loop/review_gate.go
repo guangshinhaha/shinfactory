@@ -1,8 +1,6 @@
 package loop
 
 import (
-	"bufio"
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -35,6 +33,9 @@ const (
 
 	reviewFileName = "review.md"
 	verifyFileName = "verify.json"
+
+	// reviewedHeadFile records the head a clean review saw.
+	reviewedHeadFile = "reviewed-head"
 )
 
 // Verify verdicts.
@@ -100,9 +101,11 @@ func checkGateShape(order Order) error {
 	return nil
 }
 
+// gateDir is the order's directory for one fix round. It is named like the
+// order's branch, which is unique per order and never contains a path
+// separator.
 func (l *Loop) gateDir(orderID string, round int) string {
-	safe := strings.NewReplacer("/", "_", "\\", "_").Replace(strings.TrimSpace(orderID))
-	return filepath.Join(l.runtimeDir, "gate", safe, fmt.Sprintf("round-%d", round))
+	return filepath.Join(l.runtimeDir, "gate", cookBaseName(orderID, 0, ""), fmt.Sprintf("round-%d", round))
 }
 
 // reviewReport is what a review file says.
@@ -111,38 +114,46 @@ type reviewReport struct {
 	Clean   bool
 }
 
-// parseReview reads a findings file. It needs a Covered line saying what the
-// review looked at and a Findings line: "Findings: none", or "Findings:"
-// followed by the list. An empty file, or one with no coverage statement,
-// is not a review.
+// parseReview reads a findings file. It needs one "Covered:" line saying what
+// the review looked at and one "Findings:" line, whose value is "none" (the
+// value may sit on the next line). Anything else after the Findings line, bar
+// the Covered line, counts as a finding, so a clean verdict never hides one.
+// An empty file, or one with no coverage statement, is not a review.
 func parseReview(data []byte) (reviewReport, error) {
 	var rep reviewReport
-	var sawFindings, none, listed bool
-	sc := bufio.NewScanner(bytes.NewReader(data))
-	for sc.Scan() {
-		line := strings.TrimSpace(sc.Text())
-		lower := strings.ToLower(line)
+	findings := -1
+	var after []string
+	var value string
+	for _, raw := range strings.Split(string(data), "\n") {
+		line := strings.TrimSpace(raw)
+		if line == "" {
+			continue
+		}
+		bare := strings.ToLower(strings.Trim(line, "*_`# "))
 		switch {
-		case line == "":
-		case strings.HasPrefix(lower, "covered:"):
-			rep.Covered = strings.TrimSpace(line[len("covered:"):])
-		case strings.HasPrefix(lower, "findings:"):
-			sawFindings = true
-			rest := strings.ToLower(strings.TrimSpace(line[len("findings:"):]))
-			rest = strings.TrimRight(rest, ". ")
-			none = rest == "none"
-			listed = rest != "" && !none
-		case sawFindings && (strings.HasPrefix(line, "- ") || strings.HasPrefix(line, "* ") || (line[0] >= '0' && line[0] <= '9')):
-			listed = true
+		case strings.HasPrefix(bare, "covered:"):
+			rep.Covered = strings.TrimSpace(strings.Trim(line[strings.Index(strings.ToLower(line), "covered:")+len("covered:"):], "*_` "))
+		case strings.HasPrefix(bare, "findings:"):
+			if findings >= 0 {
+				return rep, errors.New("review file has more than one \"Findings:\" line")
+			}
+			findings = 0
+			value = strings.TrimSpace(bare[len("findings:"):])
+		case findings >= 0:
+			after = append(after, bare)
 		}
 	}
 	if rep.Covered == "" {
 		return rep, errors.New("review file does not say what it covered (needs a \"Covered:\" line)")
 	}
-	if !sawFindings {
+	if findings < 0 {
 		return rep, errors.New("review file has no \"Findings:\" line")
 	}
-	rep.Clean = none && !listed
+	if value == "" && len(after) > 0 {
+		value, after = after[0], after[1:]
+	}
+	value = strings.Trim(value, "*_`()[]. ")
+	rep.Clean = value == "none" && len(after) == 0
 	return rep, nil
 }
 
@@ -205,10 +216,10 @@ func (l *Loop) reviewGate(cook *cookHandle) (bool, error) {
 	if err := checkGateShape(order); err != nil {
 		return true, l.failStage(nil, cook, err.Error())
 	}
-	_, needVerify := gateNeeds(order.Tier)
+	needReview, needVerify := gateNeeds(order.Tier)
 	switch gateStageKey(cook.stage) {
 	case gateReviewKey:
-		if needReview, _ := gateNeeds(order.Tier); !needReview {
+		if !needReview {
 			return false, nil
 		}
 		path := filepath.Join(l.gateDir(order.ID, order.Round), reviewFileName)
@@ -223,6 +234,14 @@ func (l *Loop) reviewGate(cook *cookHandle) (bool, error) {
 		if !rep.Clean {
 			return true, l.sendBack(cook, order, "review found issues, listed in "+path)
 		}
+		// Remember the head the review saw, so a later stage can't ship more.
+		head, err := headSHA(cook.worktreePath)
+		if err != nil {
+			return true, l.failStage(nil, cook, err.Error())
+		}
+		if err := os.WriteFile(filepath.Join(l.gateDir(order.ID, order.Round), reviewedHeadFile), []byte(head), 0o644); err != nil {
+			return true, l.failStage(nil, cook, "record reviewed head: "+err.Error())
+		}
 	case gateVerifyKey:
 		if !needVerify {
 			return false, nil
@@ -235,12 +254,19 @@ func (l *Loop) reviewGate(cook *cookHandle) (bool, error) {
 			return true, l.sendBack(cook, order, "verify returned FAIL: "+v.Evidence)
 		}
 	default:
-		// A later stage must not ship commits the verdict never saw.
-		if needVerify && l.isFinalStage(cook) {
+		// A later stage must not ship commits the review or verdict never saw.
+		if !l.isFinalStage(cook) {
+			break
+		}
+		if needVerify {
 			if v, err := l.readVerdict(order, cook); err != nil {
 				return true, l.failStage(nil, cook, err.Error())
 			} else if v.Verdict == VerdictFail {
 				return true, l.failStage(nil, cook, "verify returned FAIL: "+v.Evidence)
+			}
+		} else if needReview && gateStageKey(cook.stage) != gateBuildKey {
+			if err := l.checkReviewedHead(order, cook); err != nil {
+				return true, l.failStage(nil, cook, err.Error())
 			}
 		}
 	}
@@ -296,6 +322,7 @@ func (l *Loop) reopenStages(orderID string, from, to, round int) error {
 			}
 			node.Stages[i] = stage
 		}
+		node.Round = round
 		node.Status = state.OrderPending
 		node.UpdatedAt = now
 		l.canonical.Orders[orderID] = node
@@ -354,4 +381,38 @@ func (l *Loop) gateNote(order Order, stage Stage) string {
 			tier, filepath.Join(dir, verifyFileName))
 	}
 	return ""
+}
+
+// clearGateFile removes a stale gate file before its stage runs, so a file
+// left by an earlier run of the same order can't pass for this stage's work.
+func (l *Loop) clearGateFile(order Order, stage Stage) {
+	name := ""
+	switch gateStageKey(stage) {
+	case gateReviewKey:
+		name = reviewFileName
+	case gateVerifyKey:
+		name = verifyFileName
+	default:
+		return
+	}
+	if err := os.Remove(filepath.Join(l.gateDir(order.ID, order.Round), name)); err != nil && !errors.Is(err, os.ErrNotExist) {
+		l.logger.Warn("stale gate file not removed", "order", order.ID, "file", name, "error", err)
+	}
+}
+
+// checkReviewedHead fails a ship whose head is not the one the clean review saw.
+func (l *Loop) checkReviewedHead(order Order, cook *cookHandle) error {
+	path := filepath.Join(l.gateDir(order.ID, order.Round), reviewedHeadFile)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("no record of a clean review at %s", path)
+	}
+	head, err := headSHA(cook.worktreePath)
+	if err != nil {
+		return err
+	}
+	if seen := strings.TrimSpace(string(data)); seen != head {
+		return fmt.Errorf("review saw %s but the branch head is %s", seen, head)
+	}
+	return nil
 }

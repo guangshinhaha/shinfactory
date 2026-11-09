@@ -133,6 +133,13 @@ func (l *Loop) handleCompletion(ctx context.Context, cook *cookHandle, resultSta
 		if isScheduleStage(cook.stage) {
 			return l.handleScheduleCompletion(cook)
 		}
+		if l.config.Landing.PR() {
+			// Before the stage message: a blocking message parks the stage, and
+			// approving it later must not skip the review or verify check.
+			if handled, err := l.reviewGate(cook); handled || err != nil {
+				return err
+			}
+		}
 		blocked, msg := l.processStageMessage(cook)
 		if blocked {
 			return nil
@@ -142,9 +149,6 @@ func (l *Loop) handleCompletion(ctx context.Context, cook *cookHandle, resultSta
 			return l.failStage(ctx, cook, fmt.Sprintf("merge check: %v", err))
 		}
 		if l.config.Landing.PR() {
-			if handled, err := l.reviewGate(cook); handled || err != nil {
-				return err
-			}
 			return l.completeWithPR(ctx, cook, canMerge, msg)
 		}
 		gate := mode.ModeGate{}

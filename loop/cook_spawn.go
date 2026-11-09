@@ -82,6 +82,9 @@ func (l *Loop) spawnCook(ctx context.Context, cand dispatchCandidate, order Orde
 			resumePrompt = stringx.JoinNonEmpty("\n\n", hint, resumePrompt)
 		}
 	}
+	if l.config.Landing.PR() {
+		l.clearGateFile(order, stage)
+	}
 	resumePrompt = stringx.JoinNonEmpty("\n\n", l.gateNote(order, stage), resumePrompt)
 	rationale := order.Rationale
 	if gateStageKey(stage) == gateVerifyKey && l.config.Landing.PR() {
