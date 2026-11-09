@@ -46,7 +46,7 @@ Spawn one `general-purpose` subagent. See `references/agents.md § Reviewer` for
 Combines three concerns in a single pass:
 - **Synthesis**: Proposes missing wikilinks, flags principle tensions, suggests clarifications.
 - **Distillation**: Identifies recurring patterns that reveal unstated principles. New principles must be (1) independent, (2) evidenced by 2+ notes, (3) actionable.
-- **Skill review**: Cross-references skills against shinstack principles. Finds contradictions, missed structural enforcement, redundant instructions. Audits description frontmatters for context bloat.
+- **Skill review**: Cross-references skills against shinstack principles when installed, otherwise against the project's own brain and skills. Finds contradictions, missed structural enforcement, redundant instructions. Audits description frontmatters for context bloat.
 
 ### 4. Review reports
 
@@ -66,7 +66,7 @@ Apply all changes directly. The user reviews the diff.
 - **Verbose notes**: Condense in place
 - **New connections**: Add `[[wikilinks]]`
 - **Tensions**: Reword to clarify boundaries
-- **New principles**: Only from the distillation section, only if genuinely independent. Principles live in shinstack: append one line per candidate to `~/.claude/shinstack-friction.md` for shinstack's `reflect` to review. Never write principle files into the brain
+- **New principles**: Only from the distillation section, only if genuinely independent. Principles live in shinstack: when it is installed, append one line per candidate to `~/.claude/shinstack-friction.md` for shinstack's `reflect` to review; when shinstack is not installed, list the candidates under "General lessons" in the report for the human. Never write principle files into the brain
 - **Merge principles**: not done here; principles live in shinstack
 - **Bloated skill descriptions**: Tighten frontmatter descriptions — cut what Claude can infer, keep only distinctive triggers and purpose
 - **CLAUDE.md issues**: Rewrite or delete

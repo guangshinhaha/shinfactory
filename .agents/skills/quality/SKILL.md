@@ -12,9 +12,9 @@ Operate fully autonomously. Never ask the user.
 
 ## Step 0 -- Load Principles
 
-Load the `shinstack:craft` skill and read the principles its router lists for this change, in full. These govern the review. Do NOT skip this.
+If the `shinstack:craft` skill is in your skill list, load it and read the principles its router lists for this change, in full. These govern the review. Do NOT skip this. If shinstack is not installed, don't try to load it; judge against the three principles under "Without shinstack" below.
 
-**Block only on what you can show** (shinstack `interrogate` rule): a failing run, a bug a user would hit, a failed gate, a missed Done when, or a doc line the change made wrong. Everything else is a non-blocking issue.
+**Block only on what you can show** (shinstack's `interrogate` rule, which applies with or without the plugin): a failing run, a bug a user would hit, a failed gate, a missed Done when, or a doc line the change made wrong. Everything else is a non-blocking issue.
 
 ## Assessment Pipeline
 
@@ -78,4 +78,11 @@ Issues that don't warrant rejection (style nits, minor improvements, documentati
 
 ## Principles
 
-From shinstack: prove-it-works, test-behavior-not-implementation, fix-root-causes.
+From shinstack, when installed: prove-it-works, test-behavior-not-implementation, fix-root-causes.
+
+## Without shinstack
+
+Block only on what you can show: a failing run, a bug a user would hit, a failed gate, a missed Done when, or a doc line the change made wrong. Everything else is a non-blocking issue. Judge by these three:
+- **Prove it works.** Trust runs and artifacts, not the cook's self-report. Run the change yourself against the Done when.
+- **Test behavior, not implementation.** A test that only restates the code proves nothing; a good one fails when behavior breaks.
+- **Fix root causes.** A fix that hides the symptom (a retry, a swallowed error, a special case) is a blocker when you can show the cause is still there.

@@ -68,7 +68,7 @@ This is a Go project. Use `go test`, `go build`, `go vet` in prompts. Codex work
 
 When other work exists in the same codebase, include explicit "DO NOT modify or delete" file lists in the prompt. The positive instruction ("only touch these files") is insufficient — Codex interprets "clean up" broadly.
 
-Per shinstack prove-it-works: trust artifacts, not self-reports.
+Prove it works: trust artifacts, not self-reports. (This is shinstack's `prove-it-works` when it is installed; the rule holds without it.)
 
 ## Worktree Usage
 

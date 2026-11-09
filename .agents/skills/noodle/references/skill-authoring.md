@@ -385,7 +385,7 @@ Run `shinfactory schema orders` for the canonical schema. Key structure:
 
 ### Project-Specific Conventions
 
-- **Read brain at runtime.** Skills referencing principles should load shinstack and read the files so they pick up changes. Don't inline principle text.
+- **Read brain at runtime.** Skills referencing principles should load shinstack, when it is installed, and read the files so they pick up changes. Don't inline principle text. Every skill that loads a shinstack skill must also say what to do when shinstack is not installed (a short "Without shinstack" block), so the stage never fails on a missing skill.
 - **Don't use plan mode for plan-only skills.** `EnterPlanMode` restricts tools to read-only. For skills that produce plans as output, write plan files directly.
 - **Skills live in `.agents/skills/`**. The `.claude/skills` symlink makes them visible to Claude automatically.
 
