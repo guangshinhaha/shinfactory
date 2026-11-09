@@ -33,3 +33,14 @@ func TestDispatchEnvFlagsSensitiveSession(t *testing.T) {
 		}
 	}
 }
+
+func TestOrcaSpecNamesDeniedProvider(t *testing.T) {
+	d := &OrcaDispatcher{projectDir: "/p"}
+	spec := d.buildSpec("s1", DispatchRequest{Provider: "claude", Prompt: "synthetic", DenyProviders: []string{"codex"}}, "")
+	if !strings.Contains(spec, "Do not run or delegate to the codex CLI") {
+		t.Errorf("spec lacks the sensitive line:\n%s", spec)
+	}
+	if strings.Contains(d.buildSpec("s1", DispatchRequest{Provider: "claude", Prompt: "synthetic"}, ""), "Sensitive repo") {
+		t.Error("non-sensitive spec mentions a sensitive repo")
+	}
+}

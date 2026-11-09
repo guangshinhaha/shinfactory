@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -200,7 +201,13 @@ NOODLE_PROJECT_DIR=%s shinfactory event emit --session %s <event> --payload '<js
 
 The factory reads `+"`stage_yield`"+` and `+"`stage_fail`"+` from that session; the Orca
 `+"`worker_done`"+` message alone does not tell it what happened.`, sessionID, shellx.Quote(d.projectDir), sessionID)
-	return stringx.JoinNonEmpty("\n\n", buildSessionPreamble(), skillSystemPrompt, identity, req.Prompt)
+	sensitive := ""
+	if len(req.DenyProviders) > 0 {
+		// Orca starts the agent, so the factory cannot pass tool denials; this is advisory only.
+		sensitive = "## Sensitive repo\n\nThis repo's work stays on provider " + strconv.Quote(req.Provider) +
+			". Do not run or delegate to the " + strings.Join(req.DenyProviders, ", ") + " CLI."
+	}
+	return stringx.JoinNonEmpty("\n\n", buildSessionPreamble(), skillSystemPrompt, identity, sensitive, req.Prompt)
 }
 
 func (d *OrcaDispatcher) startWorker(ctx context.Context, runID, sessionID, specPath, agent string, req DispatchRequest) (string, error) {
