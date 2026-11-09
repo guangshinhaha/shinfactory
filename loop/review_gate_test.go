@@ -87,6 +87,7 @@ func (h *gateHarness) next(t *testing.T) string {
 	if err := h.l.Cycle(context.Background()); err != nil {
 		t.Fatalf("completion cycle: %v", err)
 	}
+	h.settleEvidence(t)
 	return prompt
 }
 
@@ -511,5 +512,21 @@ func TestResubmittedFailedOrderKeepsTierAndRound(t *testing.T) {
 	}
 	if got := res.Orders.Orders[0]; got.Tier != "high" || got.Round != 2 || got.Status != OrderStatusActive {
 		t.Fatalf("resubmitted order tier=%q round=%d status=%q, want high, 2, active", got.Tier, got.Round, got.Status)
+	}
+}
+
+// settleEvidence cycles until the repo checks running off the loop goroutine
+// have been handled.
+func (h *gateHarness) settleEvidence(t *testing.T) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for len(h.l.evidence.checks) > 0 {
+		if time.Now().After(deadline) {
+			t.Fatal("repo checks never finished")
+		}
+		time.Sleep(time.Millisecond)
+		if err := h.l.Cycle(context.Background()); err != nil {
+			t.Fatalf("evidence cycle: %v", err)
+		}
 	}
 }

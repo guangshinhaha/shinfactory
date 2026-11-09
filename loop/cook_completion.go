@@ -17,6 +17,9 @@ import (
 )
 
 func (l *Loop) drainCompletions(ctx context.Context) error {
+	if err := l.finishEvidenceChecks(ctx); err != nil {
+		return err
+	}
 	drainedAny := false
 	for {
 		select {
@@ -138,53 +141,57 @@ func (l *Loop) handleCompletion(ctx context.Context, cook *cookHandle, resultSta
 			return l.handleScheduleCompletion(cook)
 		}
 		if order, ok := l.orderByID(cook.orderID); ok && !isScheduleOrder(order) {
-			if err := l.checkExecuteEvidence(ctx, order, cook); err != nil {
-				reason := err.Error()
-				if ferr := l.failStage(ctx, cook, reason); ferr != nil {
-					return ferr
-				}
-				l.noteRejectedStage(ctx, cook.orderID, reason)
+			if l.needsAsyncEvidence(cook) {
+				l.startEvidenceCheck(ctx, order, cook)
 				return nil
 			}
-		}
-		if l.config.Landing.PR() {
-			// Before the stage message: a blocking message parks the stage, and
-			// approving it later must not skip the review or verify check.
-			if handled, err := l.reviewGate(cook); handled || err != nil {
-				return err
+			if err := l.checkExecuteEvidence(ctx, order, cook); err != nil {
+				return l.rejectStage(ctx, cook, err.Error())
 			}
 		}
-		blocked, msg := l.processStageMessage(cook)
-		if blocked {
-			return nil
-		}
-		canMerge, err := l.worktreeHasChanges(cook)
-		if err != nil {
-			return l.failStage(ctx, cook, fmt.Sprintf("merge check: %v", err))
-		}
-		if l.config.Landing.PR() {
-			return l.completeWithPR(ctx, cook, canMerge, msg)
-		}
-		gate := mode.ModeGate{}
-		canAutoMerge := gate.CanAutoMerge(l.canonical.Mode)
-		if canMerge && !canAutoMerge {
-			reason := gate.BlockedReason(l.canonical.Mode, mode.ActionAutoMerge)
-			if reason == "" {
-				reason = "merge requires review"
-			}
-			return l.parkPendingReview(cook, reason)
-		}
-		mergeable := canMerge && canAutoMerge
-		if err := l.emitEventChecked(ingest.EventStageCompleted, l.mergeLifecyclePayload(cook, mergeable)); err != nil {
-			return err
-		}
-		if mergeable {
-			return l.completeWithMerge(ctx, cook, msg)
-		}
-		return l.completeWithoutMerge(ctx, cook, msg)
+		return l.completeAfterEvidence(ctx, cook)
 	}
 
 	return l.handleStageFailure(ctx, cook, resultStatus, status)
+}
+
+// completeAfterEvidence lands a stage that finished and passed its evidence.
+func (l *Loop) completeAfterEvidence(ctx context.Context, cook *cookHandle) error {
+	if l.config.Landing.PR() {
+		// Before the stage message: a blocking message parks the stage, and
+		// approving it later must not skip the review or verify check.
+		if handled, err := l.reviewGate(cook); handled || err != nil {
+			return err
+		}
+	}
+	blocked, msg := l.processStageMessage(cook)
+	if blocked {
+		return nil
+	}
+	canMerge, err := l.worktreeHasChanges(cook)
+	if err != nil {
+		return l.failStage(ctx, cook, fmt.Sprintf("merge check: %v", err))
+	}
+	if l.config.Landing.PR() {
+		return l.completeWithPR(ctx, cook, canMerge, msg)
+	}
+	gate := mode.ModeGate{}
+	canAutoMerge := gate.CanAutoMerge(l.canonical.Mode)
+	if canMerge && !canAutoMerge {
+		reason := gate.BlockedReason(l.canonical.Mode, mode.ActionAutoMerge)
+		if reason == "" {
+			reason = "merge requires review"
+		}
+		return l.parkPendingReview(cook, reason)
+	}
+	mergeable := canMerge && canAutoMerge
+	if err := l.emitEventChecked(ingest.EventStageCompleted, l.mergeLifecyclePayload(cook, mergeable)); err != nil {
+		return err
+	}
+	if mergeable {
+		return l.completeWithMerge(ctx, cook, msg)
+	}
+	return l.completeWithoutMerge(ctx, cook, msg)
 }
 
 // handleScheduleCompletion handles a successful schedule stage completion.

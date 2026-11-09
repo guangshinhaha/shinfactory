@@ -2,12 +2,14 @@ package loop
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/guangshinhaha/shinfactory/internal/orderx"
 )
@@ -321,4 +323,127 @@ func TestWorkTypeSurvivesAnAmendment(t *testing.T) {
 	if !changed || merged.WorkType != "bug" {
 		t.Fatalf("merged work type = %q (changed %v), want bug kept", merged.WorkType, changed)
 	}
+}
+
+// A slow check on one order's execute stage must not hold up the loop: control
+// commands are still processed while it runs, and the stage is accepted when
+// the check finishes.
+func TestSlowCheckDoesNotBlockControlCommands(t *testing.T) {
+	h := evidenceHarness(t, "feature", checksMD)
+	started, release := make(chan struct{}), make(chan struct{})
+	old := runRepoCheck
+	runRepoCheck = func(context.Context, string, string) (string, error) {
+		close(started)
+		<-release
+		return "ok", nil
+	}
+	t.Cleanup(func() { runRepoCheck = old })
+
+	if err := h.l.Cycle(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	h.rt.sessions[h.n].complete("completed")
+	h.n++
+
+	done := make(chan error, 1)
+	go func() { done <- h.l.Cycle(context.Background()) }()
+	select {
+	case <-started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the check never started")
+	}
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("the loop cycle is stuck behind the running check")
+	}
+
+	cmd, _ := json.Marshal(ControlCommand{ID: "c1", Action: "pause"})
+	if err := os.WriteFile(filepath.Join(h.l.runtimeDir, "control.ndjson"), append(cmd, '\n'), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.l.Cycle(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := h.l.cmds.processedIDs["c1"]; !ok {
+		t.Fatal("control command not processed while a check was running")
+	}
+	if len(h.ln.merged) != 0 {
+		t.Fatal("stage accepted before its check finished")
+	}
+
+	close(release)
+	h.l.cmds.processedIDs = map[string]struct{}{}
+	h.settleEvidence(t)
+	h.shipped(t)
+}
+
+// A second order's completion lands while the first order's check is blocked.
+func TestSlowCheckDoesNotDelayAnotherOrdersCompletion(t *testing.T) {
+	h := evidenceHarness(t, "feature", checksMD)
+	if err := h.l.mutateOrdersState(func(o *OrdersFile) (bool, error) {
+		o.Orders = append(o.Orders, Order{ID: "43", Title: "Other", Status: OrderStatusActive,
+			Stages: []Stage{{TaskKey: "quality", Skill: "quality", Provider: "claude", Model: "claude-opus-4-6", Status: StageStatusPending}}})
+		return true, nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	started, release := make(chan struct{}), make(chan struct{})
+	old := runRepoCheck
+	runRepoCheck = func(context.Context, string, string) (string, error) {
+		close(started)
+		<-release
+		return "ok", nil
+	}
+	t.Cleanup(func() { runRepoCheck = old })
+	defer func() {
+		select {
+		case <-release:
+		default:
+			close(release)
+		}
+	}()
+
+	if err := h.l.Cycle(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(h.rt.sessions) != 2 {
+		t.Fatalf("sessions = %d, want both orders dispatched", len(h.rt.sessions))
+	}
+	var executeIdx, qualityIdx int
+	for i, c := range h.rt.calls {
+		if c.Skill == "execute" {
+			executeIdx = i
+		} else {
+			qualityIdx = i
+		}
+	}
+	h.rt.sessions[executeIdx].complete("completed")
+	h.rt.sessions[qualityIdx].complete("completed")
+	cycleDone := make(chan error, 1)
+	go func() { cycleDone <- h.l.Cycle(context.Background()) }()
+	<-started
+	select {
+	case err := <-cycleDone:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("the loop cycle is stuck behind the running check")
+	}
+	if o, ok := h.l.orderByID("43"); ok {
+		for _, s := range o.Stages {
+			if s.Status != StageStatusCompleted {
+				t.Fatalf("order 43 stage %s = %s, want completed while order 42's check blocks", s.TaskKey, s.Status)
+			}
+		}
+	}
+	if !h.l.evidence.running("42") {
+		t.Fatal("order 42's check should still be running")
+	}
+	close(release)
+	h.settleEvidence(t)
 }

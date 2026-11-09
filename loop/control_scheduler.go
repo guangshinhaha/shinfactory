@@ -18,6 +18,8 @@ func (l *Loop) controlAdvance(orderID string) error {
 		return fmt.Errorf("advance requires order_id")
 	}
 
+	l.cancelEvidenceCheck(orderID)
+
 	// Kill the active session to prevent double-processing when it exits.
 	if cook, ok := l.cooks.activeCooksByOrder[orderID]; ok {
 		if err := cook.session.ForceKill(); err != nil {

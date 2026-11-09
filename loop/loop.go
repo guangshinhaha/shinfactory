@@ -115,6 +115,7 @@ func New(projectDir, noodleBin string, cfg config.Config, deps Dependencies) *Lo
 			ByRuntime: map[string]int{},
 		},
 		recentHistory: make([]mise.HistoryItem, 0, 20),
+		wake:          make(chan struct{}, 1),
 	}
 	loop.mergeQueue = NewMergeQueue(context.Background(), func(ctx context.Context, req MergeRequest) error {
 		if req.Cook == nil {
@@ -374,6 +375,8 @@ func (l *Loop) Run(ctx context.Context) error {
 			return nil
 		case <-ticker.C:
 			enqueueRuntimeCycle(cycleTrigger)
+		case <-l.wake:
+			enqueueRuntimeCycle(cycleTrigger)
 		case <-cycleTrigger:
 			if err := l.runOnce(ctx); err != nil {
 				return err
@@ -390,9 +393,9 @@ func (l *Loop) runOnce(ctx context.Context) error {
 	if err := l.Cycle(ctx); err != nil {
 		return err
 	}
-	mergeSettled := true
+	mergeSettled := len(l.evidence.checks) == 0
 	if l.mergeQueue != nil {
-		mergeSettled = l.mergeQueue.Pending() == 0 && l.mergeQueue.InFlight() == 0
+		mergeSettled = mergeSettled && l.mergeQueue.Pending() == 0 && l.mergeQueue.InFlight() == 0
 	}
 	if l.state != StateDraining || l.watcherCount.Load() != 0 || !mergeSettled {
 		return nil
