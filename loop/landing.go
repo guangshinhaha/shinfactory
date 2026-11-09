@@ -24,6 +24,8 @@ type PRSpec struct {
 	Title string
 	Body  string
 	Base  string // empty means the repository default branch
+	// Branch is the order's own branch. The lander acts only on this branch.
+	Branch string
 }
 
 // Lander moves an order's branch to the remote and through its PR. Every
