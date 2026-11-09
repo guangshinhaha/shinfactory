@@ -24,7 +24,7 @@ func writeRuntime(t *testing.T) string {
 		Orders: map[string]state.OrderNode{
 			"o-run": {OrderID: "o-run", Sequence: 1, Title: "Running one", Status: state.OrderActive, Stages: []state.StageNode{
 				{StageIndex: 0, TaskKey: "execute", Provider: "claude", Model: "sonnet", Status: state.StageCompleted},
-				{StageIndex: 1, TaskKey: "quality", Provider: "claude", Model: "opus", Status: state.StageRunning,
+				{StageIndex: 1, TaskKey: "quality", Status: state.StageRunning,
 					Attempts: []state.AttemptNode{{SessionID: "sess-old", Status: state.AttemptFailed}, {SessionID: "sess-1", Status: state.AttemptRunning}}},
 			}},
 			"o-queued": {OrderID: "o-queued", Sequence: 2, Title: "Queued one", Status: state.OrderActive, Stages: []state.StageNode{
@@ -45,6 +45,10 @@ func writeRuntime(t *testing.T) string {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(sd, "orca.json"), []byte(`{"dispatch_id":"ctx_abc"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// The snapshot carries no model for the running stage; the spawn record does.
+	if err := os.WriteFile(filepath.Join(sd, "spawn.json"), []byte(`{"provider":"claude","model":"opus"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	return dir

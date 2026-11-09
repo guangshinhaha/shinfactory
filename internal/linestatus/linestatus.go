@@ -180,6 +180,11 @@ func toOrder(runtimeDir string, node state.OrderNode) Order {
 		if n := len(st.Attempts); n > 0 {
 			out.SessionID = st.Attempts[n-1].SessionID
 			out.DispatchID = dispatchID(runtimeDir, out.SessionID)
+			// Routing resolves at dispatch, so the snapshot rarely names the model;
+			// the session's spawn record holds what actually ran.
+			if provider, model := spawnRouting(runtimeDir, out.SessionID); model != "" {
+				out.Provider, out.Model = provider, model
+			}
 		}
 		order.Stages = append(order.Stages, out)
 	}
@@ -199,4 +204,17 @@ func dispatchID(runtimeDir, sessionID string) string {
 		return ""
 	}
 	return rec.DispatchID
+}
+
+// spawnRouting reads the provider and model a session was dispatched with.
+// A session with no spawn record has none.
+func spawnRouting(runtimeDir, sessionID string) (provider, model string) {
+	rec, err := jsonx.ReadJSON[struct {
+		Provider string `json:"provider"`
+		Model    string `json:"model"`
+	}](filepath.Join(runtimeDir, "sessions", sessionID, "spawn.json"))
+	if err != nil {
+		return "", ""
+	}
+	return rec.Provider, rec.Model
 }
