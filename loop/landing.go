@@ -97,6 +97,13 @@ func (g ghLander) PushAndEnsureDraft(ctx context.Context, dir string, spec PRSpe
 	} else if ok {
 		return pr, nil
 	}
+	// The PR may already be merged (by a human, or a merge queue, while the
+	// order waited on checks). Opening another would be a stray PR.
+	if pr, ok, err := g.findMerged(ctx, dir, branch); err != nil {
+		return PullRequest{}, err
+	} else if ok {
+		return pr, nil
+	}
 	args := []string{"pr", "create", "--draft", "--head", branch, "--title", spec.Title, "--body", spec.Body}
 	if spec.Base != "" {
 		args = append(args, "--base", spec.Base)
@@ -112,6 +119,31 @@ func (g ghLander) PushAndEnsureDraft(ctx context.Context, dir string, spec PRSpe
 		return PullRequest{}, fmt.Errorf("gh pr create succeeded but no open PR exists for branch %s", branch)
 	}
 	return pr, nil
+}
+
+// findMerged returns the branch's merged PR when its head is the worktree's
+// HEAD, so a reused branch name with new commits is not mistaken for it.
+func (g ghLander) findMerged(ctx context.Context, dir, branch string) (PullRequest, bool, error) {
+	head, err := g.run(ctx, dir, "git", "rev-parse", "HEAD")
+	if err != nil {
+		return PullRequest{}, false, err
+	}
+	out, err := g.run(ctx, dir, "gh", "pr", "list", "--head", branch, "--state", "merged", "--json", "url,headRefOid,isCrossRepository", "--limit", "1")
+	if err != nil {
+		return PullRequest{}, false, err
+	}
+	var prs []struct {
+		URL               string `json:"url"`
+		HeadRefOid        string `json:"headRefOid"`
+		IsCrossRepository bool   `json:"isCrossRepository"`
+	}
+	if err := json.Unmarshal([]byte(out), &prs); err != nil {
+		return PullRequest{}, false, fmt.Errorf("parse gh pr list output %q: %w", out, err)
+	}
+	if len(prs) == 0 || prs[0].IsCrossRepository || prs[0].HeadRefOid != head {
+		return PullRequest{}, false, nil
+	}
+	return PullRequest{URL: prs[0].URL, Branch: branch}, true, nil
 }
 
 func (g ghLander) find(ctx context.Context, dir, branch, base string) (PullRequest, bool, error) {

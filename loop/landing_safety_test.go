@@ -107,3 +107,35 @@ func TestGHLanderMergeRefusesAPRThatIsNotTheOrders(t *testing.T) {
 		t.Fatalf("acted on a foreign PR:\n%s", calls)
 	}
 }
+
+// A parked PR that was merged outside the loop (a human, or a merge queue)
+// must be recognised as merged. Opening a fresh PR for it is how stray PRs
+// like #43 appear.
+func TestGHLanderDoesNotOpenAnotherPRForABranchAlreadyMerged(t *testing.T) {
+	t.Setenv("SHINFACTORY_ALLOW_REAL_GH", "1")
+	work := newOrderRepo(t, "42-0-task")
+	head := gitIn(t, work, "rev-parse", "HEAD")
+	bin := t.TempDir()
+	logPath := filepath.Join(t.TempDir(), "calls.log")
+	script := "#!/bin/sh\necho \"$*\" >> \"" + logPath + "\"\n" +
+		"case \"$*\" in\n" +
+		"*\"--state merged\"*) echo '[{\"url\":\"https://github.test/o/r/pull/9\",\"isDraft\":false,\"baseRefName\":\"main\",\"isCrossRepository\":false,\"headRefOid\":\"" + head + "\"}]' ;;\n" +
+		"\"pr list\"*) echo '[]' ;;\n" +
+		"\"pr view\"*) echo '{\"headRefName\":\"42-0-task\",\"state\":\"MERGED\",\"isDraft\":false,\"isCrossRepository\":false,\"mergeStateStatus\":\"UNKNOWN\",\"statusCheckRollup\":[]}' ;;\n" +
+		"*) echo \"unexpected: $*\" >&2; exit 1 ;;\nesac\n"
+	if err := os.WriteFile(filepath.Join(bin, "gh"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	pr, err := (ghLander{}).PushAndEnsureDraft(context.Background(), work, PRSpec{Title: "T", Branch: "42-0-task"})
+	if err != nil {
+		t.Fatalf("PushAndEnsureDraft: %v", err)
+	}
+	if strings.Contains(ghCalls(logPath), "pr create") {
+		t.Fatalf("opened a new PR for a merged branch:\n%s", ghCalls(logPath))
+	}
+	if err := (ghLander{}).MarkReadyAndMerge(context.Background(), work, pr); err != nil {
+		t.Fatalf("a merged PR must count as shipped: %v", err)
+	}
+}
