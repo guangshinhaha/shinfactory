@@ -167,9 +167,9 @@ func (l *Loop) spawnCook(ctx context.Context, cand dispatchCandidate, order Orde
 
 	// Emit V2 canonical state events for dispatch.
 	l.emitEvent(ingest.EventDispatchCompleted, map[string]any{
-		"order_id":    cand.OrderID,
-		"stage_index": cand.StageIndex,
-		"attempt_id":  attemptID,
+		"order_id":      cand.OrderID,
+		"stage_index":   cand.StageIndex,
+		"attempt_id":    attemptID,
 		"session_id":    session.ID(),
 		"worktree_name": name,
 	})
@@ -204,7 +204,9 @@ func (l *Loop) dispatchSession(ctx context.Context, req loopruntime.DispatchRequ
 		l.holdRuntime(runtimeName, err.Error())
 		return nil, RuntimeFallbackOutcome{}, err
 	}
-	if runtimeName != "process" {
+	// No fallback from orca: a plain process would run on the default login
+	// while the config says orca. The caller fails the stage with this error.
+	if dispatcher.AllowsProcessFallback(runtimeName) {
 		if fallback := l.deps.Runtimes["process"]; fallback != nil {
 			l.logger.Warn("runtime dispatch failed, falling back to process", "runtime", runtimeName, "error", err)
 			req.Runtime = "process"
@@ -261,11 +263,11 @@ func (l *Loop) handleCookDispatchFailure(cand dispatchCandidate, stage Stage, wo
 	}
 	l.recordStageFailure(cook, reason, OrderFailureClassStageTerminal, nil)
 	l.emitEvent(ingest.EventStageFailed, map[string]any{
-		"order_id":    cand.OrderID,
-		"stage_index": cand.StageIndex,
-		"attempt_id":  attemptID,
+		"order_id":      cand.OrderID,
+		"stage_index":   cand.StageIndex,
+		"attempt_id":    attemptID,
 		"worktree_name": worktreeName,
-		"error":       reason,
+		"error":         reason,
 	})
 	l.forwardToScheduler(cook, "dispatch_failed", reason, nil)
 	l.classifyOrderHard(

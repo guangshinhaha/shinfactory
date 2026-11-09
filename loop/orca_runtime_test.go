@@ -101,11 +101,12 @@ func newOrcaEnv(t *testing.T, orders OrdersFile) *orcaEnv {
 // dispatcher, the way a restarted factory process would.
 func (e *orcaEnv) newLoop() *Loop {
 	od := dispatcher.NewOrcaDispatcher(dispatcher.OrcaDispatcherConfig{
-		ProjectDir:   e.projectDir,
-		RuntimeDir:   e.runtimeDir,
-		Bin:          e.fake.Bin,
-		RunID:        e.cfg.Runtime.Orca.RunID,
-		PollInterval: 5 * time.Millisecond,
+		ProjectDir:      e.projectDir,
+		RuntimeDir:      e.runtimeDir,
+		Bin:             e.fake.Bin,
+		RunID:           e.cfg.Runtime.Orca.RunID,
+		PollInterval:    5 * time.Millisecond,
+		SelectorBackoff: time.Millisecond,
 	})
 	return New(e.projectDir, "noodle", e.cfg, Dependencies{
 		Runtimes: map[string]loopruntime.Runtime{
@@ -278,6 +279,50 @@ func TestOrcaRuntimeStageEventsDecideTheResult(t *testing.T) {
 		of := env.readOrders(t)
 		return len(of.Orders) == 1 && of.Orders[0].Status == OrderStatusFailed
 	})
+}
+
+// Issue #86: Orca has not noticed the stage's brand-new worktree when the
+// first worker-start arrives (selector_not_found). The launch retries and the
+// stage runs as an Orca worker, never as a plain process.
+func TestOrcaRuntimeFirstStageRetriesUnknownWorktree(t *testing.T) {
+	orders := OrdersFile{Orders: []Order{{
+		ID: "42", Title: "fresh worktree", Status: OrderStatusActive,
+		Stages: []Stage{{TaskKey: "execute", Skill: "execute", Provider: "claude", Model: "claude-sonnet-5-5", Status: StageStatusPending}},
+	}}}
+	env := newOrcaEnv(t, orders)
+	env.fake.RefuseUnknownWorktree(t, 1)
+	process := env.loop.deps.Runtimes["process"].(*mockRuntime)
+
+	env.cycleUntil(t, "execute launched on orca", func() bool { return len(env.fake.Starts()) >= 2 })
+	if len(process.calls) != 0 {
+		t.Fatalf("process runtime got %d dispatches; an orca stage must not fall back", len(process.calls))
+	}
+	env.settleLatest(t, "succeeded")
+	env.cycleUntil(t, "order completed", func() bool { return env.orderStages(t, "42") == nil })
+}
+
+// Issue #86: when Orca keeps refusing, the stage fails with the reason. It
+// does not quietly run as a plain process.
+func TestOrcaRuntimeLaunchFailureFailsStageWithoutProcessFallback(t *testing.T) {
+	orders := OrdersFile{Orders: []Order{{
+		ID: "42", Title: "orca down", Status: OrderStatusActive,
+		Stages: []Stage{{TaskKey: "execute", Skill: "execute", Provider: "claude", Model: "claude-sonnet-5-5", Status: StageStatusPending}},
+	}}}
+	env := newOrcaEnv(t, orders)
+	env.fake.RefuseUnknownWorktree(t, 1000)
+	process := env.loop.deps.Runtimes["process"].(*mockRuntime)
+
+	for i := 0; i < 3; i++ {
+		if err := env.loop.Cycle(context.Background()); err != nil {
+			t.Fatalf("cycle: %v", err)
+		}
+	}
+	if len(process.calls) != 0 {
+		t.Fatalf("process runtime got %d dispatches; an orca stage must not fall back", len(process.calls))
+	}
+	if got := env.orderStages(t, "42"); len(got) != 1 || got[0] != "execute:failed" {
+		t.Fatalf("stages = %v, want execute:failed (visible), not running or pending", got)
+	}
 }
 
 // Done when 3: a launch refused for usage drains the loop (nothing fails, no
