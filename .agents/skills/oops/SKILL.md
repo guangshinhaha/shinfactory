@@ -1,7 +1,7 @@
 ---
 name: oops
 description: Infrastructure fix for broken builds, failed tests, stale state, and environment drift. Covers both user-project and Noodle-internal failures. Triggers when builds break, tests fail, state is stale, or environment drifts. Use on 'oops', 'fix the build', 'tests are failing', 'something broke', 'broken build'.
-schedule: "When infrastructure failures are detected (build breaks, test failures, stale Noodle state)"
+schedule: "Never scheduled by the scheduler: a standalone order names no ready issue, so the loop drops it. The loop injects it itself, or a person runs it."
 ---
 
 # Oops
