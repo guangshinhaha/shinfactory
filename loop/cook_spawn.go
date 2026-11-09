@@ -89,7 +89,7 @@ func (l *Loop) spawnCook(ctx context.Context, cand dispatchCandidate, order Orde
 	if l.config.Landing.PR() {
 		l.clearGateFile(order, stage)
 	}
-	resumePrompt = stringx.JoinNonEmpty("\n\n", l.gateNote(order, stage), resumePrompt)
+	resumePrompt = stringx.JoinNonEmpty("\n\n", playbookNote(order, stage), l.gateNote(order, stage), resumePrompt)
 	rationale := order.Rationale
 	if gateStageKey(stage) == gateVerifyKey && l.config.Landing.PR() {
 		rationale = "" // a verifier works from the issue, not the scheduler's reasoning

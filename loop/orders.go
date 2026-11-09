@@ -357,6 +357,9 @@ func consumeOrdersNext(nextPath string, existing OrdersFile, backlog []adapter.B
 				if existing.Orders[idx].Tier != "" {
 					order.Tier = existing.Orders[idx].Tier
 				}
+				if order.WorkType == "" {
+					order.WorkType = existing.Orders[idx].WorkType
+				}
 				existing.Orders[idx] = order
 				continue
 			}
@@ -440,6 +443,9 @@ func mergeAmendedActiveOrder(existing Order, incoming Order) (Order, bool) {
 	merged.Round = existing.Round
 	if existing.Tier != "" {
 		merged.Tier = existing.Tier
+	}
+	if merged.WorkType == "" {
+		merged.WorkType = existing.WorkType
 	}
 	if reflect.DeepEqual(existing, merged) {
 		return existing, false
