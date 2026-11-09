@@ -89,7 +89,7 @@ func (l *Loop) controlEditItem(cmd ControlCommand) error {
 	if err := l.config.ValidateStageProvider(cmd.Provider); err != nil {
 		return err
 	}
-	if _, active := l.cooks.activeCooksByOrder[orderID]; active {
+	if _, active := l.cooks.activeCooksByOrder[orderID]; active || l.evidence.running(orderID) {
 		return fmt.Errorf("order %q is currently cooking", orderID)
 	}
 	return l.mutateOrdersState(func(orders *OrdersFile) (bool, error) {

@@ -179,6 +179,8 @@ type Loop struct {
 	cooks         cookTracker
 	cmds          cmdProcessor
 	completionBuf completionBuffer
+	evidence      evidenceTracker
+	wake          chan struct{} // a background task finished; Run should cycle
 
 	state             State
 	registryStale     atomic.Bool

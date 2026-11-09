@@ -403,6 +403,9 @@ func (l *Loop) planCycleSpawns(orders OrdersFile, brief mise.Brief, capacity int
 	for targetID := range l.cooks.pendingReview {
 		blockedOrders[targetID] = "pending_review"
 	}
+	for targetID := range l.evidence.checks {
+		blockedOrders[targetID] = "checking"
+	}
 
 	plan := dispatch.PlanDispatches(l.canonical, capacity, blockedOrders)
 	if len(plan.Candidates) == 0 {
