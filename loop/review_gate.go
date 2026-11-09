@@ -73,6 +73,15 @@ func gateNeeds(tier string) (review, verify bool) {
 	}
 }
 
+func hasBuildStage(order Order) bool {
+	for _, s := range order.Stages {
+		if gateStageKey(s) == gateBuildKey {
+			return true
+		}
+	}
+	return false
+}
+
 // checkGateShape fails an order whose stages could ship work its tier has not
 // had reviewed. Orders with no execute stage are not build orders and pass.
 func checkGateShape(order Order) error {
@@ -212,6 +221,9 @@ func (l *Loop) reviewGate(cook *cookHandle) (bool, error) {
 	order, ok := l.orderByID(cook.orderID)
 	if !ok || isScheduleOrder(order) {
 		return false, nil
+	}
+	if order.Tier == "" && !hasBuildStage(order) {
+		return false, nil // a standalone order (meditate, debrief) that never declared a tier
 	}
 	if err := checkGateShape(order); err != nil {
 		return true, l.failStage(nil, cook, err.Error())

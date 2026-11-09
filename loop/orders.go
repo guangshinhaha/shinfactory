@@ -348,7 +348,11 @@ func consumeOrdersNext(nextPath string, existing OrdersFile, backlog []adapter.B
 		idx, exists := existingIndex[order.ID]
 		if exists {
 			if shouldReplaceFailedOrder(existing.Orders[idx], order) {
-				order.Round = existing.Orders[idx].Round // a rewrite must not reset the fix-round cap
+				// A rewrite must not reset the fix-round cap or lower the tier.
+				order.Round = existing.Orders[idx].Round
+				if existing.Orders[idx].Tier != "" {
+					order.Tier = existing.Orders[idx].Tier
+				}
 				existing.Orders[idx] = order
 				continue
 			}

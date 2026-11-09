@@ -489,3 +489,27 @@ func TestAmendKeepsRoundAndTier(t *testing.T) {
 		t.Fatalf("amended order tier=%q round=%d ok=%v, want high, 2", merged.Tier, merged.Round, ok)
 	}
 }
+
+func TestStandaloneOrderWithoutTierIsNotGated(t *testing.T) {
+	h := newGateHarness(t, "", "reflect")
+	h.next(t)
+	if len(h.ln.merged) != 1 {
+		t.Fatalf("merges = %d, want 1: an untiered order with no execute stage is not a build order", len(h.ln.merged))
+	}
+}
+
+func TestResubmittedFailedOrderKeepsTierAndRound(t *testing.T) {
+	failed := Order{ID: "42", Tier: "high", Round: 2, Status: OrderStatusFailed, Stages: []Stage{{TaskKey: "execute", Skill: "execute", Status: StageStatusFailed}}}
+	next := filepath.Join(t.TempDir(), "orders-next.json")
+	body := `{"orders":[{"id":"42","tier":"none","stages":[{"do":"execute"}]}]}`
+	if err := os.WriteFile(next, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	res, err := consumeOrdersNext(next, OrdersFile{Orders: []Order{failed}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := res.Orders.Orders[0]; got.Tier != "high" || got.Round != 2 || got.Status != OrderStatusActive {
+		t.Fatalf("resubmitted order tier=%q round=%d status=%q, want high, 2, active", got.Tier, got.Round, got.Status)
+	}
+}
