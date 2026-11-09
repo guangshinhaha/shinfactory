@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/guangshinhaha/shinfactory/adapter"
 )
@@ -28,8 +29,13 @@ const (
 // A backlog with no stop script (a todos.md backlog) has nobody to tell, so it
 // is skipped. A failed stop is logged: the order is already failed and
 // inert, and the next stop reports again.
-func (l *Loop) stopForPerson(ctx context.Context, orderID, message string) {
-	message = strings.TrimSpace(message)
+func (l *Loop) stopForPerson(ctx context.Context, orderID, summary, detail string) {
+	message := strings.TrimSpace(summary + " " + truncateRunes(strings.TrimSpace(detail), stopMessageLimit))
+	if l.config.Routing.Sensitive {
+		// The comment lands on an issue other people can read; what the agent
+		// saw in the work stays in the session log.
+		message = strings.TrimSpace(summary + " Ask the factory chat for the details.")
+	}
 	_, err := l.deps.Adapter.Run(ctx, "backlog", "stop", adapter.RunOptions{
 		Args:  []string{orderID},
 		Stdin: []byte(message),
@@ -38,8 +44,8 @@ func (l *Loop) stopForPerson(ctx context.Context, orderID, message string) {
 	case err == nil:
 		l.logger.Info("order stopped for a person", "order", orderID)
 		l.clearFailedRounds(orderID)
-	case isMissingAdapter(err):
-		l.logger.Info("backlog has no stop action; nobody to tell", "order", orderID, "reason", message)
+	case strings.Contains(err.Error(), `action "stop" script is not configured`):
+		l.logger.Info("backlog has no stop action; nobody to tell", "order", orderID, "reason", summary)
 	default:
 		l.logger.Warn("could not hand stopped order to a person", "order", orderID, "error", err)
 	}
@@ -49,15 +55,14 @@ func (l *Loop) stopForPerson(ctx context.Context, orderID, message string) {
 // person. An unbuildable issue always does; any other rejection does once the
 // order has failed maxFailedRounds rounds.
 func (l *Loop) noteRejectedStage(ctx context.Context, orderID, reason string) {
-	if strings.HasPrefix(reason, unbuildablePrefix) {
-		l.stopForPerson(ctx, orderID, reason)
+	if detail, ok := strings.CutPrefix(reason, unbuildablePrefix); ok {
+		l.stopForPerson(ctx, orderID, "The issue has no observable Done when, or something only a person can settle blocks it.", detail)
 		return
 	}
 	if l.bumpFailedRounds(orderID) < maxFailedRounds {
 		return
 	}
-	l.stopForPerson(ctx, orderID, "Two fix rounds failed. Last rejection: "+truncateRunes(reason, stopMessageLimit)+
-		" Decide whether to change the Done when, split the issue, or drop it, then remove the label.")
+	l.stopForPerson(ctx, orderID, "Two fix rounds failed. Decide whether to change the Done when, split the issue, or drop it, then remove the label. Last rejection:", reason)
 }
 
 // failedRoundsFile counts rejected rounds per order. A retry is a fresh order
@@ -89,7 +94,13 @@ func (l *Loop) writeFailedRounds(counts map[string]int) {
 	}
 }
 
+// failedRoundsMu serializes the read-modify-write on failed-rounds.json: with
+// two cooks, two rejections can land together.
+var failedRoundsMu sync.Mutex
+
 func (l *Loop) bumpFailedRounds(orderID string) int {
+	failedRoundsMu.Lock()
+	defer failedRoundsMu.Unlock()
 	counts := l.readFailedRounds()
 	counts[orderID]++
 	l.writeFailedRounds(counts)
@@ -97,6 +108,8 @@ func (l *Loop) bumpFailedRounds(orderID string) int {
 }
 
 func (l *Loop) clearFailedRounds(orderID string) {
+	failedRoundsMu.Lock()
+	defer failedRoundsMu.Unlock()
 	counts := l.readFailedRounds()
 	if _, ok := counts[orderID]; !ok {
 		return

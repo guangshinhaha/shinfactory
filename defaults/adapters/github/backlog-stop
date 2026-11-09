@@ -17,8 +17,8 @@ label="${NOODLE_GH_STOP_LABEL:-needs-shin}"
 message=$(cat)
 [ -n "$message" ] || { echo "message required" >&2; exit 1; }
 
-stopped=$(gh issue view "$id" --json labels --jq "[.labels[].name] | any(. == \"$label\")")
-[ "$stopped" != "true" ] || exit 0
+labels=$(gh issue view "$id" --json labels --jq '.labels[].name')
+if printf '%s\n' "$labels" | grep -Fxq -- "$label"; then exit 0; fi
 
 gh label create "$label" --color D93F0B --description "shinfactory stopped and needs a person's decision" --force >/dev/null
 gh issue comment "$id" --body "shinfactory: stopped. $message" >/dev/null

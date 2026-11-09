@@ -155,8 +155,8 @@ func (l *Loop) handleMergeError(cook *cookHandle, err error) error {
 		}
 
 		l.stopForPerson(context.Background(), cook.orderID,
-			"Merge conflict the factory cannot resolve: "+truncateRunes(conflictErr.Error(), stopMessageLimit)+
-				" Resolve it by hand or reshape the issue, then remove the label.")
+			"A merge conflict the factory cannot resolve. Resolve it by hand or reshape the issue, then remove the label. Conflict:",
+			conflictErr.Error())
 
 		// Park for pending review so the chef can decide.
 		if parkErr := l.parkPendingReview(cook, reason); parkErr != nil {

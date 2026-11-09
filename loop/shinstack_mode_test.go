@@ -20,6 +20,8 @@ func TestResolveRunMode(t *testing.T) {
 		{"declared manual", ptr("shinstack-mode: manual\n"), "auto", "manual"},
 		{"undeclared falls back to configured", ptr("# X\nno mode here\n"), "auto", "auto"},
 		{"unknown value falls back to configured", ptr("shinstack-mode: yolo\n"), "supervised", "supervised"},
+		{"an example in a code fence is not a declaration", ptr("```\nshinstack-mode: auto\n```\n"), "supervised", "supervised"},
+		{"the declaration after a fence still counts", ptr("```\nx\n```\nshinstack-mode: auto\n"), "supervised", "auto"},
 		{"no CLAUDE.md falls back to configured", nil, "manual", "manual"},
 	}
 	for _, tc := range cases {

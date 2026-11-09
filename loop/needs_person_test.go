@@ -26,7 +26,7 @@ func stubStopGH(t *testing.T) (logPath string) {
 	stub := `#!/bin/sh
 printf '%s\n' "$*" >> "` + logPath + `"
 case "$1 $2" in
-  "issue view") [ -f "` + dir + `/labelled" ] && echo true || echo false ;;
+  "issue view") if [ -f "` + dir + `/labelled" ]; then echo needs-shin; fi; echo ready ;;
   "issue edit") case "$*" in *--add-label*) touch "` + dir + `/labelled" ;; esac ;;
 esac
 `
@@ -137,7 +137,7 @@ func TestStopForPersonWhenTheIssueIsUnbuildable(t *testing.T) {
 
 	log := ghLog(t, env.log)
 	if strings.Count(log, "issue comment 7") != 1 ||
-		!strings.Contains(log, "issue comment 7 --body shinfactory: stopped. Unbuildable: the issue says") {
+		!strings.Contains(log, "issue comment 7 --body shinfactory: stopped. The issue has no observable Done when, or something only a person can settle blocks it. the issue says") {
 		t.Fatalf("want one comment on issue 7 carrying the reason:\n%s", log)
 	}
 	if !strings.Contains(log, "issue edit 7 --add-label needs-shin") {
@@ -158,7 +158,7 @@ func TestStopForPersonAfterTwoFailedRounds(t *testing.T) {
 	env.reject(t, 2, "Rejected: ./greet still prints nothing.")
 	log := ghLog(t, env.log)
 	if strings.Count(log, "issue comment 7") != 1 ||
-		!strings.Contains(log, "Two fix rounds failed. Last rejection: Rejected: ./greet still prints nothing.") {
+		!strings.Contains(log, "Last rejection: Rejected: ./greet still prints nothing.") {
 		t.Fatalf("want one comment after round 2 naming the decision:\n%s", log)
 	}
 	if !strings.Contains(log, "issue edit 7 --add-label needs-shin") {
@@ -195,7 +195,7 @@ func TestStopForPersonOnAnUnresolvableMergeConflict(t *testing.T) {
 	}
 
 	log := ghLog(t, logPath)
-	if strings.Count(log, "issue comment 7") != 1 || !strings.Contains(log, "Merge conflict the factory cannot resolve") {
+	if strings.Count(log, "issue comment 7") != 1 || !strings.Contains(log, "A merge conflict the factory cannot resolve") {
 		t.Fatalf("want one comment on issue 7 naming the conflict:\n%s", log)
 	}
 	if !strings.Contains(log, "issue edit 7 --add-label needs-shin") {
@@ -217,5 +217,21 @@ func TestStopForPersonSkipsABacklogWithoutAStopAction(t *testing.T) {
 	}
 	if log := ghLog(t, env.log); log != "" {
 		t.Fatalf("gh was called for a backlog with no stop action:\n%s", log)
+	}
+}
+
+// A sensitive repo's issue comment says what kind of stop it is and leaves the
+// agent's own words out.
+func TestStopForPersonKeepsDetailOutOfCommentsForSensitiveRepos(t *testing.T) {
+	env := newStopEnv(t)
+	env.loop.config.Routing.Sensitive = true
+	env.reject(t, 1, "Unbuildable: student Tan Ah Kow (S1234567A) in fixtures/roster.csv")
+
+	log := ghLog(t, env.log)
+	if strings.Contains(log, "S1234567A") || strings.Contains(log, "roster.csv") {
+		t.Fatalf("agent detail reached the issue comment:\n%s", log)
+	}
+	if !strings.Contains(log, "issue comment 7 --body shinfactory: stopped.") || !strings.Contains(log, "needs-shin") {
+		t.Fatalf("sensitive stop still has to comment and label:\n%s", log)
 	}
 }
