@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/guangshinhaha/shinfactory/internal/reducer"
 	"github.com/guangshinhaha/shinfactory/internal/state"
 	"github.com/guangshinhaha/shinfactory/internal/statusfile"
 )
@@ -36,7 +37,7 @@ func writeRuntime(t *testing.T) string {
 		},
 		PendingReviews: map[string]state.PendingReviewNode{"o-park": {OrderID: "o-park", Reason: "review"}},
 	}
-	if err := st.Persist(filepath.Join(dir, "state.snapshot.json")); err != nil {
+	if err := reducer.WriteSnapshotAtomic(filepath.Join(dir, "state.snapshot.json"), reducer.BuildSnapshot(st, nil, time.Now())); err != nil {
 		t.Fatal(err)
 	}
 	sd := filepath.Join(dir, "sessions", "sess-1")
@@ -104,5 +105,16 @@ func TestRecordNeedsShinKeepsOnePerOrder(t *testing.T) {
 	items, err := readNeedsShin(dir)
 	if err != nil || len(items) != 1 || items[0].Reason != "second" {
 		t.Fatalf("items = %+v, err = %v", items, err)
+	}
+}
+
+func TestReadTreatsAnEmptySnapshotAsAnIdleLine(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "state.snapshot.json"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	rep, err := Read(dir)
+	if err != nil || len(rep.Running) != 0 {
+		t.Fatalf("rep = %+v, err = %v", rep, err)
 	}
 }

@@ -3,13 +3,18 @@
 package linestatus
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
+	"io/fs"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/guangshinhaha/shinfactory/internal/jsonx"
+	"github.com/guangshinhaha/shinfactory/internal/reducer"
 	"github.com/guangshinhaha/shinfactory/internal/state"
 	"github.com/guangshinhaha/shinfactory/internal/statusfile"
 )
@@ -81,7 +86,7 @@ func Read(runtimeDir string) (Report, error) {
 	if err != nil {
 		return Report{}, err
 	}
-	canonical, err := state.Load(filepath.Join(runtimeDir, "state.snapshot.json"))
+	canonical, err := readCanonical(filepath.Join(runtimeDir, "state.snapshot.json"))
 	if err != nil {
 		return Report{}, err
 	}
@@ -135,6 +140,23 @@ func Read(runtimeDir string) (Report, error) {
 		}
 	}
 	return rep, nil
+}
+
+// readCanonical reads the loop's durable snapshot, which wraps the state with
+// its effect ledger. A missing file is a loop that never ran.
+func readCanonical(path string) (state.State, error) {
+	data, err := os.ReadFile(path)
+	if errors.Is(err, fs.ErrNotExist) || (err == nil && len(bytes.TrimSpace(data)) == 0) {
+		return state.State{}, nil
+	}
+	if err != nil {
+		return state.State{}, fmt.Errorf("read state snapshot: %w", err)
+	}
+	snap, err := reducer.ReadSnapshot(path)
+	if err != nil {
+		return state.State{}, err
+	}
+	return snap.State, nil
 }
 
 func hasParked(s state.State, node state.OrderNode) bool {

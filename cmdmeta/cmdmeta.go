@@ -28,6 +28,7 @@ func Commands() []Command {
 		}},
 		{Name: "version", Short: "Print noodle version"},
 		{Name: "status", Short: "Show compact runtime status"},
+		{Name: "control", Short: "Send a control to the running loop and print its result"},
 		{Name: "skills", Short: "List resolved skills", Subcommands: []Command{
 			{Name: "list", Short: "List all resolved skills"},
 		}},

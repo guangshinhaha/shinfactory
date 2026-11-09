@@ -8,8 +8,6 @@ import (
 	"io/fs"
 	"net"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -256,7 +254,7 @@ func (s *Server) processControl(req controlRequest) (loop.ControlAck, error) {
 		cmd.ID = fmt.Sprintf("web-%d", cmd.At.UnixNano())
 	}
 
-	if err := appendControlCommand(s.runtimeDir, cmd); err != nil {
+	if err := loop.AppendControlCommand(s.runtimeDir, cmd); err != nil {
 		return loop.ControlAck{}, err
 	}
 
@@ -318,27 +316,6 @@ func (s *Server) handleReviewDiff(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, result)
-}
-
-func appendControlCommand(runtimeDir string, cmd loop.ControlCommand) error {
-	path := filepath.Join(runtimeDir, "control.ndjson")
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return fmt.Errorf("create control directory: %w", err)
-	}
-	file, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
-	if err != nil {
-		return fmt.Errorf("open control file: %w", err)
-	}
-	defer file.Close()
-
-	line, err := json.Marshal(cmd)
-	if err != nil {
-		return fmt.Errorf("encode control command: %w", err)
-	}
-	if _, err := file.Write(append(line, '\n')); err != nil {
-		return fmt.Errorf("append control command: %w", err)
-	}
-	return nil
 }
 
 // uiOrPlaceholder returns a handler that serves the embedded SPA if ui is
