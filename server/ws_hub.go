@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -351,15 +352,7 @@ var wsUpgrader = websocket.Upgrader{
 }
 
 func parseControlRequest(action string, req controlRequest) (loop.ControlCommand, error) {
-	validActions := map[string]bool{
-		"pause": true, "resume": true, "drain": true, "skip": true,
-		"kill": true, "steer": true, "merge": true, "reject": true,
-		"request-changes": true, "mode": true, "enqueue": true,
-		"stop-all": true, "requeue": true, "edit-item": true,
-		"reorder": true, "stop": true, "set-max-concurrency": true,
-		"advance": true,
-	}
-	if !validActions[action] {
+	if !slices.Contains(loop.ControlActions(), action) {
 		return loop.ControlCommand{}, fmt.Errorf("unknown action: %s", action)
 	}
 	return loop.ControlCommand{

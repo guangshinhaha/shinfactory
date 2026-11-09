@@ -96,8 +96,10 @@ func newControlCmd(app *App) *cobra.Command {
 		Short: cmdmeta.Short("control"),
 		Long: "Send the same controls the web UI sends: " + controlNames() + ".\n" +
 			"The command goes through the loop's control queue; this waits for the loop's ack.\n" +
-			"Text that starts with - is read as a flag. Put -- before the arguments to send it as text:\n" +
-			"  shinfactory control -- steer s1 \"-v was a typo\"",
+			"Text that starts with - is read as a flag. Put -- before the arguments to send it as text.\n" +
+			"Flags go before --; after it everything is text:\n" +
+			"  shinfactory control -- steer s1 \"-v was a typo\"\n" +
+			"  shinfactory control --model opus -- enqueue s1 \"-v was a typo\"",
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runControl(app, cmd.OutOrStdout(), args[0], args[1:], flags)
