@@ -6,19 +6,15 @@
 #   NOODLE_GH_LABEL       the label that marks an issue ready (default: ready)
 #   NOODLE_GH_DONE_LABEL  label that backlog-done adds (default: shinfactory-done);
 #                         open issues carrying it sync as status "done"
-#   NOODLE_GH_STOP_LABEL  label that backlog-stop adds (default: needs-shin); issues
-#                         carrying it are skipped until a person removes it
 #   NOODLE_GH_LIMIT       max issues to read (default: 200)
 #
 # A plan is linked by a line in the issue body: "Plan: brain/plans/NN-slug/overview.md".
 set -eu
 
 done_label="${NOODLE_GH_DONE_LABEL:-shinfactory-done}"
-stop_label="${NOODLE_GH_STOP_LABEL:-needs-shin}"
 
 filter='.[]
   | [.labels[].name] as $tags
-  | select($tags | any(. == "'"$stop_label"'") | not)
   | ([(.body // "") | capture("(?m)^Plan:[ \t]*(?<p>[^ \t\r\n]+)") | .p] | first) as $plan
   | {id: (.number | tostring),
      title: .title,

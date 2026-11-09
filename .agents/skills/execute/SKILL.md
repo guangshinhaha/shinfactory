@@ -30,7 +30,7 @@ Output: a clear, bounded description of what changes and what doesn't.
 shinfactory event emit --session $NOODLE_SESSION_ID stage_fail --payload '{"message": "Unbuildable: <what is missing and who can settle it>"}'
 ```
 
-The message becomes the issue comment word for word, so write one or two plain sentences that state the decision a person must make. The loop fails the stage, discards the worktree, comments once on the issue with your message and labels it `needs-shin` (a GitHub backlog), and the scheduler sees the reason like any other stage failure. This is the one case where you stop before the work is complete.
+The message becomes the issue comment word for word, so write one or two plain sentences that state the decision a person must make. The loop fails the stage, discards the worktree, comments once on the issue with your message and swaps its `ready` label for `needs-shin` (a GitHub backlog), and the scheduler sees the reason like any other stage failure. This is the one case where you stop before the work is complete.
 
 ## 2. Decompose
 

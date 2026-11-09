@@ -28,8 +28,8 @@ const (
 )
 
 // stopForPerson hands the order's issue to a person: the backlog adapter's
-// "stop" action comments once with message and marks the issue needs-shin, and
-// the adapter's sync leaves it out of the backlog until the label is removed.
+// "stop" action comments once with message and swaps the issue's ready label for needs-shin,
+// so the backlog drops it until a person puts ready back.
 // A backlog with no stop script (a todos.md backlog) has nobody to tell, so it
 // is skipped. A failed stop is logged: the order is already failed and
 // inert, and the next stop reports again.
@@ -68,7 +68,7 @@ func (l *Loop) noteRejectedStage(ctx context.Context, orderID, reason string) {
 	if l.bumpFailedRounds(orderID) < maxFailedRounds {
 		return
 	}
-	l.stopForPerson(ctx, orderID, "Two fix rounds failed. Decide whether to change the Done when, split the issue, or drop it, then remove the label. Last rejection:", reason)
+	l.stopForPerson(ctx, orderID, "Two fix rounds failed. Decide whether to change the Done when, split the issue, or drop it, then put ready back. Last rejection:", reason)
 }
 
 // failedRoundsFile counts rejected rounds per order. A retry is a fresh order

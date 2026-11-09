@@ -140,7 +140,7 @@ func TestStopForPersonWhenTheIssueIsUnbuildable(t *testing.T) {
 		!strings.Contains(log, "issue comment 7 --body shinfactory: stopped. The issue has no observable Done when, or something only a person can settle blocks it. the issue says") {
 		t.Fatalf("want one comment on issue 7 carrying the reason:\n%s", log)
 	}
-	if !strings.Contains(log, "issue edit 7 --add-label needs-shin") {
+	if !strings.Contains(log, "issue edit 7 --remove-label ready --add-label needs-shin") {
 		t.Fatalf("issue 7 not labelled needs-shin:\n%s", log)
 	}
 }
@@ -161,7 +161,7 @@ func TestStopForPersonAfterTwoFailedRounds(t *testing.T) {
 		!strings.Contains(log, "Last rejection: Rejected: ./greet still prints nothing.") {
 		t.Fatalf("want one comment after round 2 naming the decision:\n%s", log)
 	}
-	if !strings.Contains(log, "issue edit 7 --add-label needs-shin") {
+	if !strings.Contains(log, "issue edit 7 --remove-label ready --add-label needs-shin") {
 		t.Fatalf("issue 7 not labelled needs-shin:\n%s", log)
 	}
 
@@ -198,7 +198,7 @@ func TestStopForPersonOnAnUnresolvableMergeConflict(t *testing.T) {
 	if strings.Count(log, "issue comment 7") != 1 || !strings.Contains(log, "A merge conflict the factory cannot resolve") {
 		t.Fatalf("want one comment on issue 7 naming the conflict:\n%s", log)
 	}
-	if !strings.Contains(log, "issue edit 7 --add-label needs-shin") {
+	if !strings.Contains(log, "issue edit 7 --remove-label ready --add-label needs-shin") {
 		t.Fatalf("issue 7 not labelled needs-shin:\n%s", log)
 	}
 }

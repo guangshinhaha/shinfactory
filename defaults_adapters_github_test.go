@@ -303,7 +303,7 @@ func backlogIDs(t *testing.T, env []string) string {
 }
 
 // A stopped issue gets one comment saying what is needed and the needs-shin label, drops out
-// of the backlog, and returns once a person removes the label.
+// of the backlog, and returns once a person puts ready back.
 func TestGitHubBacklogStopCommentsOnceLabelsAndPausesTheIssue(t *testing.T) {
 	env, logPath := fakeGH(t, stopIssues)
 	if got := backlogIDs(t, env); got != "7,8" {
@@ -320,20 +320,49 @@ func TestGitHubBacklogStopCommentsOnceLabelsAndPausesTheIssue(t *testing.T) {
 	if !strings.Contains(log, "issue comment 7 --body shinfactory: stopped. Unbuildable: the issue has no observable Done when. Shin, what should it check?") {
 		t.Fatalf("comment does not carry the message:\n%s", log)
 	}
-	if !strings.Contains(log, "issue edit 7 --add-label needs-shin") {
+	if !strings.Contains(log, "issue edit 7 --remove-label ready --add-label needs-shin") {
 		t.Fatalf("issue 7 not labelled needs-shin:\n%s", log)
 	}
 	if got := backlogIDs(t, env); got != "8" {
 		t.Fatalf("after the stop, backlog = %q, want only 8", got)
 	}
 
-	cmd := exec.Command(filepath.Join(filepath.Dir(logPath), "gh"), "issue", "edit", "7", "--remove-label", "needs-shin")
+	// The stopped issue lost ready and gained needs-shin in the same step.
+	raw, err := os.ReadFile(filepath.Join(filepath.Dir(logPath), "issues.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var stored []struct {
+		Number int `json:"number"`
+		Labels []struct {
+			Name string `json:"name"`
+		} `json:"labels"`
+	}
+	if err := json.Unmarshal(raw, &stored); err != nil {
+		t.Fatal(err)
+	}
+	for _, issue := range stored {
+		var names []string
+		for _, l := range issue.Labels {
+			names = append(names, l.Name)
+		}
+		got := strings.Join(names, ",")
+		if issue.Number == 7 && got != "needs-shin" {
+			t.Fatalf("stopped issue 7 labels = %q, want only needs-shin", got)
+		}
+		if issue.Number == 8 && got != "ready" {
+			t.Fatalf("untouched issue 8 labels = %q, want ready", got)
+		}
+	}
+
+	// A person resolves it by putting ready back.
+	cmd := exec.Command(filepath.Join(filepath.Dir(logPath), "gh"), "issue", "edit", "7", "--remove-label", "needs-shin", "--add-label", "ready")
 	cmd.Env = env
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("remove label: %v\n%s", err, out)
 	}
 	if got := backlogIDs(t, env); got != "7,8" {
-		t.Fatalf("after the label is removed, backlog = %q, want 7,8", got)
+		t.Fatalf("after ready is put back, backlog = %q, want 7,8", got)
 	}
 }
 
