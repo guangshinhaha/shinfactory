@@ -493,8 +493,18 @@ func (l *Loop) retryAwaitingChecks(ctx context.Context) error {
 			session:      &adoptedSession{id: pending.sessionID, status: "completed"},
 		}
 		err := l.shipParkedPR(ctx, cook, "required checks passed")
+		var pe pendingError
 		switch {
-		case err == nil, errors.Is(err, ErrChecksPending):
+		case err == nil:
+		case errors.Is(err, ErrChecksPending):
+			// Show what it waits on now, not on the first poll.
+			if errors.As(err, &pe) {
+				if strings.HasPrefix(pending.reason, approvedAwaitingChecksPrefix) {
+					pending.reason = approvedAwaitingChecksReason(err)
+				} else {
+					pending.reason = awaitingChecksReason(pe.url, err)
+				}
+			}
 		default:
 			l.logger.Warn("parked PR could not merge", "order", cook.orderID, "error", err)
 			pending.reason = "merge refused: " + err.Error()
