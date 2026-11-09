@@ -505,7 +505,7 @@ func TestResubmittedFailedOrderKeepsTierAndRound(t *testing.T) {
 	if err := os.WriteFile(next, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	res, err := consumeOrdersNext(next, OrdersFile{Orders: []Order{failed}})
+	res, err := consumeOrdersNext(next, OrdersFile{Orders: []Order{failed}}, backlogForProposal(t, next))
 	if err != nil {
 		t.Fatal(err)
 	}
