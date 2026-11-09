@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/guangshinhaha/shinfactory/adapter"
+	"github.com/guangshinhaha/shinfactory/config"
 	"github.com/guangshinhaha/shinfactory/dispatcher"
 	"github.com/guangshinhaha/shinfactory/event"
 	"github.com/guangshinhaha/shinfactory/internal/shellx"
