@@ -1,11 +1,13 @@
-# PR landing mode (`[landing] mode = "pr"`, the default)
+# PR landing mode (`[landing] mode = "pr"`)
+
+- **Default:** unset `[landing] mode` stays `""` through config and `loop.New` resolves it: `pr` when `origin` is on github.com, `local` otherwise. An explicit value always wins (`resolveLandingMode`).
 
 - Replaces the per-stage local merge with one branch and worktree per order (`cookWorktreeName` returns `<order>-0-task` for every stage). Code: `loop/landing.go`.
 - The first stage with commits pushes and opens a draft PR; later stages push to it. `PushAndEnsureDraft` is idempotent (it finds the PR by branch), so a crash mid-stage reruns safely.
 - Ship = the order's last stage completing. Auto mode merges (`gh pr merge --squash`; never `--admin`, never `--auto`, because `--auto` returns success while only queueing the merge, so the order would be marked done unmerged). While checks run, `MarkReadyAndMerge` returns `ErrChecksPending`: the stage parks ("waiting for required checks") and `retryAwaitingChecks` retries every 30s; a refusal after the wait stays parked with the reason. A merge queue that has not merged yet counts as pending. Other modes park the final stage before `stage.completed` is emitted, and `controlMerge` ships on approval (`approvePRShip`). Emitting `stage.completed` first drops the pending review.
 - `cleanupCookWorktree` is a no-op in this mode: a failed stage keeps the shared worktree for the retry. Only a successful ship removes it.
 - Tests use `fakeLander` (loop behaviour) and a stub `gh` on PATH with a local bare remote (`loop/landing_gh_test.go`).
-- Known gap: after a PR merges, local main is stale, so new orders branch from old code. Tracked as a follow-up issue.
-- `local` stays as an escape hatch for projects with no GitHub remote. Loop tests that exercise the local pipeline use `localLandingConfig()`.
+- New order worktrees branch from the freshly fetched remote default branch (`fetchLandingBase` -> `CreateOpts.From`, #42), or `[landing] base`. A failed fetch fails the dispatch rather than falling back to stale local main. Loop tests swap `fetchBase` in `lander_default_test.go`.
+- `local` is the fallback for projects with no GitHub remote. Loop tests that exercise the local pipeline use `localLandingConfig()`.
 - PR body: `Closes #N` only when `[landing] close_issues = true`; otherwise `Refs #N`.
 - **Tests must never reach the real gh.** `ghLander.run` refuses in a test binary unless `SHINFACTORY_ALLOW_REAL_GH` is set; `loop/lander_default_test.go` swaps `defaultLander` for a fake. History: after the default flipped to PR mode, default-config loop tests ran the real gh from the real shinfactory worktree and merged that branch's open PR. `ghLander` acts only on the order's own branch (`PRSpec.Branch` = the worktree name; the worktree package names branches exactly that, with no prefix) and `MarkReadyAndMerge` checks the PR's head matches. Order rationale and plan are not sent to GitHub (PDPA).

@@ -297,7 +297,17 @@ func (l *Loop) ensureWorktree(name string) (bool, error) {
 		return false, fmt.Errorf("stat worktree path %s: %w", path, err)
 	}
 
-	if err := l.deps.Worktree.Create(name); err != nil {
+	var createOpts []worktree.CreateOpts
+	if l.config.Landing.PR() {
+		// Branch from the remote's current default branch, not local main,
+		// which is stale once an earlier order's PR has merged.
+		from, err := fetchBase(l.projectDir, l.config.Landing.Base)
+		if err != nil {
+			return false, err
+		}
+		createOpts = append(createOpts, worktree.CreateOpts{From: from})
+	}
+	if err := l.deps.Worktree.Create(name, createOpts...); err != nil {
 		if isWorktreeAlreadyExistsError(err) {
 			return false, nil
 		}
