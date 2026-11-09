@@ -654,7 +654,7 @@ func TestOrcaRuntimeBareRateLimitErrorFailsTheStage(t *testing.T) {
 	env := newOrcaEnv(t, oneStageOrder())
 	env.cycleUntil(t, "execute started", func() bool { return len(env.fake.Starts()) == 1 })
 	id := env.fake.LastDispatch(t)
-	env.fake.SetTranscript(t, id, `Tests failed: expected {"type":"rate_limit_error"} from the mock API`)
+	env.fake.SetTranscript(t, id, "Tests failed: expected rate_limit_error from the mock API")
 	env.fake.Settle(t, id, "failed")
 	env.cycleUntil(t, "stage failed", func() bool {
 		of := env.readOrders(t)
