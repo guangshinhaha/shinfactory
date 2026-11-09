@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/guangshinhaha/shinfactory/event"
+	"github.com/guangshinhaha/shinfactory/parse"
 )
 
 const (
@@ -67,6 +69,7 @@ func newOrcaSession(cfg orcaSessionConfig) *orcaSession {
 func (s *orcaSession) start(ctx context.Context) {
 	s.writeInitialHeartbeat()
 	s.publish(SessionEvent{Type: "init", Message: "orca worker " + s.dispatchID, Timestamp: nowUTC()})
+	s.appendCanonical(parse.EventInit, "orca worker "+s.dispatchID)
 	go s.closeEventsWhenDone()
 	go s.poll(ctx)
 }
@@ -238,8 +241,37 @@ func (s *orcaSession) finish(outcome SessionOutcome) {
 		s.outcome = outcome
 		s.mu.Unlock()
 		s.closeStreamDone()
+		s.recordTerminal(outcome)
 		close(s.done)
 	})
+}
+
+// recordTerminal writes the worker's end into the canonical log, which the
+// monitor reads for meta.json: its timestamps give the duration and its type
+// the final status. Orca reports no cost, so none is recorded.
+func (s *orcaSession) recordTerminal(outcome SessionOutcome) {
+	if outcome.Status == StatusCompleted {
+		s.appendCanonical(parse.EventComplete, outcome.Reason)
+		return
+	}
+	s.appendCanonical(parse.EventFailed, outcome.Reason)
+}
+
+func (s *orcaSession) appendCanonical(kind parse.EventType, message string) {
+	if strings.TrimSpace(s.canonicalPath) == "" {
+		return
+	}
+	line, err := json.Marshal(parse.CanonicalEvent{Type: kind, Message: message, Timestamp: nowUTC()})
+	if err != nil {
+		return
+	}
+	f, err := os.OpenFile(s.canonicalPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		s.publish(SessionEvent{Type: "warning", Message: "write canonical event: " + err.Error(), Timestamp: nowUTC()})
+		return
+	}
+	defer f.Close()
+	_, _ = f.Write(append(line, '\n'))
 }
 
 func (s *orcaSession) Terminate() error {

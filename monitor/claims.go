@@ -46,7 +46,7 @@ func (r *CanonicalClaimsReader) ReadSession(sessionID string) (SessionClaims, er
 	file, err := os.Open(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return SessionClaims{SessionID: sessionID}, nil
+			return r.withSpawnMetadata(SessionClaims{SessionID: sessionID}), nil
 		}
 		return SessionClaims{}, fmt.Errorf("open canonical events: %w", err)
 	}
@@ -89,27 +89,36 @@ func (r *CanonicalClaimsReader) ReadSession(sessionID string) (SessionClaims, er
 			claims.Completed = true
 		case parse.EventComplete:
 			claims.Completed = true
+		case parse.EventFailed:
+			claims.Failed = true
 		}
 	}
 	if err := scanner.Err(); err != nil {
 		return SessionClaims{}, fmt.Errorf("read canonical events: %w", err)
 	}
-	if metadata, err := r.readSpawnMetadata(sessionID); err == nil {
-		if claims.Skill == "" {
-			claims.Skill = metadata.Skill
-		}
-		if claims.Runtime == "" {
-			claims.Runtime = metadata.Runtime
-		}
-		if claims.Provider == "" {
-			claims.Provider = metadata.Provider
-		}
-		if claims.Model == "" {
-			claims.Model = metadata.Model
-		}
-	}
+	return r.withSpawnMetadata(claims), nil
+}
 
-	return claims, nil
+// withSpawnMetadata fills the claims' skill, runtime, provider and model from
+// spawn.json. It applies even when the session has no canonical log yet.
+func (r *CanonicalClaimsReader) withSpawnMetadata(claims SessionClaims) SessionClaims {
+	metadata, err := r.readSpawnMetadata(claims.SessionID)
+	if err != nil {
+		return claims
+	}
+	if claims.Skill == "" {
+		claims.Skill = metadata.Skill
+	}
+	if claims.Runtime == "" {
+		claims.Runtime = metadata.Runtime
+	}
+	if claims.Provider == "" {
+		claims.Provider = metadata.Provider
+	}
+	if claims.Model == "" {
+		claims.Model = metadata.Model
+	}
+	return claims
 }
 
 func (r *CanonicalClaimsReader) readSpawnMetadata(sessionID string) (SessionClaims, error) {

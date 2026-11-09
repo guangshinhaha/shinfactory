@@ -10,6 +10,16 @@ import (
 )
 
 func TestOrcaSessionMetaCarriesRuntimeModelAndOutcome(t *testing.T) {
+	for _, tc := range []struct {
+		outcome string
+		want    SessionStatus
+	}{{"succeeded", SessionStatusExited}, {"failed", SessionStatusFailed}} {
+		t.Run(tc.outcome, func(t *testing.T) { checkOrcaMeta(t, tc.outcome, tc.want) })
+	}
+}
+
+func checkOrcaMeta(t *testing.T, outcome string, want SessionStatus) {
+	t.Helper()
 	fake := fakeorca.New(t)
 	dir := t.TempDir()
 	rt := dir + "/.noodle"
@@ -24,7 +34,7 @@ func TestOrcaSessionMetaCarriesRuntimeModelAndOutcome(t *testing.T) {
 		t.Fatal(err)
 	}
 	time.Sleep(50 * time.Millisecond)
-	fake.Settle(t, fake.LastDispatch(t), "succeeded")
+	fake.Settle(t, fake.LastDispatch(t), outcome)
 	select {
 	case <-s.Done():
 	case <-time.After(5 * time.Second):
@@ -39,8 +49,8 @@ func TestOrcaSessionMetaCarriesRuntimeModelAndOutcome(t *testing.T) {
 	if m.Runtime != "orca" || m.Model != "claude-sonnet-5-5" {
 		t.Errorf("runtime/model = %q/%q", m.Runtime, m.Model)
 	}
-	if m.Status != SessionStatusExited {
-		t.Errorf("status = %q, want exited", m.Status)
+	if m.Status != want || m.Alive {
+		t.Errorf("status = %q alive=%v, want %q", m.Status, m.Alive, want)
 	}
 	if m.DurationSeconds < 0 {
 		t.Errorf("duration")

@@ -70,7 +70,7 @@ func DeriveSessionMeta(
 	durationSeconds := int64(0)
 	if !claims.FirstEventAt.IsZero() {
 		end := now
-		if !observation.Alive && !claims.LastEventAt.IsZero() {
+		if (!observation.Alive || terminalByClaims) && !claims.LastEventAt.IsZero() {
 			end = claims.LastEventAt
 		}
 		if end.After(claims.FirstEventAt) {
