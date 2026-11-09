@@ -52,7 +52,7 @@ func (l *Loop) spawnCook(ctx context.Context, cand dispatchCandidate, order Orde
 	if l.runtimeHeld(runtimeName) {
 		return nil // out of usage: the stage stays pending until a launch can succeed
 	}
-	if why := l.overSpendCap(cand.OrderID, spendTaskKey(stage)); why != "" {
+	if why := l.overSpendCap(cand.OrderID, spendTaskKey(stage)); why != "" && !opts.steered {
 		return l.stopOverCap(ctx, cand, stage, why)
 	}
 
