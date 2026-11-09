@@ -43,12 +43,35 @@ type Stage struct {
 
 // Order is a pipeline of stages (serialization type).
 type Order struct {
-	ID        string      `json:"id"`
-	Title     string      `json:"title,omitempty"`
-	Plan      []string    `json:"plan,omitempty"`
-	Rationale string      `json:"rationale,omitempty"`
-	Stages    []Stage     `json:"stages"`
-	Status    OrderStatus `json:"status"`
+	ID        string   `json:"id"`
+	Title     string   `json:"title,omitempty"`
+	Plan      []string `json:"plan,omitempty"`
+	Rationale string   `json:"rationale,omitempty"`
+	// Tier is the order's risk tier: none, low, medium or high. Empty means
+	// medium. It sets how deep review goes and whether verify runs.
+	Tier string `json:"tier,omitempty"`
+	// Round counts the fix rounds a failed review or verify has sent back to
+	// execute. Only the loop writes it.
+	Round  int         `json:"round,omitempty"`
+	Stages []Stage     `json:"stages"`
+	Status OrderStatus `json:"status"`
+}
+
+// Risk tiers an order can carry.
+const (
+	TierNone   = "none"
+	TierLow    = "low"
+	TierMedium = "medium"
+	TierHigh   = "high"
+)
+
+// ValidateTier returns an error if tier is not empty or a known tier.
+func ValidateTier(tier string) error {
+	switch tier {
+	case "", TierNone, TierLow, TierMedium, TierHigh:
+		return nil
+	}
+	return fmt.Errorf("unknown tier %q (want none, low, medium or high)", tier)
 }
 
 // OrdersFile is the top-level orders.json structure (serialization type).

@@ -48,7 +48,7 @@ case "$1 $2" in
   if [ -f "` + state + `/ready" ]; then d=false; else d=true; fi
   if [ -f "` + state + `/merged" ]; then st=MERGED; else st=OPEN; fi
   if [ -f "` + state + `/pending" ]; then r='[{"status":"IN_PROGRESS"}]'; else r='[{"status":"COMPLETED"}]'; fi
-  echo "{\"headRefName\":\"order-42\",\"headRefOid\":\"$(git rev-parse HEAD)\",\"state\":\"$st\",\"isDraft\":$d,\"isCrossRepository\":false,\"mergeStateStatus\":\"CLEAN\",\"statusCheckRollup\":$r}" ;;
+  echo "{\"headRefName\":\"${STUB_BRANCH:-order-42}\",\"headRefOid\":\"$(git rev-parse HEAD)\",\"state\":\"$st\",\"isDraft\":$d,\"isCrossRepository\":false,\"mergeStateStatus\":\"CLEAN\",\"statusCheckRollup\":$r}" ;;
 "pr create") touch "` + state + `/pr"; echo https://github.test/o/r/pull/7 ;;
 "pr ready") touch "` + state + `/ready" ;;
 "pr merge") touch "` + state + `/merged" ;;

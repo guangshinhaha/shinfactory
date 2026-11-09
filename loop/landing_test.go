@@ -64,6 +64,7 @@ func newLandingHarness(t *testing.T, runMode string, stages int) *landingHarness
 	}
 	order := testOrder("42", "execute", "execute", "claude", "claude-opus-4-6")
 	order.Title = "Land through a PR"
+	order.Tier = "none" // these tests are about landing, not the review gate
 	for i := 1; i < stages; i++ {
 		order.Stages = append(order.Stages, Stage{TaskKey: "reflect", Skill: "reflect", Provider: "claude", Model: "claude-opus-4-6", Status: StageStatusPending})
 	}

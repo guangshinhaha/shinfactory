@@ -82,7 +82,12 @@ func (l *Loop) spawnCook(ctx context.Context, cand dispatchCandidate, order Orde
 			resumePrompt = stringx.JoinNonEmpty("\n\n", hint, resumePrompt)
 		}
 	}
-	prompt := buildCookPrompt(cand.OrderID, stage, order.Plan, order.Title, order.Rationale, resumePrompt)
+	resumePrompt = stringx.JoinNonEmpty("\n\n", l.gateNote(order, stage), resumePrompt)
+	rationale := order.Rationale
+	if gateStageKey(stage) == gateVerifyKey && l.config.Landing.PR() {
+		rationale = "" // a verifier works from the issue, not the scheduler's reasoning
+	}
+	prompt := buildCookPrompt(cand.OrderID, stage, order.Plan, order.Title, rationale, resumePrompt)
 
 	taskType, _ := l.registry.ByKey(stage.TaskKey)
 	stageProvider, stageModel := l.config.ResolveStageRouting(nonEmpty(stage.TaskKey, stage.Skill), stage.Provider, stage.Model)
