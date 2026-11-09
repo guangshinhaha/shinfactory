@@ -669,7 +669,9 @@ func TestOrcaRuntimeBareRateLimitErrorFailsTheStage(t *testing.T) {
 // then fails instead of relaunching forever.
 func TestOrcaRuntimeUsageLimitRequeuesAreBounded(t *testing.T) {
 	env := newOrcaEnv(t, oneStageOrder())
-	for i := 1; i <= maxUsageLimitRequeues; i++ {
+	const bound = 2
+	env.loop.limitRequeues.cap = bound
+	for i := 1; i <= bound; i++ {
 		env.cycleUntil(t, "execute started", func() bool { return len(env.fake.Starts()) == i })
 		id := env.fake.LastDispatch(t)
 		env.fake.SetTranscript(t, id, "Claude usage limit reached.")
@@ -680,7 +682,7 @@ func TestOrcaRuntimeUsageLimitRequeuesAreBounded(t *testing.T) {
 		})
 		env.clock = env.clock.Add(2 * time.Minute)
 	}
-	n := maxUsageLimitRequeues + 1
+	n := bound + 1
 	env.cycleUntil(t, "execute started again", func() bool { return len(env.fake.Starts()) == n })
 	id := env.fake.LastDispatch(t)
 	env.fake.SetTranscript(t, id, "Claude usage limit reached.")

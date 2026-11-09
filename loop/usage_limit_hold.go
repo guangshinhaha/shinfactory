@@ -52,10 +52,19 @@ func (h *usageLimitHolds) release(runtime string) bool {
 // own output trips the detector) fails instead of relaunching forever.
 const maxUsageLimitRequeues = 5
 
+// usageLimitRequeueCap is the requeue bound; tests lower it to stay quick.
+func (l *Loop) usageLimitRequeueCap() int {
+	if l.limitRequeues.cap > 0 {
+		return l.limitRequeues.cap
+	}
+	return maxUsageLimitRequeues
+}
+
 // usageLimitRequeues counts requeues per stage since the loop started.
 type usageLimitRequeues struct {
-	mu sync.Mutex
-	n  map[string]int
+	mu  sync.Mutex
+	n   map[string]int
+	cap int // overrides maxUsageLimitRequeues when positive
 }
 
 func (r *usageLimitRequeues) bump(orderID string, stageIndex int) int {
@@ -142,7 +151,7 @@ func (l *Loop) requeueAfterUsageLimit(cook *cookHandle) error {
 	runtimeName := nonEmpty(cook.dispatchedRuntime, l.stageRuntime(cook.stage))
 	reason := nonEmpty(cook.session.Outcome().Reason, "usage limit reached")
 	l.holdRuntime(runtimeName, reason)
-	if n := l.limitRequeues.bump(cook.orderID, cook.stageIndex); n > maxUsageLimitRequeues {
+	if n := l.limitRequeues.bump(cook.orderID, cook.stageIndex); n > l.usageLimitRequeueCap() {
 		return l.failStage(nil, cook, fmt.Sprintf("stage was requeued after the usage limit %d times: %s", n, reason))
 	}
 	if err := l.resetStageToPending(cook.orderID, cook.stageIndex, reason); err != nil {
