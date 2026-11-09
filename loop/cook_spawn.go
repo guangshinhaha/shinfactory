@@ -206,7 +206,7 @@ func (l *Loop) dispatchSession(ctx context.Context, req loopruntime.DispatchRequ
 	}
 	// No fallback from orca: a plain process would run on the default login
 	// while the config says orca. The caller fails the stage with this error.
-	if runtimeName != "process" && runtimeName != "orca" {
+	if dispatcher.AllowsProcessFallback(runtimeName) {
 		if fallback := l.deps.Runtimes["process"]; fallback != nil {
 			l.logger.Warn("runtime dispatch failed, falling back to process", "runtime", runtimeName, "error", err)
 			req.Runtime = "process"

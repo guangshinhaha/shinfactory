@@ -250,7 +250,7 @@ func (d *OrcaDispatcher) startWorker(ctx context.Context, runID, sessionID, spec
 	for retry := 0; err != nil && retry < defaultOrcaSelectorRetries && isSelectorNotFound(err, out); retry++ {
 		select {
 		case <-startCtx.Done():
-			return "", fmt.Errorf("orca worker-start failed: %w", err)
+			return "", fmt.Errorf("orca worker-start failed: %w (stopped waiting: %v)", err, startCtx.Err())
 		case <-time.After(wait):
 		}
 		wait *= 2

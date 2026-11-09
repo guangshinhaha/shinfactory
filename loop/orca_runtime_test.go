@@ -293,7 +293,7 @@ func TestOrcaRuntimeFirstStageRetriesUnknownWorktree(t *testing.T) {
 	env.fake.RefuseUnknownWorktree(t, 1)
 	process := env.loop.deps.Runtimes["process"].(*mockRuntime)
 
-	env.cycleUntil(t, "execute launched on orca", func() bool { return len(env.fake.Starts()) == 2 })
+	env.cycleUntil(t, "execute launched on orca", func() bool { return len(env.fake.Starts()) >= 2 })
 	if len(process.calls) != 0 {
 		t.Fatalf("process runtime got %d dispatches; an orca stage must not fall back", len(process.calls))
 	}
@@ -320,8 +320,8 @@ func TestOrcaRuntimeLaunchFailureFailsStageWithoutProcessFallback(t *testing.T) 
 	if len(process.calls) != 0 {
 		t.Fatalf("process runtime got %d dispatches; an orca stage must not fall back", len(process.calls))
 	}
-	if got := env.orderStages(t, "42"); len(got) == 1 && got[0] == "execute:active" {
-		t.Fatalf("stages = %v, want the stage not silently running", got)
+	if got := env.orderStages(t, "42"); len(got) != 1 || got[0] != "execute:failed" {
+		t.Fatalf("stages = %v, want execute:failed (visible), not running or pending", got)
 	}
 }
 
