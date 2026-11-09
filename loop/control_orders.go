@@ -121,11 +121,18 @@ func (l *Loop) controlEditItem(cmd ControlCommand) error {
 				orders.Orders[i].Stages[stageIdx].TaskKey = taskKey
 				changed = true
 			}
-			// Validate the stage as it will be after the edit: a provider needs a model.
-			nextProvider := nonEmpty(strings.TrimSpace(cmd.Provider), orders.Orders[i].Stages[stageIdx].Provider)
-			nextModel := nonEmpty(strings.TrimSpace(cmd.Model), orders.Orders[i].Stages[stageIdx].Model)
-			if err := l.config.ValidateStageRouting(nextProvider, nextModel); err != nil {
-				return false, err
+			// Validate only an edit that touches routing. A new provider drops the old
+			// model, which names a model of the old provider.
+			if cmd.Provider != "" || cmd.Model != "" {
+				current := orders.Orders[i].Stages[stageIdx]
+				nextProvider := nonEmpty(strings.TrimSpace(cmd.Provider), current.Provider)
+				nextModel := strings.TrimSpace(cmd.Model)
+				if nextModel == "" && stringx.Normalize(nextProvider) == stringx.Normalize(current.Provider) {
+					nextModel = current.Model
+				}
+				if err := l.config.ValidateStageRouting(nextProvider, nextModel); err != nil {
+					return false, err
+				}
 			}
 			if provider := strings.TrimSpace(cmd.Provider); provider != "" && orders.Orders[i].Stages[stageIdx].Provider != provider {
 				orders.Orders[i].Stages[stageIdx].Provider = provider

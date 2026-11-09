@@ -92,9 +92,9 @@ func scheduleOrder(prompt string) Order {
 		Status: OrderStatusActive,
 		Stages: []Stage{
 			{
-				TaskKey:  scheduleOrderID,
-				Skill:    "schedule",
-				Status:   StageStatusPending,
+				TaskKey: scheduleOrderID,
+				Skill:   "schedule",
+				Status:  StageStatusPending,
 			},
 		},
 	}
@@ -113,9 +113,9 @@ func scheduleBootstrapOopsOrder() Order {
 		Status:    OrderStatusActive,
 		Stages: []Stage{
 			{
-				TaskKey:  "oops",
-				Skill:    "oops",
-				Status:   StageStatusPending,
+				TaskKey: "oops",
+				Skill:   "oops",
+				Status:  StageStatusPending,
 				Prompt: strings.Join([]string{
 					"Schedule skill is missing. Bootstrap it now so Noodle can recover scheduler dispatch.",
 					"Create `.agents/skills/schedule/SKILL.md` with proper frontmatter including `schedule:`.",
@@ -271,8 +271,8 @@ func (l *Loop) spawnBootstrapIfNeeded(ctx context.Context, order Order) error {
 		cookIdentity: cookIdentity{
 			orderID: order.ID,
 			stage: Stage{
-				TaskKey: scheduleOrderID,
-				Skill:   "bootstrap",
+				TaskKey:  scheduleOrderID,
+				Skill:    "bootstrap",
 				Provider: provider,
 				Model:    model,
 				Runtime:  "process",

@@ -105,14 +105,14 @@ type OrderNode struct {
 }
 
 // StageNode represents a stage within an order.
-// StageNode Provider and Model are the stage definition: empty when the stage
-// is unpinned and its role decides at dispatch. They mirror back onto the
-// legacy Stage, so they never hold resolved routing.
 type StageNode struct {
-	StageIndex  int                        `json:"stage_index"`
-	TaskKey     string                     `json:"task_key"`
-	Prompt      string                     `json:"prompt"`
-	Skill       string                     `json:"skill"`
+	StageIndex int    `json:"stage_index"`
+	TaskKey    string `json:"task_key"`
+	Prompt     string `json:"prompt"`
+	Skill      string `json:"skill"`
+	// Provider and Model are the stage definition: empty when the stage is
+	// unpinned and its role decides at dispatch. They mirror back onto the legacy
+	// Stage, so they never hold resolved routing.
 	Provider    string                     `json:"provider"`
 	Model       string                     `json:"model"`
 	Runtime     string                     `json:"runtime"`

@@ -15,11 +15,11 @@ import (
 )
 
 type PendingReviewItem struct {
-	OrderID      string   `json:"order_id"`
-	StageIndex   int      `json:"stage_index"`
-	TaskKey      string   `json:"task_key,omitempty"`
-	Title        string   `json:"title,omitempty"`
-	Prompt       string   `json:"prompt,omitempty"`
+	OrderID    string `json:"order_id"`
+	StageIndex int    `json:"stage_index"`
+	TaskKey    string `json:"task_key,omitempty"`
+	Title      string `json:"title,omitempty"`
+	Prompt     string `json:"prompt,omitempty"`
 	// Provider and Model are the stage definition, not what ran. loadPendingReview
 	// turns them back into a Stage, so resolving here would pin routing onto it.
 	// Readers that show what ran resolve through Loop.stageRouting.
