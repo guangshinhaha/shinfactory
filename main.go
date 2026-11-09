@@ -272,6 +272,9 @@ func startRepairSession(
 	if !app.Validation.CanSpawn() {
 		return repairLaunchResult{}, fmt.Errorf("fatal config diagnostics prevent spawn")
 	}
+	if err := app.Config.ValidateStageProvider(provider); err != nil {
+		return repairLaunchResult{}, fmt.Errorf("repair provider: %w", err)
+	}
 
 	worktreeApp, err := worktree.NewApp()
 	if err != nil {
@@ -299,12 +302,13 @@ func startRepairSession(
 		ProviderConfigs: providerConfigs,
 	})
 	request := dispatcher.DispatchRequest{
-		Name:         name,
-		Prompt:       prompt,
-		Provider:     provider,
-		Model:        repairModelForProvider(provider, app.Config),
-		Skill:        loop.RepairTaskSkill(),
-		WorktreePath: worktreePath,
+		Name:          name,
+		Prompt:        prompt,
+		Provider:      provider,
+		Model:         repairModelForProvider(provider, app.Config),
+		Skill:         loop.RepairTaskSkill(),
+		WorktreePath:  worktreePath,
+		DenyProviders: app.Config.ForeignProviders(provider),
 	}
 	session, err := d.Dispatch(ctx, request)
 	if err != nil {

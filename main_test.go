@@ -388,3 +388,13 @@ func assertFailureStateMessage(t *testing.T, message string) {
 		}
 	}
 }
+
+func TestRepairRefusesSecondProviderOnSensitiveRepo(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.Routing.Sensitive = true
+	app := &App{Config: cfg}
+	_, err := startRepairSession(context.Background(), app, "codex", "synthetic prompt")
+	if err == nil || !strings.Contains(err.Error(), "routing.sensitive") {
+		t.Fatalf("err = %v, want routing.sensitive rejection", err)
+	}
+}

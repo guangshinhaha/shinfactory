@@ -113,3 +113,31 @@ func TestScheduleOrderResolvesSchedulerRoleAtDispatch(t *testing.T) {
 		t.Fatalf("schedule stage resolves to %s/%s, want claude/claude-haiku-5-5", p, m)
 	}
 }
+
+// A fixture run on a sensitive repo: an order whose stage names codex never
+// reaches the runtime on codex, and every launch carries the deny list.
+func TestIntegrationSensitiveRepoStaysOnOneProvider(t *testing.T) {
+	orders := OrdersFile{Orders: []Order{
+		{ID: "pii", Title: "synthetic", Status: OrderStatusActive,
+			Stages: []Stage{{TaskKey: "execute", Skill: "execute", Provider: "codex", Model: "gpt-5.4", Status: StageStatusPending}}},
+	}}
+	env := newIntegrationEnv(t, orders, func(ic *integrationCfg) {
+		ic.cfg.Mode = "auto"
+		ic.cfg.Routing.Sensitive = true
+	})
+	seedCanonicalFromOrders(env.loop, orders)
+	if err := env.loop.Cycle(context.Background()); err != nil {
+		t.Fatalf("cycle: %v", err)
+	}
+	if len(env.rt.calls) == 0 {
+		t.Fatal("nothing dispatched")
+	}
+	for _, call := range env.rt.calls {
+		if call.Provider != "claude" {
+			t.Errorf("%s dispatched on %s, want claude", call.Skill, call.Provider)
+		}
+		if len(call.DenyProviders) != 1 || call.DenyProviders[0] != "codex" {
+			t.Errorf("%s DenyProviders = %v, want [codex]", call.Skill, call.DenyProviders)
+		}
+	}
+}

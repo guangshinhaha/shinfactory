@@ -44,6 +44,8 @@ sensitive = true
 
 Every stage stays on `routing.defaults.provider`. A role that names another provider is a fatal config error. An order or control command whose stage names another provider is rejected when it is read, instead of being rerouted silently.
 
+The loop also keeps a running stage from handing work to the other provider. Every launch on a sensitive repo sets `NOODLE_SENSITIVE=1` and `NOODLE_DENY_PROVIDERS`, and a claude stage is started with Bash deny rules for the `codex` CLI, so the `codex` and `adversarial-review` skills cannot delegate mid-stage. The rule matches the CLI by name: a script that wraps it still gets through, and a codex stage has no equivalent deny list yet. `noodle start` refuses to run its repair session on another provider.
+
 Routing resolves when a stage is dispatched, so editing `[routing.roles]` also changes stages already queued. A stage that names its own model keeps it.
 
 A `routing.defaults` with `provider = "codex"` needs its own `model`; the claude default model is not filled in for it.

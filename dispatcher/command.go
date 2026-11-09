@@ -33,6 +33,10 @@ func claudeBaseArgs(req DispatchRequest, systemPrompt string) []string {
 	if strings.TrimSpace(req.Model) != "" {
 		args = append(args, "--model", req.Model)
 	}
+	if denied := deniedBashPatterns(req.DenyProviders); len(denied) > 0 {
+		// "=" form: the flag is variadic and would otherwise swallow the prompt.
+		args = append(args, "--disallowedTools="+strings.Join(denied, ","))
+	}
 	if strings.TrimSpace(req.ReasoningLevel) != "" {
 		args = append(args, "--effort", req.ReasoningLevel)
 	}
@@ -40,6 +44,21 @@ func claudeBaseArgs(req DispatchRequest, systemPrompt string) []string {
 		args = append(args, "--append-system-prompt", systemPrompt)
 	}
 	return args
+}
+
+// deniedBashPatterns turns provider names into Bash deny rules. Claude applies
+// them even under bypassPermissions, so a stage cannot hand sensitive context
+// to another provider's CLI. A script that wraps the CLI still gets through.
+func deniedBashPatterns(providers []string) []string {
+	var out []string
+	for _, p := range providers {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		out = append(out, "Bash("+p+":*)", "Bash(*"+p+" exec*)")
+	}
+	return out
 }
 
 // codexBaseArgs returns the canonical Codex CLI flags for a dispatch request.
@@ -103,6 +122,9 @@ func buildDispatchEnv(req DispatchRequest) []string {
 	env = append(env, "NOODLE_WORKTREE="+req.WorktreePath)
 	env = append(env, "NOODLE_PROVIDER="+req.Provider)
 	env = append(env, "NOODLE_MODEL="+req.Model)
+	if len(req.DenyProviders) > 0 {
+		env = append(env, "NOODLE_SENSITIVE=1", "NOODLE_DENY_PROVIDERS="+strings.Join(req.DenyProviders, ","))
+	}
 	if req.ReasoningLevel != "" {
 		env = append(env, "NOODLE_REASONING_LEVEL="+req.ReasoningLevel)
 	}

@@ -108,6 +108,26 @@ func (c Config) ValidateStageProvider(provider string) error {
 	return fmt.Errorf("stage provider %q not allowed: routing.sensitive keeps every stage on %q", provider, c.Routing.Defaults.Provider)
 }
 
+// knownProviders are the agent CLIs a stage could shell out to.
+var knownProviders = []string{"claude", "codex"}
+
+// ForeignProviders lists the provider CLIs a stage on provider must not run.
+// It is empty unless routing.sensitive is set. The dispatcher turns it into
+// tool denials, so the rule holds even when a skill delegates mid-stage.
+func (c Config) ForeignProviders(provider string) []string {
+	if !c.Routing.Sensitive {
+		return nil
+	}
+	provider = stringx.Normalize(provider)
+	var out []string
+	for _, name := range knownProviders {
+		if name != provider {
+			out = append(out, name)
+		}
+	}
+	return out
+}
+
 // PolicyForRole returns the configured provider and model for a role.
 func (c Config) PolicyForRole(role Role) ModelPolicy {
 	if policy, ok := c.Routing.Roles[string(role)]; ok {
