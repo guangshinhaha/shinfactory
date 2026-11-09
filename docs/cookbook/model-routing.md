@@ -44,6 +44,10 @@ sensitive = true
 
 Every stage stays on `routing.defaults.provider`. A role that names another provider is a fatal config error. An order or control command whose stage names another provider is rejected when it is read, instead of being rerouted silently.
 
+The loop also keeps a running stage from handing work to the other provider. Every launch on a sensitive repo sets `NOODLE_SENSITIVE=1` and `NOODLE_DENY_PROVIDERS`. A claude stage starts with a Bash deny rule for the `codex` CLI. A codex stage gets a `claude` stub ahead of `PATH` that exits non-zero. So the `codex` and `adversarial-review` skills cannot delegate mid-stage. `noodle start` refuses to run its repair session on another provider.
+
+Limits: the match is by CLI name, so a script that wraps the CLI gets through. The `orca` runtime can only be told in the worker spec, because Orca starts the agent. A custom `runtimeDefault` template builds its own command and gets only the environment variables, so it must honour them.
+
 Routing resolves when a stage is dispatched, so editing `[routing.roles]` also changes stages already queued. A stage that names its own model keeps it.
 
 A `routing.defaults` with `provider = "codex"` needs its own `model`; the claude default model is not filled in for it.

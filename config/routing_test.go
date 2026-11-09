@@ -182,3 +182,17 @@ func TestValidateStageProviderOnSensitiveRepo(t *testing.T) {
 		t.Errorf("non-sensitive repo should not reject: %v", err)
 	}
 }
+
+func TestForeignProvidersOnlyOnSensitiveRepo(t *testing.T) {
+	cfg := parseRouting(t, "[routing]\nsensitive = true\n")
+	if got := cfg.ForeignProviders("claude"); len(got) != 1 || got[0] != "codex" {
+		t.Errorf("sensitive claude repo: foreign = %v, want [codex]", got)
+	}
+	if got := cfg.ForeignProviders("codex"); len(got) != 1 || got[0] != "claude" {
+		t.Errorf("sensitive codex stage: foreign = %v, want [claude]", got)
+	}
+	cfg.Routing.Sensitive = false
+	if got := cfg.ForeignProviders("claude"); got != nil {
+		t.Errorf("non-sensitive repo: foreign = %v, want none", got)
+	}
+}

@@ -260,6 +260,26 @@ func promptRepairSelection(input io.Reader, w io.Writer) (string, bool, error) {
 	return "", false, nil
 }
 
+// checkRepairProvider refuses a repair provider that routing.sensitive forbids.
+func checkRepairProvider(cfg config.Config, provider string) error {
+	if err := cfg.ValidateStageProvider(provider); err != nil {
+		return fmt.Errorf("repair provider: %w", err)
+	}
+	return nil
+}
+
+func repairDispatchRequest(cfg config.Config, name, prompt, provider, worktreePath string) dispatcher.DispatchRequest {
+	return dispatcher.DispatchRequest{
+		Name:          name,
+		Prompt:        prompt,
+		Provider:      provider,
+		Model:         repairModelForProvider(provider, cfg),
+		Skill:         loop.RepairTaskSkill(),
+		WorktreePath:  worktreePath,
+		DenyProviders: cfg.ForeignProviders(provider),
+	}
+}
+
 func startRepairSession(
 	ctx context.Context,
 	app *App,
@@ -271,6 +291,9 @@ func startRepairSession(
 	}
 	if !app.Validation.CanSpawn() {
 		return repairLaunchResult{}, fmt.Errorf("fatal config diagnostics prevent spawn")
+	}
+	if err := checkRepairProvider(app.Config, provider); err != nil {
+		return repairLaunchResult{}, err
 	}
 
 	worktreeApp, err := worktree.NewApp()
@@ -298,14 +321,7 @@ func startRepairSession(
 		SkillResolver:   resolver,
 		ProviderConfigs: providerConfigs,
 	})
-	request := dispatcher.DispatchRequest{
-		Name:         name,
-		Prompt:       prompt,
-		Provider:     provider,
-		Model:        repairModelForProvider(provider, app.Config),
-		Skill:        loop.RepairTaskSkill(),
-		WorktreePath: worktreePath,
-	}
+	request := repairDispatchRequest(app.Config, name, prompt, provider, worktreePath)
 	session, err := d.Dispatch(ctx, request)
 	if err != nil {
 		_ = worktreeApp.Cleanup(name, worktree.CleanupOpts{Force: true})

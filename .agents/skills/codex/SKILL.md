@@ -8,6 +8,8 @@ description: >-
 
 # Codex
 
+If `NOODLE_SENSITIVE` is set, stop: the loop keeps this repo's work on one provider and does not allow delegation to Codex.
+
 ## Profiles
 
 - **(no profile)** — read-only analysis (no compilation, no tests)

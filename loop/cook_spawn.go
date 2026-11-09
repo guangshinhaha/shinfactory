@@ -176,6 +176,8 @@ func (l *Loop) dispatchSession(ctx context.Context, req loopruntime.DispatchRequ
 	}
 
 	req.Runtime = runtimeName
+	// Every launch passes here, so the deny list cannot be skipped by a new call site.
+	req.DenyProviders = l.config.ForeignProviders(req.Provider)
 	session, err := runtime.Dispatch(ctx, req)
 	if err == nil {
 		l.releaseRuntime(runtimeName)
