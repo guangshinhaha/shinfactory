@@ -95,14 +95,15 @@ func (l *Loop) appendActiveCookSummary(activeCooks *[]CookSummary, totalCost *fl
 	if runtime == "" {
 		runtime = cook.stage.Runtime
 	}
+	provider, model := l.stageRouting(cook.stage)
 	*activeCooks = append(*activeCooks, CookSummary{
 		SessionID:    cook.session.ID(),
 		OrderID:      cook.orderID,
 		TaskKey:      cook.stage.TaskKey,
 		Skill:        cook.stage.Skill,
 		Runtime:      runtime,
-		Provider:     cook.stage.Provider,
-		Model:        cook.stage.Model,
+		Provider:     provider,
+		Model:        model,
 		WorktreeName: cook.worktreeName,
 		StartedAt:    cook.startedAt,
 		DisplayName:  cook.displayName,

@@ -74,6 +74,21 @@ func TestQueuedStagesKeepNoResolvedRouting(t *testing.T) {
 		t.Fatalf("dispatch calls = %+v, want one on the builder role model", env.rt.calls)
 	}
 
+	// The running cook still matches its order's stage, or the next cycle
+	// would treat it as superseded and cancel it.
+	cook := env.loop.cooks.activeCooksByOrder["first"]
+	if cook == nil {
+		t.Fatal("no active cook for order first")
+	}
+	for _, o := range got.Orders {
+		if o.ID == "first" && !sameStageDefinition(cook.stage, o.Stages[0]) {
+			t.Errorf("cook stage %+v differs from order stage %+v", cook.stage, o.Stages[0])
+		}
+	}
+	if p, m := env.loop.stageRouting(cook.stage); p != "claude" || m != "claude-sonnet-5-5" {
+		t.Errorf("snapshot routing = %s/%s, want claude/claude-sonnet-5-5", p, m)
+	}
+
 	// Edit the role after the first dispatch; the still-queued stage resolves
 	// against the new table.
 	env.loop.config.Routing.Roles["builder"] = config.ModelPolicy{Provider: "claude", Model: "claude-haiku-5-5"}
