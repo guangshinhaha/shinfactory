@@ -31,7 +31,8 @@ func evidenceHarness(t *testing.T, workType, claudeMD string, keys ...string) *g
 		t.Fatal(err)
 	}
 	if claudeMD != "" {
-		if err := os.WriteFile(filepath.Join(dir, "CLAUDE.md"), []byte(claudeMD), 0o644); err != nil {
+		// The repo's checks come from the main checkout, not the cook's worktree.
+		if err := os.WriteFile(filepath.Join(h.l.projectDir, "CLAUDE.md"), []byte(claudeMD), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -183,10 +184,11 @@ func TestRepoChecksParse(t *testing.T) {
 		md   string
 		want []string
 	}{
-		"one":        {"Before a PR:\n- `pnpm check`\n", []string{"pnpm check"}},
-		"several":    {"x\nBefore a PR:\n- `a`\n* `b c`\n\nlater\n- `d`\n", []string{"a", "b c"}},
-		"none":       {"# nothing\n", nil},
-		"in a fence": {"```\nBefore a PR:\n- `a`\n```\n", nil},
+		"one":                         {"Before a PR:\n- `pnpm check`\n", []string{"pnpm check"}},
+		"blank line after the header": {"Before a PR:\n\n- `a`\n", []string{"a"}},
+		"several":                     {"x\nBefore a PR:\n- `a`\n* `b c`\n\nlater\n- `d`\n", []string{"a", "b c"}},
+		"none":                        {"# nothing\n", nil},
+		"in a fence":                  {"```\nBefore a PR:\n- `a`\n```\n", nil},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -218,6 +220,8 @@ func TestCheckTestFirst(t *testing.T) {
 		{"only tests", []commitFiles{c("a", "x_test.go")}, false},
 		{"no commits", nil, false},
 		{"tests, docs, fix", []commitFiles{c("a", "web/app.spec.ts"), c("b", "README.md"), c("c", "x.go")}, true},
+		{"notes commit first is neutral", []commitFiles{c("a", "brain/note.md"), c("b", "x_test.go"), c("c", "x.go")}, true},
+		{"docs-only branch has no fix", []commitFiles{c("a", "x_test.go"), c("b", "README.md")}, false},
 		{"testdata counts as test", []commitFiles{c("a", "pkg/testdata/in.json"), c("b", "x.go")}, true},
 	}
 	for _, tc := range cases {
@@ -290,6 +294,24 @@ func TestWorkTypeRoundTripsAndRejectsUnknown(t *testing.T) {
 	if _, err := orderx.ParseCompactOrders([]byte(`{"orders":[{"id":"1","work_type":"chore","stages":[{"do":"execute"}]}]}`)); err == nil {
 		t.Fatal("unknown work_type accepted")
 	}
+}
+
+func TestAmendmentCanCorrectTheWorkType(t *testing.T) {
+	existing := Order{ID: "1", Status: OrderStatusActive, WorkType: "feature", Stages: []Stage{{TaskKey: "execute", Status: StageStatusActive}}}
+	incoming := Order{ID: "1", Status: OrderStatusActive, WorkType: "bug", Stages: []Stage{{TaskKey: "execute", Status: StageStatusPending}, {TaskKey: "quality", Status: StageStatusPending}}}
+	if merged, _ := mergeAmendedActiveOrder(existing, incoming); merged.WorkType != "bug" {
+		t.Fatalf("merged work type = %q, want the corrected bug", merged.WorkType)
+	}
+}
+
+func TestChecksAreReadFromTheMainCheckoutNotTheWorktree(t *testing.T) {
+	h := evidenceHarness(t, "feature", "")
+	wt := h.l.worktreePath(h.l.cookWorktreeName("42", 0, "execute"))
+	if err := os.WriteFile(filepath.Join(wt, "CLAUDE.md"), []byte("Before a PR:\n- `exit 9`\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h.next(t)
+	h.shipped(t) // the cook's own CLAUDE.md declares nothing the loop trusts
 }
 
 func TestWorkTypeSurvivesAnAmendment(t *testing.T) {

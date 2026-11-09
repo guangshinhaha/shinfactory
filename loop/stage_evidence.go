@@ -121,7 +121,8 @@ var (
 
 // repoChecks reads the commands a repo lists under "Before a PR:" in its
 // CLAUDE.md, the block shinstack init writes. No file or no list means the
-// repo declares no checks.
+// repo declares no checks. Blank lines between the header and the bullets are
+// fine; the first other line ends the list.
 func repoChecks(dir string) []string {
 	data, err := os.ReadFile(filepath.Join(dir, "CLAUDE.md"))
 	if err != nil {
@@ -133,6 +134,7 @@ func repoChecks(dir string) []string {
 		switch {
 		case repoChecksHeader.MatchString(line):
 			in = true
+		case in && strings.TrimSpace(line) == "" && len(cmds) == 0:
 		case in:
 			m := repoCheckBullet.FindStringSubmatch(line)
 			if m == nil {
@@ -172,10 +174,11 @@ func tail(s string, n int) string {
 	return "..." + s[len(s)-n:]
 }
 
-// checkRepoChecks runs the repo's declared checks in the worktree and reports
-// the first that fails.
-func checkRepoChecks(ctx context.Context, dir string) error {
-	for _, command := range repoChecks(dir) {
+// checkRepoChecks runs the checks declared in declaredIn's CLAUDE.md inside the
+// worktree dir and reports the first that fails. The declaration comes from the
+// main checkout, so the cook being checked can't edit its own checks away.
+func checkRepoChecks(ctx context.Context, declaredIn, dir string) error {
+	for _, command := range repoChecks(declaredIn) {
 		out, err := runRepoCheck(ctx, dir, command)
 		if err != nil {
 			return fmt.Errorf("repo check `%s` failed (%v): %s", command, err, tail(out, maxCheckOutput))
@@ -214,11 +217,11 @@ func gitBranchCommits(dir string) ([]commitFiles, error) {
 	}
 	var commits []commitFiles
 	for _, sha := range strings.Fields(revs) {
-		files, err := git("diff-tree", "--root", "--no-commit-id", "--name-only", "-r", sha)
+		files, err := git("diff-tree", "--root", "--no-commit-id", "--name-only", "-r", "-z", sha)
 		if err != nil {
 			return nil, fmt.Errorf("list files of %s: %w", sha, err)
 		}
-		commits = append(commits, commitFiles{SHA: sha, Files: strings.Fields(files)})
+		commits = append(commits, commitFiles{SHA: sha, Files: strings.FieldsFunc(files, func(r rune) bool { return r == 0 })})
 	}
 	return commits, nil
 }
@@ -243,18 +246,22 @@ func isTestPath(p string) bool {
 }
 
 // checkTestFirst requires a commit that touches only tests before the first
-// commit that touches anything else, and at least one fix commit after it.
+// commit that touches code, and at least one fix commit after it. Commits that
+// touch only Markdown (notes, docs) are neither: they can sit anywhere.
 func checkTestFirst(commits []commitFiles) error {
 	sawTestOnly := false
 	for _, c := range commits {
-		testOnly := len(c.Files) > 0
+		testOnly, docsOnly := len(c.Files) > 0, len(c.Files) > 0
 		for _, f := range c.Files {
 			if !isTestPath(f) {
 				testOnly = false
-				break
+			}
+			if !strings.HasSuffix(strings.ToLower(f), ".md") {
+				docsOnly = false
 			}
 		}
 		switch {
+		case docsOnly && !testOnly:
 		case testOnly:
 			sawTestOnly = true
 		case len(c.Files) == 0:
@@ -283,7 +290,7 @@ func (l *Loop) checkExecuteEvidence(ctx context.Context, order Order, cook *cook
 	if gateStageKey(cook.stage) != gateBuildKey || cook.worktreePath == "" {
 		return nil
 	}
-	if err := checkRepoChecks(ctx, cook.worktreePath); err != nil {
+	if err := checkRepoChecks(ctx, l.projectDir, cook.worktreePath); err != nil {
 		return err
 	}
 	if order.WorkType == orderx.WorkTypeBug {

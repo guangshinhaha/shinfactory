@@ -431,7 +431,7 @@ func mergeAmendedActiveOrder(existing Order, incoming Order) (Order, bool) {
 	if existing.Tier != "" {
 		merged.Tier = existing.Tier
 	}
-	if existing.WorkType != "" {
+	if merged.WorkType == "" {
 		merged.WorkType = existing.WorkType
 	}
 	if reflect.DeepEqual(existing, merged) {
