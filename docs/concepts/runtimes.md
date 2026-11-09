@@ -81,13 +81,13 @@ The scheduler reads `routing.available_runtimes` from the mise to know what's av
 
 Read `routing.available_runtimes` from mise before writing orders.
 
-- If only `process` is available, set stage `"runtime": "process"`.
-- If `sprites` is available, prefer `"runtime": "sprites"` for
-  long-running `execute` work.
-- Keep `review`, `reflect`, and `meditate` on `"runtime": "process"`
-  unless explicitly justified.
-- Always include `"runtime"` on scheduled stages so dispatch routing
-  is explicit.
+Leave `runtime` off your stages. The loop picks it from `[runtime] default`
+in `.noodle.toml`; setting `process` by habit would override a configured
+`orca` default.
+
+Set `runtime` only when this order needs a specific one, and state why in
+the stage's `extra`: `"extra": {"runtime_reason": "<why>"}`. A stage with
+`runtime` but no `runtime_reason` is ignored when the default is `orca`.
 ```
 
 Because the scheduler is just a skill, you have full control over how it assigns runtimes. You can tell it to always use sprites for implementation, keep reviews local, or split work across runtimes based on whatever criteria make sense for your project.

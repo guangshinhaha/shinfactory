@@ -10,4 +10,4 @@
 - Restart: `orcaRuntime.Recover` stops unsettled workers in the factory's run that have a session `orca.json` (so a shared configured run's foreign workers are safe). It adopts nothing: adoption is PID-based. The reconcile then resets the stage to pending and it relaunches in its kept worktree.
 - The hold parses the reset time (`dispatcher.ParseUsageLimitReset`: `resets 3pm (Zone)`, `resets in 2 hours`, `limit reached|<epoch>`) plus a minute of slack, else falls back to `limit_retry_seconds`.
 - A relaunch reuses the attempt id, so the reducer replaces the whole attempt record instead of patching it (stale `Error`/`CompletedAt` used to survive).
-- Restart pitfall: the canonical checkpoint used to stamp `runtime: process` on stages with no runtime, which turned a restarted orca factory into a process one. It now stamps `stageRuntime("")`.
+- Restart pitfall: the canonical checkpoint used to stamp `runtime: process` on stages with no runtime, which turned a restarted orca factory into a process one. It now stamps the resolved `stageRuntime` of the stage.
