@@ -315,6 +315,10 @@ func TestPRLandingRefreshedWaitReasonIsPersisted(t *testing.T) {
 			if err := h.l.syncPendingReviewProjection(); err != nil {
 				t.Fatal(err)
 			}
+			canon := h.l.canonical.Orders["42"].Stages[0]
+			if len(canon.Attempts) != 1 {
+				t.Fatalf("attempts after re-park = %d, want 1 (re-park adds none)", len(canon.Attempts))
+			}
 			got := h.l.cooks.pendingReview["42"].reason
 			if !strings.HasPrefix(got, tc.prefix) || !strings.Contains(got, "test pending") {
 				t.Fatalf("reason after reload = %q, want %q prefix and the refreshed detail", got, tc.prefix)

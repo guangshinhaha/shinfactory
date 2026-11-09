@@ -610,6 +610,14 @@ func reduceStageReviewParked(current state.State, event ingest.StateEvent) (stat
 	if next.PendingReviews == nil {
 		next.PendingReviews = make(map[string]state.PendingReviewNode)
 	}
+	// Parking an already parked stage again only refreshes why it waits: it
+	// is no new attempt and must not add one to the stage history.
+	if parked, ok := next.PendingReviews[payload.OrderID]; ok && parked.StageIndex == payload.StageIndex {
+		parked.Reason = strings.TrimSpace(payload.Reason)
+		next.PendingReviews[payload.OrderID] = parked
+		next.LastEventID = strconv.FormatUint(uint64(event.ID), 10)
+		return next, nil, nil
+	}
 	order = next.Orders[payload.OrderID]
 	stage = order.Stages[payload.StageIndex]
 	stage.Status = state.StageReview
