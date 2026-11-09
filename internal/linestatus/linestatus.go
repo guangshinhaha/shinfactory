@@ -54,7 +54,39 @@ type Stage struct {
 type NeedsShin struct {
 	Order  string    `json:"order"`
 	Reason string    `json:"reason,omitempty"`
+	Title  string    `json:"title,omitempty"`
+	URL    string    `json:"url,omitempty"`
 	At     time.Time `json:"at,omitempty"`
+}
+
+// MergeNeedsShin reconciles the loop's recorded stops with the backlog's
+// stopped items, which are authoritative: a recorded stop the backlog no longer
+// lists was settled by a person and drops out. A recorded entry keeps its
+// reason and gains the backlog's title and URL; a stopped issue the loop never
+// recorded (a scheduler refusal, a hand-applied label) is added after them.
+func (r *Report) MergeNeedsShin(stopped []NeedsShin) {
+	byOrder := map[string]NeedsShin{}
+	for _, it := range stopped {
+		byOrder[it.Order] = it
+	}
+	merged := []NeedsShin{}
+	seen := map[string]bool{}
+	for _, it := range r.NeedsShin {
+		backlog, ok := byOrder[it.Order]
+		if !ok {
+			continue
+		}
+		it.Title, it.URL = backlog.Title, backlog.URL
+		merged = append(merged, it)
+		seen[it.Order] = true
+	}
+	for _, it := range stopped {
+		if !seen[it.Order] {
+			seen[it.Order] = true
+			merged = append(merged, it)
+		}
+	}
+	r.NeedsShin = merged
 }
 
 const needsShinFile = "needs-shin.json"

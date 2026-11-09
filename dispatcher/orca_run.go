@@ -3,9 +3,11 @@ package dispatcher
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/guangshinhaha/shinfactory/internal/filex"
@@ -97,16 +99,31 @@ func parseOrcaRunID(out []byte) (string, error) {
 // for them, so it cannot collect their results: stopping them leaves each stage
 // pending, and it relaunches in its kept worktree instead of two workers sharing
 // one. Only workers this factory launched (those with a session record) are
-// touched, so a configured run shared with other work stays safe.
+// touched, so a configured run shared with other work stays safe. Each session
+// record names the run its worker launched in, so every run is scanned, even
+// after run_id changed or orca-run.json was lost; one run failing does not skip
+// the others.
 func (d *OrcaDispatcher) RecoverOrphans(ctx context.Context) ([]string, error) {
-	runID := d.knownRun()
-	if runID == "" {
-		return nil, nil
+	var stopped []string
+	var errs []error
+	byRun := d.launchedDispatchIDs()
+	runIDs := make([]string, 0, len(byRun))
+	for runID := range byRun {
+		runIDs = append(runIDs, runID)
 	}
-	ours := d.launchedDispatchIDs()
-	if len(ours) == 0 {
-		return nil, nil
+	sort.Strings(runIDs)
+	for _, runID := range runIDs {
+		got, err := d.recoverRun(ctx, runID, byRun[runID])
+		stopped = append(stopped, got...)
+		if err != nil {
+			errs = append(errs, err)
+		}
 	}
+	return stopped, errors.Join(errs...)
+}
+
+// recoverRun stops the unsettled workers of ours that run lists.
+func (d *OrcaDispatcher) recoverRun(ctx context.Context, runID string, ours map[string]bool) ([]string, error) {
 	callCtx, cancel := context.WithTimeout(ctx, orcaStartTimeout)
 	defer cancel()
 	var stopped []string
@@ -119,7 +136,7 @@ func (d *OrcaDispatcher) RecoverOrphans(ctx context.Context) ([]string, error) {
 		}
 		out, err := d.run(callCtx, d.bin, args...)
 		if err != nil {
-			return stopped, fmt.Errorf("list orca workers for recovery: %w", err)
+			return stopped, fmt.Errorf("list orca workers of run %s for recovery: %w", runID, err)
 		}
 		var reply struct {
 			Result struct {
@@ -128,7 +145,7 @@ func (d *OrcaDispatcher) RecoverOrphans(ctx context.Context) ([]string, error) {
 			} `json:"result"`
 		}
 		if err := json.Unmarshal(out, &reply); err != nil {
-			return stopped, fmt.Errorf("worker-list reply unreadable: %w", err)
+			return stopped, fmt.Errorf("worker-list reply of run %s unreadable: %w", runID, err)
 		}
 		for _, w := range reply.Result.Workers {
 			if !ours[w.DispatchID] || w.settled() {
@@ -150,20 +167,10 @@ func (d *OrcaDispatcher) RecoverOrphans(ctx context.Context) ([]string, error) {
 	return stopped, firstErr
 }
 
-// knownRun is the run workers were launched in, without creating one.
-func (d *OrcaDispatcher) knownRun() string {
-	d.runMu.Lock()
-	defer d.runMu.Unlock()
-	if d.runID != "" {
-		return d.runID
-	}
-	return d.recordedRun()
-}
-
-// launchedDispatchIDs reads the dispatch id of every session this factory
-// started on Orca.
-func (d *OrcaDispatcher) launchedDispatchIDs() map[string]bool {
-	ids := map[string]bool{}
+// launchedDispatchIDs reads, per Orca run, the dispatch id of every session
+// this factory started there.
+func (d *OrcaDispatcher) launchedDispatchIDs() map[string]map[string]bool {
+	byRun := map[string]map[string]bool{}
 	paths, _ := filepath.Glob(filepath.Join(d.runtimeDir, "sessions", "*", "orca.json"))
 	for _, path := range paths {
 		data, err := os.ReadFile(path)
@@ -172,10 +179,15 @@ func (d *OrcaDispatcher) launchedDispatchIDs() map[string]bool {
 		}
 		var rec struct {
 			DispatchID string `json:"dispatch_id"`
+			RunID      string `json:"run_id"`
 		}
-		if json.Unmarshal(data, &rec) == nil && rec.DispatchID != "" {
-			ids[rec.DispatchID] = true
+		if json.Unmarshal(data, &rec) != nil || rec.DispatchID == "" || rec.RunID == "" {
+			continue
 		}
+		if byRun[rec.RunID] == nil {
+			byRun[rec.RunID] = map[string]bool{}
+		}
+		byRun[rec.RunID][rec.DispatchID] = true
 	}
-	return ids
+	return byRun
 }

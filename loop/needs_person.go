@@ -54,6 +54,7 @@ func (l *Loop) stopForPerson(ctx context.Context, orderID, summary, detail strin
 			l.logger.Warn("could not record needs-shin for status", "order", orderID, "error", err)
 		}
 		l.clearFailedRounds(orderID)
+		l.clearOrderSpend(orderID)
 	case strings.Contains(err.Error(), `action "stop" script is not configured`):
 		l.logger.Info("backlog has no stop action; nobody to tell", "order", orderID, "reason", summary)
 	default:

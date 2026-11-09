@@ -31,6 +31,7 @@ type spawnOptions struct {
 	attempt     int
 	resume      string
 	displayName string // preserved across retries; empty = compute from session ID
+	steered     bool   // the same attempt resumed with a steer; not a new launch for the spend cap
 }
 
 func (l *Loop) atMaxConcurrency() bool {
@@ -50,6 +51,9 @@ func (l *Loop) spawnCook(ctx context.Context, cand dispatchCandidate, order Orde
 	runtimeName := l.stageRuntime(stage)
 	if l.runtimeHeld(runtimeName) {
 		return nil // out of usage: the stage stays pending until a launch can succeed
+	}
+	if why := l.overSpendCap(cand.OrderID, spendTaskKey(stage)); why != "" && !opts.steered {
+		return l.stopOverCap(ctx, cand, stage, why)
 	}
 
 	// Belt-and-suspenders: give the registry one last chance to pick up
@@ -85,7 +89,7 @@ func (l *Loop) spawnCook(ctx context.Context, cand dispatchCandidate, order Orde
 	if l.config.Landing.PR() {
 		l.clearGateFile(order, stage)
 	}
-	resumePrompt = stringx.JoinNonEmpty("\n\n", l.gateNote(order, stage), resumePrompt)
+	resumePrompt = stringx.JoinNonEmpty("\n\n", playbookNote(order, stage), l.gateNote(order, stage), resumePrompt)
 	rationale := order.Rationale
 	if gateStageKey(stage) == gateVerifyKey && l.config.Landing.PR() {
 		rationale = "" // a verifier works from the issue, not the scheduler's reasoning
@@ -155,6 +159,9 @@ func (l *Loop) spawnCook(ctx context.Context, cand dispatchCandidate, order Orde
 		dispatchedRuntime: dispatchedRuntime,
 	}
 	l.trackCookStarted(cook)
+	if !opts.steered {
+		l.recordStageLaunch(cand.OrderID, spendTaskKey(stage))
+	}
 	l.cooks.activeCooksByOrder[cand.OrderID] = cook
 	l.startSessionWatcher(ctx, cook, false)
 

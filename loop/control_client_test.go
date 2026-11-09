@@ -48,3 +48,29 @@ func TestWaitControlAckTimesOutWithoutALoop(t *testing.T) {
 		t.Fatalf("err = %v", err)
 	}
 }
+
+func TestWaitControlAckResumesFromItsOffsetAndSurvivesPartialLines(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "control-ack.ndjson")
+	if err := os.WriteFile(path, []byte(`{"id":"a","status":"ok"}`+"\n"+`{"id":"mi`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// The partial line must not advance the offset past its start.
+	if _, off, ok := findAckFrom(path, "mine", 0); ok || off != int64(len(`{"id":"a","status":"ok"}`+"\n")) {
+		t.Fatalf("offset = %d, ok = %v", off, ok)
+	}
+	f, _ := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o644)
+	_, _ = f.WriteString(`ne","status":"ok"}` + "\n")
+	f.Close()
+	ack, _, ok := findAckFrom(path, "mine", int64(len(`{"id":"a","status":"ok"}`+"\n")))
+	if !ok || ack.ID != "mine" {
+		t.Fatalf("ack = %+v, ok = %v", ack, ok)
+	}
+	// A replaced (shorter) file restarts the scan.
+	if err := os.WriteFile(path, []byte(`{"id":"mine","status":"ok"}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, ok := findAckFrom(path, "mine", 9999); !ok {
+		t.Fatal("did not rescan a truncated ack file")
+	}
+}

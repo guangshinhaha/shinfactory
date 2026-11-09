@@ -79,6 +79,9 @@ func (l *Loop) applyStageResult(ctx context.Context, result StageResult) error {
 		return nil
 	}
 	l.trackCookCompleted(cook, result)
+	if !isScheduleStage(cook.stage) {
+		l.recordStageCost(cook.orderID, cook.session.TotalCost())
+	}
 	delete(l.cooks.activeCooksByOrder, cook.orderID)
 	if err := l.handleCompletion(ctx, cook, result.Status, string(result.Status)); err != nil {
 		if conflictErr := l.handleMergeConflict(cook, err); conflictErr != nil {
@@ -136,6 +139,16 @@ func (l *Loop) handleCompletion(ctx context.Context, cook *cookHandle, resultSta
 	if resultStatus == StageResultCompleted {
 		if isScheduleStage(cook.stage) {
 			return l.handleScheduleCompletion(cook)
+		}
+		if order, ok := l.orderByID(cook.orderID); ok && !isScheduleOrder(order) {
+			if err := l.checkExecuteEvidence(ctx, order, cook); err != nil {
+				reason := err.Error()
+				if ferr := l.failStage(ctx, cook, reason); ferr != nil {
+					return ferr
+				}
+				l.noteRejectedStage(ctx, cook.orderID, reason)
+				return nil
+			}
 		}
 		if l.config.Landing.PR() {
 			// Before the stage message: a blocking message parks the stage, and
@@ -376,6 +389,7 @@ func (l *Loop) advanceAndPersist(ctx context.Context, cook *cookHandle, message 
 			}
 		}
 		l.clearFailedRounds(cook.orderID)
+		l.clearOrderSpend(cook.orderID)
 	}
 	return nil
 }

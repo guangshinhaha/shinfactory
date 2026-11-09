@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
@@ -45,13 +46,17 @@ func AppendControlCommand(runtimeDir string, cmd ControlCommand) error {
 }
 
 // WaitControlAck returns the loop's ack for command id, polling until ctx ends.
-// No ack means no loop is reading the queue, or it is busy.
+// No ack means no loop is reading the queue, or it is busy. Each poll reads only
+// the bytes appended since the last one.
 func WaitControlAck(ctx context.Context, runtimeDir, id string) (ControlAck, error) {
 	path := filepath.Join(runtimeDir, "control-ack.ndjson")
+	var offset int64
 	for {
-		if ack, ok := findAck(path, id); ok {
+		ack, next, ok := findAckFrom(path, id, offset)
+		if ok {
 			return ack, nil
 		}
+		offset = next
 		select {
 		case <-ctx.Done():
 			return ControlAck{}, fmt.Errorf("no ack for command %s: %w", id, ctx.Err())
@@ -60,19 +65,32 @@ func WaitControlAck(ctx context.Context, runtimeDir, id string) (ControlAck, err
 	}
 }
 
-func findAck(path, id string) (ControlAck, bool) {
+// findAckFrom scans complete lines of path from offset for id's ack. It returns
+// the offset to resume from: the end of the last complete line read, so a line
+// the loop is still writing is read whole next time. A file shorter than offset
+// was replaced, so the scan restarts at 0.
+func findAckFrom(path, id string, offset int64) (ControlAck, int64, bool) {
 	file, err := os.Open(path)
 	if err != nil {
-		return ControlAck{}, false
+		return ControlAck{}, offset, false
 	}
 	defer file.Close()
-	scanner := bufio.NewScanner(file)
-	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-	for scanner.Scan() {
+	if info, err := file.Stat(); err != nil || info.Size() < offset {
+		offset = 0
+	}
+	if _, err := file.Seek(offset, io.SeekStart); err != nil {
+		return ControlAck{}, offset, false
+	}
+	reader := bufio.NewReader(file)
+	for {
+		line, err := reader.ReadBytes('\n')
+		if err != nil {
+			return ControlAck{}, offset, false // partial or no line left
+		}
+		offset += int64(len(line))
 		var ack ControlAck
-		if json.Unmarshal(scanner.Bytes(), &ack) == nil && ack.ID == id {
-			return ack, true
+		if json.Unmarshal(line, &ack) == nil && ack.ID == id {
+			return ack, offset, true
 		}
 	}
-	return ControlAck{}, false
 }

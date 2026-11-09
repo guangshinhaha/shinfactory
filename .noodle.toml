@@ -36,6 +36,7 @@ add = "defaults/adapters/github/backlog-add"
 done = "defaults/adapters/github/backlog-done"
 edit = "defaults/adapters/github/backlog-edit"
 stop = "defaults/adapters/github/backlog-stop"
+stopped = "defaults/adapters/github/backlog-stopped"
 
 [landing]
 mode = "pr"

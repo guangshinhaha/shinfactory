@@ -208,12 +208,13 @@ type Loop struct {
 	lastStatus statusfile.Status
 
 	// V2 canonical state — event-sourced pipeline.
-	canonical    state.State
+	canonical       state.State
 	canonicalLoaded bool
-	effectLedger *reducer.EffectLedger
-	eventCounter atomic.Uint64
+	effectLedger    *reducer.EffectLedger
+	eventCounter    atomic.Uint64
 
-	limitHolds usageLimitHolds
+	limitHolds    usageLimitHolds
+	limitRequeues usageLimitRequeues
 
 	reconciledFailures []reconciledFailure
 	lastMiseWarnings   []string

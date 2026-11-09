@@ -3,8 +3,10 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/spf13/cobra"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -72,5 +74,29 @@ func TestRunControlSaysSoWhenNoLoopAnswers(t *testing.T) {
 	err := runControl(&App{}, &bytes.Buffer{}, "pause", nil, controlFlags{timeout: 300 * time.Millisecond})
 	if err == nil || !strings.Contains(err.Error(), "pause was queued but the loop did not answer") {
 		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestControlSpecsCoverEveryLoopAction(t *testing.T) {
+	var specs []string
+	for _, spec := range controlSpecs {
+		specs = append(specs, spec.name)
+	}
+	sort.Strings(specs)
+	if got, want := strings.Join(specs, ","), strings.Join(loop.ControlActions(), ","); got != want {
+		t.Fatalf("controlSpecs = %s\nloop actions = %s", got, want)
+	}
+}
+
+func TestControlDoubleDashLetsPromptTextStartWithADash(t *testing.T) {
+	var got []string
+	cmd := newControlCmd(&App{})
+	cmd.RunE = func(_ *cobra.Command, args []string) error { got = args; return nil }
+	cmd.SetArgs([]string{"--", "steer", "s1", "-v", "was", "a", "typo"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(got, "|") != "steer|s1|-v|was|a|typo" {
+		t.Fatalf("args = %q", got)
 	}
 }

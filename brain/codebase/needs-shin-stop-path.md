@@ -6,3 +6,5 @@
 - Idempotent: the script does nothing when the label is already up, so a rerun never comments twice.
 - Mode: `resolveRunMode` (`loop/shinstack_mode.go`) reads `shinstack-mode:` from the project's CLAUDE.md and overrides `.noodle.toml` `mode`; undeclared or unknown values fall back to the config.
 - Test trap: `exec.Command("gh")` resolves from the test process's PATH, not `cmd.Env`. A test that built its own env once ran the real gh; call the stub by absolute path.
+- `status --json` `needs_shin` merges `.noodle/needs-shin.json` (loop-recorded stops) with the backlog `stopped` action (`backlog-stopped`: open issues labelled `needs-shin`). A scheduler refusal runs the stop script via the skill, bypassing the loop's record, so the file alone missed it (#87).
+- `processControlCommands` stamps `status.json` before writing the ack; the stamp used to land later in the cycle, so `status` read one control behind.

@@ -82,6 +82,13 @@ func applyDefaultsFromMetadata(config *Config, metadata toml.MetaData, diagnosti
 		config.Concurrency.MaxConcurrency = defaultMaxConcurrency
 	}
 
+	if !metadata.IsDefined("spend", "max_attempts") {
+		config.Spend.MaxAttempts = defaultMaxStageAttempts
+	}
+	if !metadata.IsDefined("spend", "max_cost_usd") {
+		config.Spend.MaxCostUSD = defaultMaxOrderCostUSD
+	}
+
 	config.Runtime.spritesDefined = metadata.IsDefined("runtime", "sprites")
 	config.Runtime.cursorDefined = metadata.IsDefined("runtime", "cursor")
 	config.Runtime.orcaDefined = metadata.IsDefined("runtime", "orca")
@@ -277,6 +284,19 @@ func normalizeParsedValues(config *Config, metadata toml.MetaData, diagnostics *
 			)
 		}
 		config.Concurrency.MaxConcurrency = defaultMaxConcurrency
+	}
+
+	if config.Spend.MaxAttempts <= 0 {
+		appendNormalizedValueDiagnostic(diagnostics, "spend.max_attempts",
+			fmt.Sprintf("max_attempts=%d is invalid; using %d", config.Spend.MaxAttempts, defaultMaxStageAttempts),
+		)
+		config.Spend.MaxAttempts = defaultMaxStageAttempts
+	}
+	if config.Spend.MaxCostUSD <= 0 {
+		appendNormalizedValueDiagnostic(diagnostics, "spend.max_cost_usd",
+			fmt.Sprintf("max_cost_usd=%v is invalid; using %v", config.Spend.MaxCostUSD, defaultMaxOrderCostUSD),
+		)
+		config.Spend.MaxCostUSD = defaultMaxOrderCostUSD
 	}
 
 	if strings.TrimSpace(config.Runtime.Default) == "" {

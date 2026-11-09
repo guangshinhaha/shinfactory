@@ -324,3 +324,43 @@ func localLandingConfig() config.Config {
 	cfg.Landing.Mode = config.LandingModeLocal
 	return cfg
 }
+
+// Approval while checks run must not ask for a second yes: the order parks as
+// approved and the loop merges it, even in supervised mode.
+func TestPRLandingApprovalWhileChecksPendingMergesWithoutSecondApproval(t *testing.T) {
+	h := newLandingHarness(t, "supervised", 1)
+	h.runStage(t, 1)
+	h.ln.pending = 1
+	if err := h.l.controlMerge("42"); err != nil {
+		t.Fatalf("approve: %v", err)
+	}
+	review, parked := h.l.cooks.pendingReview["42"]
+	if !parked || !strings.HasPrefix(review.reason, approvedAwaitingChecksPrefix) {
+		t.Fatalf("pending review = %+v (parked=%v), want parked as approved and waiting", review, parked)
+	}
+	if len(h.ln.merged) != 0 {
+		t.Fatal("merged while checks were pending")
+	}
+	h.l.lastChecksPoll = time.Time{}
+	if err := h.l.Cycle(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(h.ln.merged) != 1 || len(h.ar.doneCalls) != 1 {
+		t.Fatalf("merged=%d done=%v, want the loop to finish the approved order", len(h.ln.merged), h.ar.doneCalls)
+	}
+}
+
+// Marking the issue done is not bounded by the ship deadline.
+func TestPRLandingMarkDoneRunsOutsideTheShipDeadline(t *testing.T) {
+	h := newLandingHarness(t, "supervised", 1)
+	h.runStage(t, 1)
+	if err := h.l.controlMerge("42"); err != nil {
+		t.Fatal(err)
+	}
+	if len(h.ar.doneCalls) != 1 || h.ar.doneHadDeadline {
+		t.Fatalf("done=%v hadDeadline=%v, want done without the ship deadline", h.ar.doneCalls, h.ar.doneHadDeadline)
+	}
+	if !h.ln.deadline {
+		t.Fatal("the merge itself lost its deadline")
+	}
+}

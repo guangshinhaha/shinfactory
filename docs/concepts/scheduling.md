@@ -58,6 +58,7 @@ An order is a unit of work with one or more stages. The scheduling agent writes 
 | `rationale` | Why the scheduler chose this work      |
 | `plan`      | Optional list of linked plan paths     |
 | `tier`      | `none`, `low`, `medium` (default) or `high`. Sets the review gate: `quality` after `execute`, plus `verify` for `high` |
+| `work_type` | `bug`, `feature` or `refactor`, from the issue's label or text. Picks the shinstack playbook the `execute` stage follows and the evidence checked before it is accepted (the repo's checks; for a `bug`, a test-only commit before the fix). Optional |
 | `stages`    | Pipeline of stages to execute          |
 
 ## Stages
