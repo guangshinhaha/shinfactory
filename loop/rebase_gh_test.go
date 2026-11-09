@@ -31,6 +31,9 @@ func newConflictFixture(t *testing.T) conflictFixture {
 	gitIn(t, work, "clone", remote, ".")
 	gitIn(t, work, "checkout", "-b", "order-42")
 	t.Setenv("STUB_MERGEABLE_BY_GIT", "1")
+	// A rebase commits as the configured user; CI has none.
+	t.Setenv("GIT_COMMITTER_NAME", "t")
+	t.Setenv("GIT_COMMITTER_EMAIL", "t@example.test")
 	return conflictFixture{remote: remote, work: work}
 }
 
