@@ -91,11 +91,8 @@ func TestBootstrapScheduleOrderCreatesSingleStageOrder(t *testing.T) {
 	if stage.Status != StageStatusPending {
 		t.Fatalf("stage status = %q, want %q", stage.Status, StageStatusPending)
 	}
-	if stage.Provider != "claude" {
-		t.Fatalf("stage provider = %q, want %q", stage.Provider, "claude")
-	}
-	if stage.Model != "claude-haiku-5-5" {
-		t.Fatalf("stage model = %q, want %q", stage.Model, "claude-haiku-5-5")
+	if stage.Provider != "" || stage.Model != "" {
+		t.Fatalf("stage routing = %s/%s, want none (resolved at dispatch)", stage.Provider, stage.Model)
 	}
 }
 

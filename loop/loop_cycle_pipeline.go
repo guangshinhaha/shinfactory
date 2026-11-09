@@ -243,17 +243,6 @@ func (l *Loop) bootstrapScheduleIfEmpty(brief mise.Brief, orders *OrdersFile) (i
 	return false, nil
 }
 
-// applyRoutingDefaults normalizes runtime and provider defaults on orders,
-// persisting if any changed.
-func (l *Loop) applyRoutingDefaults(orders *OrdersFile) error {
-	updated, changed := ApplyOrderRoutingDefaults(*orders, l.registry, l.config)
-	if !changed {
-		return nil
-	}
-	*orders = updated
-	return l.writeOrdersState(*orders)
-}
-
 func (l *Loop) prepareOrdersForCycle(brief mise.Brief, warnings []string, miseChanged bool) (OrdersFile, bool, error) {
 	result, err := l.mergeOrdersNext()
 	if err := l.handlePromotionResult(result, err); err != nil {
@@ -288,9 +277,6 @@ func (l *Loop) prepareOrdersForCycle(brief mise.Brief, warnings []string, miseCh
 		return OrdersFile{}, false, nil
 	}
 
-	if err := l.applyRoutingDefaults(&orders); err != nil {
-		return OrdersFile{}, false, err
-	}
 	l.setOrdersState(orders)
 	return orders, true, nil
 }

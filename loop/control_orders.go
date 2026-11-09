@@ -34,6 +34,9 @@ func (l *Loop) controlEnqueue(cmd ControlCommand) error {
 	if orderID == "" {
 		return fmt.Errorf("enqueue requires order_id")
 	}
+	if err := l.config.ValidateStageProvider(cmd.Provider); err != nil {
+		return err
+	}
 	prompt := strings.TrimSpace(cmd.Prompt)
 	taskKey := strings.TrimSpace(cmd.TaskKey)
 	if taskKey == "" {
@@ -82,6 +85,9 @@ func (l *Loop) controlEditItem(cmd ControlCommand) error {
 	orderID := strings.TrimSpace(cmd.OrderID)
 	if orderID == "" {
 		return fmt.Errorf("edit-item requires order_id")
+	}
+	if err := l.config.ValidateStageProvider(cmd.Provider); err != nil {
+		return err
 	}
 	if _, active := l.cooks.activeCooksByOrder[orderID]; active {
 		return fmt.Errorf("order %q is currently cooking", orderID)

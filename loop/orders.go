@@ -424,12 +424,14 @@ func sameStageDefinition(a Stage, b Stage) bool {
 	return reflect.DeepEqual(a, b)
 }
 
+// stageRouting returns the provider and model a stage runs on, for display and
+// events. Stages keep no resolved routing of their own, so this resolves it.
+func (l *Loop) stageRouting(stage Stage) (provider, model string) {
+	return l.config.ResolveStageRouting(nonEmpty(stage.TaskKey, stage.Skill), stage.Provider, stage.Model)
+}
+
 // NormalizeAndValidateOrders delegates to orderx.
 func NormalizeAndValidateOrders(of OrdersFile, reg taskreg.Registry, cfg config.Config) (OrdersFile, bool, error) {
 	return orderx.NormalizeAndValidateOrders(of, reg, cfg)
 }
 
-// ApplyOrderRoutingDefaults delegates to orderx.
-func ApplyOrderRoutingDefaults(of OrdersFile, reg taskreg.Registry, cfg config.Config) (OrdersFile, bool) {
-	return orderx.ApplyOrderRoutingDefaults(of, reg, cfg)
-}

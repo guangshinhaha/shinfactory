@@ -22,6 +22,7 @@
 - [[codebase/pr-landing-mode]]
 - [[codebase/provider-routing-must-fail-loudly]]
 - [[codebase/projection-owns-snapshot-active-order-ids]]
+- [[codebase/routing-resolves-at-dispatch-only]]
 - [[codebase/release-changelog-wrapper-script]]
 - [[codebase/root-tests-require-ui-dist-assets]]
 - [[codebase/orca-runtime-usage-limit-hold]]
