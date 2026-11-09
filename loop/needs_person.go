@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/guangshinhaha/shinfactory/adapter"
 )
@@ -21,6 +22,9 @@ const (
 	// stopMessageLimit bounds how much of a failure reason goes into the issue
 	// comment.
 	stopMessageLimit = 600
+	// stopTimeout bounds the stop action's gh calls, which run on the loop's
+	// goroutine.
+	stopTimeout = 2 * time.Minute
 )
 
 // stopForPerson hands the order's issue to a person: the backlog adapter's
@@ -36,6 +40,8 @@ func (l *Loop) stopForPerson(ctx context.Context, orderID, summary, detail strin
 		// saw in the work stays in the session log.
 		message = strings.TrimSpace(summary + " Ask the factory chat for the details.")
 	}
+	ctx, cancel := context.WithTimeout(ctx, stopTimeout)
+	defer cancel()
 	_, err := l.deps.Adapter.Run(ctx, "backlog", "stop", adapter.RunOptions{
 		Args:  []string{orderID},
 		Stdin: []byte(message),
