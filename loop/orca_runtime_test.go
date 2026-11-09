@@ -648,3 +648,45 @@ func TestStageRuntimeOrcaDefaultWinsUnlessReasonStated(t *testing.T) {
 		}
 	}
 }
+
+// A worker whose output merely mentions rate_limit_error is a real failure.
+func TestOrcaRuntimeBareRateLimitErrorFailsTheStage(t *testing.T) {
+	env := newOrcaEnv(t, oneStageOrder())
+	env.cycleUntil(t, "execute started", func() bool { return len(env.fake.Starts()) == 1 })
+	id := env.fake.LastDispatch(t)
+	env.fake.SetTranscript(t, id, `Tests failed: expected {"type":"rate_limit_error"} from the mock API`)
+	env.fake.Settle(t, id, "failed")
+	env.cycleUntil(t, "stage failed", func() bool {
+		of := env.readOrders(t)
+		return len(of.Orders) == 1 && of.Orders[0].Status == OrderStatusFailed
+	})
+	if _, held := env.loop.limitHolds.heldUntil("orca", env.clock); held {
+		t.Fatal("runtime held by a failure that only mentions rate_limit_error")
+	}
+}
+
+// A stage that keeps dying on the limit is requeued a bounded number of times,
+// then fails instead of relaunching forever.
+func TestOrcaRuntimeUsageLimitRequeuesAreBounded(t *testing.T) {
+	env := newOrcaEnv(t, oneStageOrder())
+	for i := 1; i <= maxUsageLimitRequeues; i++ {
+		env.cycleUntil(t, "execute started", func() bool { return len(env.fake.Starts()) == i })
+		id := env.fake.LastDispatch(t)
+		env.fake.SetTranscript(t, id, "Claude usage limit reached.")
+		env.fake.Settle(t, id, "failed")
+		env.cycleUntil(t, "stage requeued", func() bool {
+			got := env.orderStages(t, "42")
+			return len(got) == 1 && got[0] == "execute:pending" && env.loop.cooks.activeCooksByOrder["42"] == nil
+		})
+		env.clock = env.clock.Add(2 * time.Minute)
+	}
+	n := maxUsageLimitRequeues + 1
+	env.cycleUntil(t, "execute started again", func() bool { return len(env.fake.Starts()) == n })
+	id := env.fake.LastDispatch(t)
+	env.fake.SetTranscript(t, id, "Claude usage limit reached.")
+	env.fake.Settle(t, id, "failed")
+	env.cycleUntil(t, "stage failed", func() bool {
+		of := env.readOrders(t)
+		return len(of.Orders) == 1 && of.Orders[0].Status == OrderStatusFailed
+	})
+}

@@ -12,9 +12,9 @@ import (
 // usageLimitPattern matches the wording agents and Orca use when the account
 // behind a launch has no usage left. It stays narrow on purpose: an ordinary
 // failure that merely mentions a "rate limit" (a test name, a code review) must
-// not hold the runtime, so bare "rate limit" and "limit reached" don't match.
+// not hold the runtime, so bare "rate limit", "rate_limit_error" and "limit reached" don't match.
 var usageLimitPattern = regexp.MustCompile(
-	`(?i)(usage limit reached|(5-hour|five-hour|weekly|session|opus|sonnet) limit reached|hit your (usage |weekly |5-hour |session )?limit|reached your (usage|weekly|5-hour|session) limit|out of (extra )?(usage|credits)|credit balance is too low|exceeded your (usage|quota)|insufficient credits|rate_limit_error)`)
+	`(?i)(usage limit reached|(5-hour|five-hour|weekly|session|opus|sonnet) limit reached|hit your (usage |weekly |5-hour |session )?limit|reached your (usage|weekly|5-hour|session) limit|out of (extra )?(usage|credits)|credit balance is too low|exceeded your (usage|quota)|insufficient credits)`)
 
 // IsUsageLimitText reports whether text reads like a usage-limit failure.
 func IsUsageLimitText(text string) bool {

@@ -149,7 +149,7 @@ func (d *OrcaDispatcher) Dispatch(ctx context.Context, req DispatchRequest) (Ses
 		return nil, err
 	}
 	if err := os.WriteFile(filepath.Join(sessionDir, "orca.json"),
-		[]byte(fmt.Sprintf(`{"dispatch_id":%q}`+"\n", dispatchID)), 0o644); err != nil {
+		[]byte(fmt.Sprintf(`{"dispatch_id":%q,"run_id":%q}`+"\n", dispatchID, runID)), 0o644); err != nil {
 		d.stopWorker(dispatchID)
 		return nil, fmt.Errorf("write orca metadata: %w", err)
 	}
