@@ -9,13 +9,13 @@ import (
 	"testing"
 )
 
-func git(t *testing.T, dir string, args ...string) string {
+func runGit(t *testing.T, dir string, args ...string) string {
 	t.Helper()
 	cmd := exec.Command("git", append([]string{"-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false"}, args...)...)
 	cmd.Dir = dir
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		t.Fatalf("git %v: %v\n%s", args, err, out)
+		t.Errorf("git %v: %v\n%s", args, err, out)
 	}
 	return string(out)
 }

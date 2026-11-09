@@ -98,7 +98,7 @@ NN is the backlog item ID (the issue number on a GitHub backlog). Verify both af
 - `brain/plans/index.md` has `- [[plans/NN-plan-name/overview]]`
 - the backlog item links the plan: use the `todo` skill (Link a plan)
 
-No backlog item yet: add one with the `todo` skill first, then link the plan. Do NOT edit `brain/index.md` — the auto-index hook maintains it.
+No backlog item yet: add one with the `todo` skill first, then link the plan. Do NOT edit `brain/index.md` — it is generated (`scripts/brain-index.sh`) and gitignored.
 
 ### Archiving completed plans
 

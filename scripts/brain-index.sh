@@ -6,13 +6,14 @@
 set -eu
 
 BRAIN_DIR="${1:-brain}"
+BRAIN_DIR="${BRAIN_DIR%/}"
 [ -d "$BRAIN_DIR" ] || exit 0
 INDEX="$BRAIN_DIR/index.md"
 
 # All .md files except index.md, as relative paths without the extension.
 # plans/ and archive/plans/ subdirectories have their own index.
 disk=$(find "$BRAIN_DIR" -name '*.md' ! -name index.md -type f |
-  sed "s|^$BRAIN_DIR/||; s|\.md\$||" |
+  awk -v p="$BRAIN_DIR/" 'index($0, p) == 1 { s = substr($0, length(p) + 1); sub(/\.md$/, "", s); print s }' |
   grep -v '^plans/.\+/' | grep -v '^archive/plans/.\+/' | LC_ALL=C sort || true)
 
 section() { # title, grep-pattern
@@ -32,9 +33,12 @@ trap 'rm -f "$tmp"' EXIT INT TERM
   section Notes '^notes/'
   section Audits '^audits/'
   section Backlog '^todos$'
+  other=$(printf '%s\n' "$disk" | grep -vE '^(architecture|vision|principles|todos)$|^(codebase|notes|audits)/' || true)
+  if [ -n "$other" ]; then printf '\n## Other\n'; printf '%s\n' "$other" | sed 's/.*/- [[&]]/'; fi
   [ -f "$BRAIN_DIR/plans/index.md" ] && printf '\n## Plans\n- [[plans/index]]\n'
   [ -f "$BRAIN_DIR/archive/plans/index.md" ] && printf '\n## Archived Plans\n- [[archive/plans/index]]\n'
   true
 } > "$tmp"
 
+chmod 644 "$tmp"
 if ! cmp -s "$tmp" "$INDEX" 2>/dev/null; then mv "$tmp" "$INDEX"; fi
