@@ -15,6 +15,9 @@ import (
 // loop can find the workers its previous process left behind.
 const orcaRunFile = "orca-run.json"
 
+// orcaRecoverMaxPages bounds how many pages of workers recovery reads.
+const orcaRecoverMaxPages = 50
+
 // ensureRun returns the Orca run the factory launches its workers in. Stages
 // never land in the coordinator's run: the run is either the configured one,
 // the one a previous loop recorded (if Orca still has it), or a new one.
@@ -106,31 +109,43 @@ func (d *OrcaDispatcher) RecoverOrphans(ctx context.Context) ([]string, error) {
 	}
 	callCtx, cancel := context.WithTimeout(ctx, orcaStartTimeout)
 	defer cancel()
-	out, err := d.run(callCtx, d.bin, "orchestration", "worker-list", "--run", runID, "--json", "--limit", "100")
-	if err != nil {
-		return nil, fmt.Errorf("list orca workers for recovery: %w", err)
-	}
-	var reply struct {
-		Result struct {
-			Workers []orcaWorker `json:"workers"`
-		} `json:"result"`
-	}
-	if err := json.Unmarshal(out, &reply); err != nil {
-		return nil, fmt.Errorf("worker-list reply unreadable: %w", err)
-	}
 	var stopped []string
 	var firstErr error
-	for _, w := range reply.Result.Workers {
-		if !ours[w.DispatchID] || w.settled() {
-			continue
+	cursor := ""
+	for page := 0; page < orcaRecoverMaxPages; page++ {
+		args := []string{"orchestration", "worker-list", "--run", runID, "--json", "--limit", "100"}
+		if cursor != "" {
+			args = append(args, "--cursor", cursor)
 		}
-		if err := stopOrcaWorker(d.run, d.bin, w.DispatchID); err != nil {
-			if firstErr == nil {
-				firstErr = fmt.Errorf("stop orphaned orca worker %s: %w", w.DispatchID, err)
+		out, err := d.run(callCtx, d.bin, args...)
+		if err != nil {
+			return stopped, fmt.Errorf("list orca workers for recovery: %w", err)
+		}
+		var reply struct {
+			Result struct {
+				Workers    []orcaWorker `json:"workers"`
+				NextCursor string       `json:"nextCursor"`
+			} `json:"result"`
+		}
+		if err := json.Unmarshal(out, &reply); err != nil {
+			return stopped, fmt.Errorf("worker-list reply unreadable: %w", err)
+		}
+		for _, w := range reply.Result.Workers {
+			if !ours[w.DispatchID] || w.settled() {
+				continue
 			}
-			continue
+			if err := stopOrcaWorker(d.run, d.bin, w.DispatchID); err != nil {
+				if firstErr == nil {
+					firstErr = fmt.Errorf("stop orphaned orca worker %s: %w", w.DispatchID, err)
+				}
+				continue
+			}
+			stopped = append(stopped, w.DispatchID)
 		}
-		stopped = append(stopped, w.DispatchID)
+		if reply.Result.NextCursor == "" {
+			break
+		}
+		cursor = reply.Result.NextCursor
 	}
 	return stopped, firstErr
 }
