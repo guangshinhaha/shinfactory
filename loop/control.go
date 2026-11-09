@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -235,52 +236,56 @@ func (l *Loop) applyControlCommand(cmd ControlCommand) ControlAck {
 	return ack
 }
 
-func (l *Loop) dispatchControlCommand(cmd ControlCommand) error {
-	switch stringx.Normalize(cmd.Action) {
-	case "pause":
-		return l.controlPause()
-	case "resume":
-		return l.controlResume()
-	case "drain":
-		return l.controlDrain()
-	case "skip":
-		return l.controlSkip(cmd.OrderID)
-	case "kill":
-		return l.controlKill(cmd.Name)
-	case "steer":
-		return l.controlSteer(cmd.Target, cmd.Prompt)
-	case "merge":
-		return l.controlMerge(cmd.OrderID)
-	case "reject":
-		return l.controlReject(cmd.OrderID)
-	case "request-changes":
+// controlHandlers is the loop's dispatch table: one entry per control action.
+// ControlActions lists its keys so the CLI can check it covers every action.
+var controlHandlers = map[string]func(l *Loop, cmd ControlCommand) error{
+	"pause":  func(l *Loop, _ ControlCommand) error { return l.controlPause() },
+	"resume": func(l *Loop, _ ControlCommand) error { return l.controlResume() },
+	"drain":  func(l *Loop, _ ControlCommand) error { return l.controlDrain() },
+	"skip":   func(l *Loop, cmd ControlCommand) error { return l.controlSkip(cmd.OrderID) },
+	"kill":   func(l *Loop, cmd ControlCommand) error { return l.controlKill(cmd.Name) },
+	"steer":  func(l *Loop, cmd ControlCommand) error { return l.controlSteer(cmd.Target, cmd.Prompt) },
+	"merge":  func(l *Loop, cmd ControlCommand) error { return l.controlMerge(cmd.OrderID) },
+	"reject": func(l *Loop, cmd ControlCommand) error { return l.controlReject(cmd.OrderID) },
+	"request-changes": func(l *Loop, cmd ControlCommand) error {
 		return l.controlRequestChanges(cmd.OrderID, cmd.Prompt)
-	case "mode":
-		return l.controlMode(cmd.Value)
-	case "enqueue":
-		return l.controlEnqueue(cmd)
-	case "stop-all":
+	},
+	"mode":    func(l *Loop, cmd ControlCommand) error { return l.controlMode(cmd.Value) },
+	"enqueue": func(l *Loop, cmd ControlCommand) error { return l.controlEnqueue(cmd) },
+	"stop-all": func(l *Loop, _ ControlCommand) error {
 		l.controlStopAll()
 		return nil
-	case "requeue":
-		return l.controlRequeue(cmd.OrderID)
-	case "edit-item":
-		return l.controlEditItem(cmd)
-	case "reorder":
-		return l.controlReorder(cmd)
-	case "stop":
-		return l.controlStop(cmd.Name)
-	case "set-max-concurrency":
+	},
+	"requeue":   func(l *Loop, cmd ControlCommand) error { return l.controlRequeue(cmd.OrderID) },
+	"edit-item": func(l *Loop, cmd ControlCommand) error { return l.controlEditItem(cmd) },
+	"reorder":   func(l *Loop, cmd ControlCommand) error { return l.controlReorder(cmd) },
+	"stop":      func(l *Loop, cmd ControlCommand) error { return l.controlStop(cmd.Name) },
+	"set-max-concurrency": func(l *Loop, cmd ControlCommand) error {
 		return l.controlSetMaxConcurrency(cmd.Value)
-	case "advance":
-		return l.controlAdvance(cmd.OrderID)
-	case "add-stage":
-		return l.controlAddStage(cmd)
-	case "park-review":
+	},
+	"advance":   func(l *Loop, cmd ControlCommand) error { return l.controlAdvance(cmd.OrderID) },
+	"add-stage": func(l *Loop, cmd ControlCommand) error { return l.controlAddStage(cmd) },
+	"park-review": func(l *Loop, cmd ControlCommand) error {
 		return l.controlParkReview(cmd.OrderID, cmd.Prompt)
-	default:
+	},
+}
+
+// ControlActions returns the name of every control the loop dispatches, sorted.
+func ControlActions() []string {
+	names := make([]string, 0, len(controlHandlers))
+	for name := range controlHandlers {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
+func (l *Loop) dispatchControlCommand(cmd ControlCommand) error {
+	handler, ok := controlHandlers[stringx.Normalize(cmd.Action)]
+	if !ok {
 		return fmt.Errorf("unsupported action")
 	}
+	return handler(l, cmd)
 }
 
 func (l *Loop) controlPause() error {

@@ -57,6 +57,12 @@ var controlSpecs = []controlSpec{
 		cmd.Prompt = strings.Join(args[1:], " ")
 	}},
 	{name: "enqueue", usage: "<order> <prompt> [--provider --model --skill --task-key]", min: 2, max: -1, fill: orderAndPrompt},
+	{name: "add-stage", usage: "<order> <task-key> [prompt] [--provider --model --skill]", min: 2, max: -1, fill: func(cmd *loop.ControlCommand, args []string) {
+		cmd.OrderID = args[0]
+		cmd.TaskKey = args[1]
+		cmd.Prompt = strings.Join(args[2:], " ")
+	}},
+	{name: "park-review", usage: "<order> [reason]", min: 1, max: -1, fill: orderAndPrompt},
 	{name: "edit-item", usage: "<order> [new title] [--provider --model --skill --task-key]", min: 1, max: -1, fill: orderAndPrompt},
 }
 
@@ -89,7 +95,9 @@ func newControlCmd(app *App) *cobra.Command {
 		Use:   "control <command> [args]",
 		Short: cmdmeta.Short("control"),
 		Long: "Send the same controls the web UI sends: " + controlNames() + ".\n" +
-			"The command goes through the loop's control queue; this waits for the loop's ack.",
+			"The command goes through the loop's control queue; this waits for the loop's ack.\n" +
+			"Text that starts with - is read as a flag. Put -- before the arguments to send it as text:\n" +
+			"  shinfactory control -- steer s1 \"-v was a typo\"",
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runControl(app, cmd.OutOrStdout(), args[0], args[1:], flags)
