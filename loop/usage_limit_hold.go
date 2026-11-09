@@ -4,6 +4,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/guangshinhaha/shinfactory/dispatcher"
 	"github.com/guangshinhaha/shinfactory/internal/state"
 	"github.com/guangshinhaha/shinfactory/internal/stringx"
 )
@@ -44,6 +45,10 @@ func (h *usageLimitHolds) release(runtime string) bool {
 	return was
 }
 
+// usageLimitResetSlack keeps the probe launch from landing in the second the
+// limit resets, when the account may not have refilled yet.
+const usageLimitResetSlack = time.Minute
+
 // stageRuntime resolves the runtime an order stage launches on: its own, else
 // process, as before the orca runtime existed. Only a configured default of
 // "orca" is honoured for stages without a runtime, so no other config changes.
@@ -81,10 +86,16 @@ func (l *Loop) runtimeHeld(runtimeName string) bool {
 }
 
 func (l *Loop) holdRuntime(runtimeName, reason string) {
-	until := l.deps.Now().Add(l.config.Runtime.Orca.LimitRetry())
+	now := l.deps.Now()
+	until := now.Add(l.config.Runtime.Orca.LimitRetry())
+	source := "retry interval"
+	if reset, ok := dispatcher.ParseUsageLimitReset(reason, now); ok {
+		until = reset.Add(usageLimitResetSlack)
+		source = "reset time in the error"
+	}
 	l.limitHolds.hold(runtimeName, until)
 	l.logger.Warn("runtime out of usage; holding launches",
-		"runtime", runtimeName, "until", until, "reason", reason)
+		"runtime", runtimeName, "until", until, "until_from", source, "reason", reason)
 }
 
 func (l *Loop) releaseRuntime(runtimeName string) {

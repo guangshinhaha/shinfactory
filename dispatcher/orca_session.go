@@ -22,6 +22,7 @@ const (
 type orcaSessionConfig struct {
 	id            string
 	dispatchID    string
+	runID         string
 	bin           string
 	run           orcaRunner
 	pollInterval  time.Duration
@@ -39,6 +40,7 @@ type orcaSessionConfig struct {
 type orcaSession struct {
 	sessionBase
 	dispatchID   string
+	runID        string
 	bin          string
 	run          orcaRunner
 	pollInterval time.Duration
@@ -55,6 +57,7 @@ func newOrcaSession(cfg orcaSessionConfig) *orcaSession {
 			sink:          cfg.sink,
 		}),
 		dispatchID:   cfg.dispatchID,
+		runID:        cfg.runID,
 		bin:          cfg.bin,
 		run:          cfg.run,
 		pollInterval: cfg.pollInterval,
@@ -143,7 +146,7 @@ func (w orcaWorker) settled() bool {
 func (s *orcaSession) fetchWorker(ctx context.Context) (orcaWorker, error) {
 	callCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	out, err := s.run(callCtx, s.bin, "orchestration", "worker-list", "--json", "--limit", "100")
+	out, err := s.run(callCtx, s.bin, "orchestration", "worker-list", "--run", s.runID, "--json", "--limit", "100")
 	if err != nil {
 		return orcaWorker{}, err
 	}

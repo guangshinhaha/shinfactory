@@ -129,6 +129,7 @@ type SpritesConfig struct {
 // workers. It is available only when this table is set and the orca CLI exists.
 type OrcaConfig struct {
 	Bin               string `toml:"bin"`                 // orca CLI; empty = "orca" on PATH
+	RunID             string `toml:"run_id"`              // Orca run for factory workers; empty = the factory creates and remembers its own
 	MaxConcurrent     int    `toml:"max_concurrent"`      // 0 = unlimited
 	LimitRetrySeconds int    `toml:"limit_retry_seconds"` // pause after a usage-limit failure before the next launch attempt
 }

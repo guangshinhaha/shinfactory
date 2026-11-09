@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/guangshinhaha/shinfactory/event"
@@ -27,6 +28,7 @@ type OrcaDispatcherConfig struct {
 	ProjectDir    string
 	RuntimeDir    string
 	Bin           string // orca CLI; empty = "orca" on PATH
+	RunID         string // Orca run to launch workers in; empty = the factory creates and remembers its own
 	SkillResolver skill.Resolver
 	PollInterval  time.Duration // 0 = default
 	Sink          SessionEventSink
@@ -45,6 +47,9 @@ type OrcaDispatcher struct {
 
 	// run executes the orca CLI. Injected for testing.
 	run orcaRunner
+
+	runMu sync.Mutex
+	runID string // the Orca run every worker is launched in; empty until ensureRun
 }
 
 // orcaRunner runs the orca CLI and returns stdout. On failure the error
@@ -69,6 +74,7 @@ func NewOrcaDispatcher(config OrcaDispatcherConfig) *OrcaDispatcher {
 		pollInterval:  poll,
 		sink:          config.Sink,
 		run:           runOrcaCLI,
+		runID:         strings.TrimSpace(config.RunID),
 	}
 }
 
@@ -133,7 +139,11 @@ func (d *OrcaDispatcher) Dispatch(ctx context.Context, req DispatchRequest) (Ses
 		return nil, fmt.Errorf("write orca spec: %w", err)
 	}
 
-	dispatchID, err := d.startWorker(ctx, sessionID, specPath, agent, req)
+	runID, err := d.ensureRun(ctx)
+	if err != nil {
+		return nil, err
+	}
+	dispatchID, err := d.startWorker(ctx, runID, sessionID, specPath, agent, req)
 	if err != nil {
 		return nil, err
 	}
@@ -150,6 +160,7 @@ func (d *OrcaDispatcher) Dispatch(ctx context.Context, req DispatchRequest) (Ses
 	session := newOrcaSession(orcaSessionConfig{
 		id:            sessionID,
 		dispatchID:    dispatchID,
+		runID:         runID,
 		bin:           d.bin,
 		run:           d.run,
 		pollInterval:  d.pollInterval,
@@ -192,9 +203,10 @@ The factory reads `+"`stage_yield`"+` and `+"`stage_fail`"+` from that session; 
 	return stringx.JoinNonEmpty("\n\n", buildSessionPreamble(), skillSystemPrompt, identity, req.Prompt)
 }
 
-func (d *OrcaDispatcher) startWorker(ctx context.Context, sessionID, specPath, agent string, req DispatchRequest) (string, error) {
+func (d *OrcaDispatcher) startWorker(ctx context.Context, runID, sessionID, specPath, agent string, req DispatchRequest) (string, error) {
 	args := []string{
 		"orchestration", "worker-start",
+		"--run", runID,
 		"--spec-file", specPath,
 		"--worktree", "path:" + req.WorktreePath,
 		"--agent", agent,

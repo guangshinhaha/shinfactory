@@ -73,12 +73,11 @@ func defaultDependencies(projectDir, runtimeDir, noodleBin string, cfg config.Co
 			ProjectDir:    projectDir,
 			RuntimeDir:    runtimeDir,
 			Bin:           cfg.Runtime.Orca.BinName(),
+			RunID:         cfg.Runtime.Orca.RunID,
 			SkillResolver: resolver,
 			Sink:          sink,
 		})
-		r := loopruntime.NewDispatcherRuntime("orca", od, runtimeDir)
-		r.SetMaxConcurrent(cfg.Runtime.Orca.MaxConcurrent)
-		runtimes["orca"] = r
+		runtimes["orca"] = loopruntime.NewOrcaRuntime(od, runtimeDir, cfg.Runtime.Orca.MaxConcurrent)
 	}
 
 	wtApp, _ := worktree.NewApp()
