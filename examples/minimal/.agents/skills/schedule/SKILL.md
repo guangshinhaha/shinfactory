@@ -24,7 +24,6 @@ Each order has a single execute stage:
           "skill": "execute",
           "provider": "claude",
           "model": "claude-sonnet-4-6",
-          "runtime": "process",
           "status": "pending"
         }
       ]

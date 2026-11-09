@@ -47,7 +47,7 @@ func (l *Loop) spawnCook(ctx context.Context, cand dispatchCandidate, order Orde
 	}
 
 	stage := cand.Stage
-	runtimeName := l.stageRuntime(stage.Runtime)
+	runtimeName := l.stageRuntime(stage)
 	if l.runtimeHeld(runtimeName) {
 		return nil // out of usage: the stage stays pending until a launch can succeed
 	}

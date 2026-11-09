@@ -1,6 +1,7 @@
 package loop
 
 import (
+	"strings"
 	"sync"
 	"time"
 
@@ -52,9 +53,15 @@ const usageLimitResetSlack = time.Minute
 // stageRuntime resolves the runtime an order stage launches on: its own, else
 // process, as before the orca runtime existed. Only a configured default of
 // "orca" is honoured for stages without a runtime, so no other config changes.
-func (l *Loop) stageRuntime(stageRuntime string) string {
-	name := stringx.Normalize(stageRuntime)
-	if name == "" && stringx.Normalize(l.config.Runtime.Default) != "orca" {
+func (l *Loop) stageRuntime(stage Stage) string {
+	name := stringx.Normalize(stage.Runtime)
+	if stringx.Normalize(l.config.Runtime.Default) == "orca" {
+		// A configured orca default wins over a runtime the scheduler set by
+		// habit; the stage keeps its own only with a stated runtime_reason.
+		if strings.TrimSpace(legacyExtraString(stage.Extra, "runtime_reason")) == "" {
+			name = ""
+		}
+	} else if name == "" {
 		name = "process"
 	}
 	return l.dispatchRuntime(name)
@@ -108,7 +115,7 @@ func (l *Loop) releaseRuntime(runtimeName string) {
 // hold the runtime and put the stage back to pending. The worktree is kept, so
 // the relaunch resumes from its commits instead of starting over.
 func (l *Loop) requeueAfterUsageLimit(cook *cookHandle) error {
-	runtimeName := nonEmpty(cook.dispatchedRuntime, l.stageRuntime(cook.stage.Runtime))
+	runtimeName := nonEmpty(cook.dispatchedRuntime, l.stageRuntime(cook.stage))
 	reason := nonEmpty(cook.session.Outcome().Reason, "usage limit reached")
 	l.holdRuntime(runtimeName, reason)
 	if err := l.resetStageToPending(cook.orderID, cook.stageIndex, reason); err != nil {

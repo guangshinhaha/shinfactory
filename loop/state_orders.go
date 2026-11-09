@@ -77,7 +77,7 @@ func (l *Loop) ensureCanonicalLoadedFromBridge() error {
 		})
 	}
 	now := timeNowUTC(l.deps.Now)
-	l.canonical = synthesizeCanonicalState(l.orders, pendingReview, state.RunMode(l.config.Mode), now, l.stageRuntime(""))
+	l.canonical = synthesizeCanonicalState(l.orders, pendingReview, state.RunMode(l.config.Mode), now, l.stageRuntime(Stage{}))
 	l.effectLedger = reducer.NewEffectLedger()
 	l.eventCounter.Store(0)
 	l.canonicalLoaded = true

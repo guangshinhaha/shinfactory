@@ -23,9 +23,9 @@ Build multi-stage pipelines. A typical order:
       "rationale": "why this order was scheduled",
       "status": "active",
       "stages": [
-        {"task_key": "execute", "skill": "execute", "provider": "claude", "model": "claude-sonnet-4-6", "runtime": "process", "status": "pending"},
-        {"task_key": "test", "skill": "test", "provider": "claude", "model": "claude-sonnet-4-6", "runtime": "process", "status": "pending"},
-        {"task_key": "deploy", "skill": "deploy", "provider": "claude", "model": "claude-sonnet-4-6", "runtime": "process", "status": "pending"}
+        {"task_key": "execute", "skill": "execute", "provider": "claude", "model": "claude-sonnet-4-6", "status": "pending"},
+        {"task_key": "test", "skill": "test", "provider": "claude", "model": "claude-sonnet-4-6", "status": "pending"},
+        {"task_key": "deploy", "skill": "deploy", "provider": "claude", "model": "claude-sonnet-4-6", "status": "pending"}
       ]
     }
   ]
