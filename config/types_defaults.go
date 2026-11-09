@@ -24,6 +24,22 @@ type Config struct {
 	Runtime     RuntimeConfig            `toml:"runtime"`
 	Server      ServerConfig             `toml:"server"`
 	Landing     LandingConfig            `toml:"landing"`
+	Spend       SpendConfig              `toml:"spend"`
+}
+
+const (
+	defaultMaxStageAttempts = 3
+	defaultMaxOrderCostUSD  = 20.0
+)
+
+// SpendConfig caps what one order may spend before the loop stops it and asks
+// a person. Both caps are checked before each stage launch.
+type SpendConfig struct {
+	// MaxAttempts is how many times one order may launch the same stage.
+	MaxAttempts int `toml:"max_attempts"`
+	// MaxCostUSD is the cost ceiling for one order, summed from the cost its
+	// finished stages reported in their session logs.
+	MaxCostUSD float64 `toml:"max_cost_usd"`
 }
 
 // LandingConfig controls how finished work reaches the default branch.
@@ -267,6 +283,10 @@ func DefaultConfig() Config {
 		},
 		Server: ServerConfig{
 			Port: 3000,
+		},
+		Spend: SpendConfig{
+			MaxAttempts: defaultMaxStageAttempts,
+			MaxCostUSD:  defaultMaxOrderCostUSD,
 		},
 	}
 }

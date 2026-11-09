@@ -79,6 +79,9 @@ func (l *Loop) applyStageResult(ctx context.Context, result StageResult) error {
 		return nil
 	}
 	l.trackCookCompleted(cook, result)
+	if !isScheduleStage(cook.stage) {
+		l.recordStageCost(cook.orderID, cook.session.TotalCost())
+	}
 	delete(l.cooks.activeCooksByOrder, cook.orderID)
 	if err := l.handleCompletion(ctx, cook, result.Status, string(result.Status)); err != nil {
 		if conflictErr := l.handleMergeConflict(cook, err); conflictErr != nil {
@@ -376,6 +379,7 @@ func (l *Loop) advanceAndPersist(ctx context.Context, cook *cookHandle, message 
 			}
 		}
 		l.clearFailedRounds(cook.orderID)
+		l.clearOrderSpend(cook.orderID)
 	}
 	return nil
 }

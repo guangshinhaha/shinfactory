@@ -88,6 +88,27 @@ Each agent consumes tokens independently. `max_concurrency = 4` means up to four
 
 ---
 
+### `[spend]`
+
+Caps what one order may spend. Before each stage launch the loop checks the order against both caps. An order over either cap fails without launching, comments once on its issue with what it spent and why it stopped, and swaps `ready` for `needs-shin`. A person puts `ready` back to resume it.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `max_attempts` | int | `3` | Times one order may launch the same stage |
+| `max_cost_usd` | float | `20` | Cost ceiling per order, summed from the cost its finished stages reported in their session logs |
+
+```toml
+[spend]
+max_attempts = 3
+max_cost_usd = 20
+```
+
+The cost cap does not apply where the runtime reports no cost: the Orca runtime reports none, so on Orca only `max_attempts` stops a runaway order. The stop comment says so when the order's recorded cost is zero.
+
+The cost check runs between stages, so one stage can finish past the ceiling before the order stops. There is no cap across orders.
+
+---
+
 ### `[agents]`
 
 Configures paths and arguments for agent CLI binaries. Each sub-table names a provider.

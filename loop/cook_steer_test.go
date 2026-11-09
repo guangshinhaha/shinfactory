@@ -469,3 +469,36 @@ func (c *serializedController) SendMessage(ctx context.Context, prompt string) e
 	c.lastSentMessage = prompt
 	return c.sendMessageErr
 }
+
+// Steering the last allowed attempt resumes it: the respawn is the same attempt,
+// so the spend cap must not kill it, and the attempt count stays put.
+func TestSteerRespawnOnTheLastAllowedAttemptIsNotStoppedByTheSpendCap(t *testing.T) {
+	rt := newMockRuntime()
+	l := newSteerTestLoop(t, rt)
+	for i := 0; i < l.config.Spend.MaxAttempts; i++ {
+		l.recordStageLaunch("order-2", "execute")
+	}
+
+	sess := &mockSession{id: "sess-last", status: "running", done: make(chan struct{})}
+	l.cooks.activeCooksByOrder["order-2"] = &cookHandle{
+		cookIdentity: cookIdentity{
+			orderID: "order-2",
+			stage:   Stage{TaskKey: "execute", Prompt: "original", Provider: "claude", Model: "claude-sonnet-4-6"},
+		},
+		session:      sess,
+		worktreeName: "wt-2",
+		worktreePath: t.TempDir(),
+		orderStatus:  OrderStatusActive,
+	}
+
+	if err := l.steer("wt-2", "new direction"); err != nil {
+		t.Fatalf("steer: %v", err)
+	}
+	newCook, ok := l.cooks.activeCooksByOrder["order-2"]
+	if !ok || newCook.session.ID() == "sess-last" {
+		t.Fatal("steer on the last allowed attempt did not respawn the cook")
+	}
+	if got := l.orderSpendOf("order-2").Attempts["execute"]; got != l.config.Spend.MaxAttempts {
+		t.Fatalf("execute attempts = %d, want %d: a steer is not a new attempt", got, l.config.Spend.MaxAttempts)
+	}
+}

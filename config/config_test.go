@@ -720,3 +720,24 @@ func TestParseLandingMode(t *testing.T) {
 		t.Fatalf("a config with no [landing] section must leave the mode unset: %+v %v", cfg.Landing, err)
 	}
 }
+
+func TestSpendCapsDefaultAndOverride(t *testing.T) {
+	def := DefaultConfig().Spend
+	if def.MaxAttempts != 3 || def.MaxCostUSD != 20 {
+		t.Fatalf("spend defaults = %#v, want 3 attempts and $20", def)
+	}
+	cfg, err := Parse([]byte("[spend]\nmax_attempts = 5\nmax_cost_usd = 7.5\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Spend.MaxAttempts != 5 || cfg.Spend.MaxCostUSD != 7.5 {
+		t.Fatalf("spend = %#v, want 5 attempts and $7.5", cfg.Spend)
+	}
+	cfg, err = Parse([]byte("[spend]\nmax_attempts = 0\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Spend.MaxAttempts != 3 || cfg.Spend.MaxCostUSD != 20 {
+		t.Fatalf("invalid spend = %#v, want defaults", cfg.Spend)
+	}
+}
