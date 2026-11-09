@@ -23,6 +23,22 @@ type fakeLander struct {
 	mergeErr error
 	deadline bool // the last MarkReadyAndMerge context had a deadline
 	pending  int  // MarkReadyAndMerge returns ErrChecksPending this many times first
+	// conflicts makes MarkReadyAndMerge return ErrPRConflict this many times.
+	conflicts int
+	// rebaseErr is returned by RebaseOntoBase; rebases counts the calls.
+	rebaseErr error
+	rebases   int
+	// probeFiles is what ConflictingFiles reports.
+	probeFiles []string
+}
+
+func (f *fakeLander) RebaseOntoBase(context.Context, string, string) error {
+	f.rebases++
+	return f.rebaseErr
+}
+
+func (f *fakeLander) ConflictingFiles(context.Context, string, string) ([]string, error) {
+	return f.probeFiles, nil
 }
 
 func (f *fakeLander) PushAndEnsureDraft(_ context.Context, dir string, spec PRSpec) (PullRequest, error) {
@@ -36,6 +52,10 @@ func (f *fakeLander) PushAndEnsureDraft(_ context.Context, dir string, spec PRSp
 
 func (f *fakeLander) MarkReadyAndMerge(ctx context.Context, _ string, pr PullRequest) error {
 	_, f.deadline = ctx.Deadline()
+	if f.conflicts > 0 {
+		f.conflicts--
+		return ErrPRConflict
+	}
 	if f.pending > 0 {
 		f.pending--
 		return ErrChecksPending

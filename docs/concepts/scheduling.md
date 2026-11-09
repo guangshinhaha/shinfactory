@@ -73,6 +73,7 @@ A stage is a single step within an order.
 | `runtime`      | Where to run: `process` or `sprites`             |
 | `group`        | Parallel execution group number                 |
 | `extra_prompt` | Supplemental instructions for the cook          |
+| `extra.writes` | Shared files the stage writes, as repo-relative paths (`["brain/index.md"]`). Two stages that name the same file never run at the same time. |
 
 The loop manages stage lifecycle transitions automatically (pending, active, merging, completed, failed, cancelled). The scheduler does not write status fields.
 

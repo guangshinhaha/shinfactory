@@ -101,7 +101,7 @@ var schemaTargets = []targetSpec{
 			"orders[].stages[].runtime":      {Description: "runtime for this stage (process, sprites, etc.)"},
 			"orders[].stages[].prompt":       {Description: "full prompt text for the dispatched session"},
 			"orders[].stages[].extra_prompt": {Description: "supplemental instructions for the cook on how to approach the task (max ~1000 chars)"},
-			"orders[].stages[].extra{}":      {Type: "JSON", Description: "opaque extension data preserved across round-trips"},
+			"orders[].stages[].extra{}":      {Type: "JSON", Description: "opaque extension data preserved across round-trips; extra.writes lists shared repo-relative files the stage writes, and the loop never runs two stages naming one file at once"},
 			"orders[].stages[].group":        {Description: "parallel group ID; stages in the same group run concurrently, groups execute sequentially (default: 0)"},
 			"action_needed[]":                {Description: "backlog item ID skipped pending user action"},
 		},

@@ -44,11 +44,35 @@ type Lander interface {
 	// merge queue has not merged the PR yet; the caller waits and calls again.
 	// It acts only on the PR whose head is pr.Branch.
 	MarkReadyAndMerge(ctx context.Context, dir string, pr PullRequest) error
+	// RebaseOntoBase rebases the worktree's branch onto the current remote base
+	// branch (the repository default when base is empty) and force-pushes it
+	// with a lease. On a conflict it aborts the rebase, leaves the branch as it
+	// was, and returns a *RebaseConflictError naming the files.
+	RebaseOntoBase(ctx context.Context, dir, base string) error
+	// ConflictingFiles lists the files a rebase onto the remote base branch
+	// would conflict in, without changing the branch.
+	ConflictingFiles(ctx context.Context, dir, base string) ([]string, error)
 }
 
 // ErrChecksPending means the PR cannot merge yet because checks are still
 // running or the merge is queued. It is not a failure: call again later.
 var ErrChecksPending = errors.New("required checks pending")
+
+// ErrPRConflict means the PR cannot merge because its branch conflicts with the
+// base branch. Rebasing, not waiting, is what clears it.
+var ErrPRConflict = errors.New("PR conflicts with the base branch")
+
+// RebaseConflictError is a rebase that stopped on conflicts.
+type RebaseConflictError struct {
+	Files []string
+}
+
+func (e *RebaseConflictError) Error() string {
+	if len(e.Files) == 0 {
+		return "rebase conflicts in files git did not name"
+	}
+	return "rebase conflicts in " + strings.Join(e.Files, ", ")
+}
 
 // realGHEnv lets a test run the real gh and git. A test binary refuses to
 // otherwise, so no test can act on a real PR by accident.
@@ -181,6 +205,7 @@ type prState struct {
 	IsDraft           bool   `json:"isDraft"`
 	IsCrossRepository bool   `json:"isCrossRepository"`
 	MergeStateStatus  string `json:"mergeStateStatus"`
+	Mergeable         string `json:"mergeable"` // MERGEABLE, CONFLICTING, UNKNOWN
 	StatusCheckRollup []struct {
 		Status string `json:"status"` // CheckRun: QUEUED, IN_PROGRESS, COMPLETED
 		State  string `json:"state"`  // StatusContext: PENDING, EXPECTED, SUCCESS, ...
@@ -219,7 +244,7 @@ func (e pendingError) Error() string {
 func (e pendingError) Is(target error) bool { return target == ErrChecksPending }
 
 func (g ghLander) view(ctx context.Context, dir string, pr PullRequest) (prState, error) {
-	out, err := g.run(ctx, dir, "gh", "pr", "view", pr.URL, "--json", "headRefName,headRefOid,state,isDraft,isCrossRepository,mergeStateStatus,statusCheckRollup")
+	out, err := g.run(ctx, dir, "gh", "pr", "view", pr.URL, "--json", "headRefName,headRefOid,state,isDraft,isCrossRepository,mergeStateStatus,mergeable,statusCheckRollup")
 	if err != nil {
 		return prState{}, err
 	}
@@ -264,6 +289,9 @@ func (g ghLander) MarkReadyAndMerge(ctx context.Context, dir string, pr PullRequ
 			return err
 		}
 	}
+	if st.Mergeable == "CONFLICTING" || st.MergeStateStatus == "DIRTY" {
+		return fmt.Errorf("%w: %s", ErrPRConflict, pr.URL)
+	}
 	if detail := st.checksPending(); detail != "" {
 		return pendingError{pr.URL, detail}
 	}
@@ -286,6 +314,77 @@ func (g ghLander) MarkReadyAndMerge(ctx context.Context, dir string, pr PullRequ
 		return pendingError{pr.URL, "merge is queued, not merged"}
 	}
 	return nil
+}
+
+// resolveBase returns base, or the repository's default branch when base is
+// empty.
+func (g ghLander) resolveBase(ctx context.Context, dir, base string) (string, error) {
+	if base != "" {
+		return base, nil
+	}
+	out, err := g.run(ctx, dir, "gh", "repo", "view", "--json", "defaultBranchRef", "--jq", ".defaultBranchRef.name")
+	if err != nil {
+		return "", err
+	}
+	if out == "" {
+		return "", errors.New("gh reported no default branch for the repository")
+	}
+	return out, nil
+}
+
+func (g ghLander) RebaseOntoBase(ctx context.Context, dir, base string) error {
+	base, err := g.resolveBase(ctx, dir, base)
+	if err != nil {
+		return err
+	}
+	branch, err := g.run(ctx, dir, "git", "branch", "--show-current")
+	if err != nil {
+		return err
+	}
+	if branch == "" {
+		return fmt.Errorf("worktree %s is on a detached HEAD, so there is no branch to rebase", dir)
+	}
+	if _, err := g.run(ctx, dir, "git", "fetch", "origin", "+refs/heads/"+base+":refs/remotes/origin/"+base); err != nil {
+		return err
+	}
+	if out, err := g.run(ctx, dir, "git", "rebase", "origin/"+base); err != nil {
+		files, _ := g.run(ctx, dir, "git", "diff", "--name-only", "--diff-filter=U")
+		_, _ = g.run(ctx, dir, "git", "rebase", "--abort")
+		if files != "" {
+			return &RebaseConflictError{Files: strings.Split(files, "\n")}
+		}
+		return fmt.Errorf("rebase onto origin/%s failed: %s", base, out)
+	}
+	_, err = g.run(ctx, dir, "git", "push", "--force-with-lease", "origin", branch)
+	return err
+}
+
+func (g ghLander) ConflictingFiles(ctx context.Context, dir, base string) ([]string, error) {
+	base, err := g.resolveBase(ctx, dir, base)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := g.run(ctx, dir, "git", "fetch", "origin", "+refs/heads/"+base+":refs/remotes/origin/"+base); err != nil {
+		return nil, err
+	}
+	// merge-tree exits 1 on conflicts; its output is the tree id, then the
+	// conflicted file names, then a blank line and the messages.
+	out, err := g.run(ctx, dir, "git", "merge-tree", "--write-tree", "--name-only", "origin/"+base, "HEAD")
+	if err == nil {
+		return nil, nil
+	}
+	lines := strings.Split(out, "\n")
+	var files []string
+	for _, line := range lines[min(1, len(lines)):] {
+		if strings.TrimSpace(line) == "" {
+			break
+		}
+		files = append(files, line)
+	}
+	if len(files) == 0 {
+		return nil, err
+	}
+	return files, nil
 }
 
 // prSpec is the order's PR spec. Its branch is the order's own worktree
@@ -391,7 +490,14 @@ func (l *Loop) completeWithPR(ctx context.Context, cook *cookHandle, hasCommits 
 			// The draft PR stays up for the human to ready and merge here.
 			return l.parkPendingReview(cook, gate.BlockedReason(l.canonical.Mode, mode.ActionAutoMerge)+" ("+pr.URL+")")
 		}
-		if err := l.shipPR(ctx, cook, pr); err != nil {
+		err := l.shipPR(ctx, cook, pr)
+		if errors.Is(err, ErrPRConflict) {
+			var stopped bool
+			if stopped, err = l.onShipConflict(ctx, cook, pr, false); stopped {
+				return err
+			}
+		}
+		if err != nil {
 			if errors.Is(err, ErrChecksPending) {
 				// Gantry's checks run on the final push. Wait for them: the
 				// order stays parked and each cycle retries the merge.
@@ -559,6 +665,12 @@ func (l *Loop) shipParkedPR(ctx context.Context, cook *cookHandle, reason string
 	// The deadline bounds the push, lookup and merge only. Marking the issue
 	// done afterwards gets the caller's full context.
 	pr, err := l.pushAndShip(ctx, cook, order)
+	if errors.Is(err, ErrPRConflict) {
+		var stopped bool
+		if stopped, err = l.onShipConflict(ctx, cook, pr, true); stopped {
+			return err
+		}
+	}
 	if err != nil {
 		return err
 	}
@@ -594,7 +706,7 @@ func (l *Loop) pushAndShip(ctx context.Context, cook *cookHandle, order Order) (
 		return PullRequest{}, fmt.Errorf("find order PR: %w", err)
 	}
 	if err := l.shipPR(ctx, cook, pr); err != nil {
-		return PullRequest{}, fmt.Errorf("ship PR: %w", err)
+		return pr, fmt.Errorf("ship PR: %w", err)
 	}
 	return pr, nil
 }

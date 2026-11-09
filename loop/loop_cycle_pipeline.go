@@ -429,7 +429,7 @@ func (l *Loop) planCycleSpawns(orders OrdersFile, brief mise.Brief, capacity int
 			Stage:      order.Stages[candidate.StageIndex],
 		})
 	}
-	return candidates, nil
+	return l.withoutWriteClashes(candidates), nil
 }
 
 func (l *Loop) spawnPlannedCandidates(ctx context.Context, candidates []dispatchCandidate, orders OrdersFile) error {

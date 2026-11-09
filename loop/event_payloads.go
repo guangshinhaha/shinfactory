@@ -85,6 +85,8 @@ type MergeConflictPayload struct {
 	OrderID      string `json:"order_id"`
 	StageIndex   int    `json:"stage_index"`
 	WorktreeName string `json:"worktree_name"`
+	// Files names the conflicting files when git could say.
+	Files []string `json:"files,omitempty"`
 }
 
 type OrderRequeuedPayload struct {

@@ -379,6 +379,7 @@ func (l *Loop) advanceAndPersist(ctx context.Context, cook *cookHandle, message 
 			}
 		}
 		l.clearFailedRounds(cook.orderID)
+		l.clearRebased(cook.orderID)
 		l.clearOrderSpend(cook.orderID)
 	}
 	return nil
