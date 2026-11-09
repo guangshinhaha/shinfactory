@@ -422,6 +422,27 @@ func TestOrcaRuntimeAbsentFallsBackToProcess(t *testing.T) {
 	}
 }
 
+// Orca starts the agent, so the factory cannot enforce routing.sensitive there.
+// A sensitive repo resolves orca to process, whether orca is the default or asked for.
+func TestSensitiveRepoNeverResolvesToOrca(t *testing.T) {
+	cfg := localLandingConfig()
+	cfg.Runtime.Default = "orca"
+	cfg.Routing.Sensitive = true
+	rts := map[string]loopruntime.Runtime{"process": newMockRuntime(), "orca": newMockRuntime()}
+	l := &Loop{config: cfg, deps: Dependencies{Runtimes: rts}}
+	if got := l.stageRuntime(Stage{}); got != "process" {
+		t.Errorf("stageRuntime = %q, want process", got)
+	}
+	if got := l.dispatchRuntime("orca"); got != "process" {
+		t.Errorf("dispatchRuntime(orca) = %q, want process", got)
+	}
+	cfg.Routing.Sensitive = false
+	l = &Loop{config: cfg, deps: Dependencies{Runtimes: rts}}
+	if got := l.dispatchRuntime("orca"); got != "orca" {
+		t.Errorf("non-sensitive dispatchRuntime(orca) = %q, want orca", got)
+	}
+}
+
 // The safety fact for "runs exactly as today": no config other than a default of
 // orca changes which runtime a stage gets. A sprites default still leaves a
 // stage without a runtime on process, as before.

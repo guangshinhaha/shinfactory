@@ -111,6 +111,7 @@ func (l *Loop) stageRuntime(stage Stage) string {
 // dispatchRuntime resolves a request's runtime: its own, else the configured
 // default, else process. A configured "orca" that is not wired (no orca CLI)
 // resolves to process, so the factory runs as it does without the orca runtime.
+// A sensitive repo never uses orca (when process is wired): orca cannot enforce routing.
 func (l *Loop) dispatchRuntime(requested string) string {
 	name := stringx.Normalize(requested)
 	if name == "" {
@@ -118,6 +119,10 @@ func (l *Loop) dispatchRuntime(requested string) string {
 	}
 	if name == "" {
 		name = "process"
+	}
+	if name == "orca" && l.config.Routing.Sensitive && l.deps.Runtimes["process"] != nil {
+		// Orca starts the agent, so the factory cannot pass it tool denials or a PATH shim.
+		return "process"
 	}
 	if name == "orca" && l.deps.Runtimes["orca"] == nil && l.deps.Runtimes["process"] != nil {
 		return "process"
