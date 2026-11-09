@@ -1,12 +1,16 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
+	"time"
 
+	"github.com/guangshinhaha/shinfactory/adapter"
 	"github.com/guangshinhaha/shinfactory/cmdmeta"
 	"github.com/guangshinhaha/shinfactory/internal/linestatus"
 	"github.com/guangshinhaha/shinfactory/internal/orderx"
@@ -48,9 +52,51 @@ func runStatusJSON(app *App, w io.Writer) error {
 	if err != nil {
 		return err
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), stoppedTimeout)
+	defer cancel()
+	stopped, listed, err := app.backlogStopped(ctx)
+	if err != nil {
+		return err
+	}
+	if listed {
+		report.MergeNeedsShin(stopped)
+	}
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	return enc.Encode(report)
+}
+
+// stoppedTimeout bounds the backlog call so a hung gh cannot hang status.
+const stoppedTimeout = 30 * time.Second
+
+// backlogStopped asks the backlog adapter which items wait on a person. A
+// backlog with no `stopped` script reports listed=false and the recorded stops stand; a script that fails is
+// an error, because an empty needs_shin would read as "nobody is waiting".
+func (a *App) backlogStopped(ctx context.Context) (items []linestatus.NeedsShin, listed bool, _ error) {
+	projectDir, err := a.ProjectDir()
+	if err != nil {
+		return nil, false, err
+	}
+	if strings.TrimSpace(a.Config.Adapters["backlog"].Scripts["stopped"]) == "" {
+		return nil, false, nil
+	}
+	out, err := adapter.NewRunner(projectDir, a.Config).Run(ctx, "backlog", "stopped", adapter.RunOptions{})
+	if err != nil {
+		return nil, false, fmt.Errorf("list stopped backlog items: %w", err)
+	}
+	dec := json.NewDecoder(strings.NewReader(out))
+	for dec.More() {
+		var row struct {
+			ID    string `json:"id"`
+			Title string `json:"title"`
+			URL   string `json:"url"`
+		}
+		if err := dec.Decode(&row); err != nil {
+			return nil, false, fmt.Errorf("parse stopped backlog items: %w", err)
+		}
+		items = append(items, linestatus.NeedsShin{Order: row.ID, Title: row.Title, URL: row.URL})
+	}
+	return items, true, nil
 }
 
 func runStatus(app *App) error {

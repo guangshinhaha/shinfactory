@@ -120,6 +120,8 @@ A ready-made GitHub Issues adapter lives in `defaults/adapters/github/`: every o
 
 When an order stops and needs a person, the loop runs the backlog adapter's optional `stop` action (the issue number is the argument, the message is on stdin). The GitHub script comments once with what is needed, then removes `ready` and adds `needs-shin` in one edit, so the scheduler leaves the issue alone until a person fixes it and adds `ready` back. The factory reads only `ready`. A stop is: a stage that reports `Unbuildable:` (no observable Done when), a second failed round on the same issue, or a merge conflict the loop cannot resolve. A backlog with no `stop` script is skipped.
 
+`shinfactory status --json` lists the items waiting on a person from the optional `stopped` action: it prints one JSON object per line (`id`, `title`, `url`) for every open issue labelled `needs-shin`, so an issue counts however it got the label. The GitHub script is `backlog-stopped`. A backlog with no `stopped` script lists only the stops the loop recorded itself.
+
 ### Handing an issue to the factory
 
 The `ready` label is a person's permission to build. The factory never sees an open issue without it, and there is no setting that syncs every issue.

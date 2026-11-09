@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/guangshinhaha/shinfactory/config"
 )
 
 func TestRunStatusNoActiveCooks(t *testing.T) {
@@ -117,5 +120,67 @@ func TestRunStatusJSONPrintsTheLine(t *testing.T) {
 		if list, ok := got[key].([]any); !ok || len(list) != 0 {
 			t.Fatalf("%s = %v, want []", key, got[key])
 		}
+	}
+}
+
+// An open issue labelled needs-shin is waiting on Shin however it got the
+// label: the scheduler's refusal runs the stop script, not the loop's record.
+func TestRunStatusJSONListsNeedsShinIssues(t *testing.T) {
+	if _, err := exec.LookPath("jq"); err != nil {
+		t.Skip("jq not installed; the filter runs inside gh in real use")
+	}
+	env, _ := fakeGH(t, `[
+  {"number": 16, "title": "Refused by the scheduler", "url": "https://github.com/o/r/issues/16", "labels": [{"name": "needs-shin"}]},
+  {"number": 17, "title": "Ready", "url": "https://github.com/o/r/issues/17", "labels": [{"name": "ready"}]}
+]`)
+	for _, kv := range env {
+		if k, v, ok := strings.Cut(kv, "="); ok && k == "PATH" {
+			t.Setenv("PATH", v)
+		}
+	}
+	projectDir := t.TempDir()
+	script, err := filepath.Abs(filepath.Join("defaults", "adapters", "github", "backlog-stopped"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	app := &App{projectDir: projectDir, Config: config.Config{Adapters: map[string]config.AdapterConfig{
+		"backlog": {Scripts: map[string]string{"stopped": script}},
+	}}}
+
+	var out bytes.Buffer
+	if err := runStatusJSON(app, &out); err != nil {
+		t.Fatalf("runStatusJSON: %v", err)
+	}
+	var got struct {
+		NeedsShin []struct {
+			Order string `json:"order"`
+			Title string `json:"title"`
+		} `json:"needs_shin"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
+		t.Fatalf("output is not JSON: %v\n%s", err, out.String())
+	}
+	if len(got.NeedsShin) != 1 || got.NeedsShin[0].Order != "16" || got.NeedsShin[0].Title != "Refused by the scheduler" {
+		t.Fatalf("needs_shin = %+v, want only issue 16", got.NeedsShin)
+	}
+}
+
+// With no `stopped` script the loop's own record is all there is, and it stands.
+func TestRunStatusJSONKeepsRecordedStopsWithoutStoppedScript(t *testing.T) {
+	projectDir := t.TempDir()
+	runtimeDir := filepath.Join(projectDir, ".noodle")
+	if err := os.MkdirAll(runtimeDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(runtimeDir, "needs-shin.json"),
+		[]byte(`[{"order":"7","reason":"two rounds failed"}]`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	if err := runStatusJSON(&App{projectDir: projectDir}, &out); err != nil {
+		t.Fatalf("runStatusJSON: %v", err)
+	}
+	if !strings.Contains(out.String(), `"order": "7"`) {
+		t.Fatalf("recorded stop dropped:\n%s", out.String())
 	}
 }

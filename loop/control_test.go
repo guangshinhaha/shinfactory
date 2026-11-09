@@ -941,3 +941,47 @@ func TestControlRejectsStageProviderOnSensitiveRepo(t *testing.T) {
 		t.Errorf("rejected enqueue still wrote %d orders", len(got.Orders))
 	}
 }
+
+// status.json must already show the new loop state when the ack lands: a caller
+// that reads status right after `control drain` returns acts on that file.
+func TestControlStampsStatusBeforeAck(t *testing.T) {
+	projectDir := t.TempDir()
+	runtimeDir := filepath.Join(projectDir, ".noodle")
+	statusPath := filepath.Join(runtimeDir, "status.json")
+	ordersPath := filepath.Join(runtimeDir, "orders.json")
+	if err := writeOrdersAtomic(ordersPath, OrdersFile{Orders: []Order{}}); err != nil {
+		t.Fatalf("write orders: %v", err)
+	}
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
+		Runtimes:   map[string]loopruntime.Runtime{"process": newMockRuntime()},
+		Worktree:   &fakeWorktree{},
+		Adapter:    &fakeAdapterRunner{},
+		Mise:       &fakeMise{},
+		Monitor:    fakeMonitor{},
+		Registry:   testLoopRegistry(),
+		Now:        time.Now,
+		OrdersFile: ordersPath,
+		StatusFile: statusPath,
+	})
+	if err := l.stampStatus(); err != nil {
+		t.Fatalf("initial stampStatus: %v", err)
+	}
+
+	for _, step := range []struct{ action, want string }{
+		{"drain", "draining"},
+		{"resume", "running"},
+	} {
+		line, _ := json.Marshal(ControlCommand{ID: "c-" + step.action, Action: step.action})
+		if err := os.WriteFile(filepath.Join(runtimeDir, "control.ndjson"), append(line, '\n'), 0o644); err != nil {
+			t.Fatalf("write control: %v", err)
+		}
+		var atAck string
+		l.TestControlAckBarrier = func() { atAck = readStatusFile(t, statusPath).LoopState }
+		if err := l.processControlCommands(); err != nil {
+			t.Fatalf("processControlCommands: %v", err)
+		}
+		if atAck != step.want {
+			t.Fatalf("after %s, status.json loop_state at ack time = %q, want %q", step.action, atAck, step.want)
+		}
+	}
+}
