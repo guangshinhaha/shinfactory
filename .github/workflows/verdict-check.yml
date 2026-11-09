@@ -1,0 +1,17 @@
+name: verdict-check
+# Fails a PR labelled risk:high unless a verifier's verdict (PASS or PASS+NOTES)
+# for its current head is posted as a PR comment. Skips unlabelled PRs. A verdict
+# comment re-runs the check by itself; actions: write is for that re-run.
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled, unlabeled]
+  issue_comment:
+    types: [created, edited, deleted]
+jobs:
+  verdict-check:
+    uses: guangshinhaha/gantry/.github/workflows/verdict-check.yml@main
+    permissions:
+      actions: write
+      contents: read
+      issues: read
+      pull-requests: read
