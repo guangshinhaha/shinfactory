@@ -1,0 +1,4 @@
+# High-risk paths for shinfactory, on top of the gantry defaults. A PR changing one gets risk:high.
+loop/**
+dispatcher/**
+config/**
