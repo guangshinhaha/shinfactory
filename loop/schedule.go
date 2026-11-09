@@ -240,7 +240,9 @@ func (l *Loop) spawnBootstrapIfNeeded(ctx context.Context, order Order) error {
 	}
 
 	stage := order.Stages[0]
-	provider, model := l.stageRouting(stage)
+	// The bootstrap agent writes a skill: builder work, not the scheduler role of
+	// the schedule stage it replaces.
+	provider, model := l.stageRouting(Stage{TaskKey: "oops", Provider: stage.Provider, Model: stage.Model})
 
 	prompt := buildBootstrapPrompt(provider)
 
