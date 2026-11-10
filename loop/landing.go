@@ -228,6 +228,17 @@ const unknownMergeabilityDetail = "GitHub has not computed mergeability yet"
 // within seconds; past this the PR is stuck and a person must look.
 const unknownMergeabilityTimeout = 10 * time.Minute
 
+// checkWaitTimeout bounds how long a PR may wait on a check that GitHub shows
+// red, or on mergeability it has not computed. A re-run takes seconds to a few
+// minutes; past this the check is stuck and a person must look.
+const checkWaitTimeout = unknownMergeabilityTimeout
+
+// redCheckDetail is what a blocked PR waits on while a check still shows its
+// failure from before the latest comment or push.
+func redCheckDetail(names ...string) string {
+	return ""
+}
+
 // checksPending reports what the PR still waits on, or "" when nothing.
 func (p prState) checksPending() string {
 	if p.MergeStateStatus == "UNKNOWN" || p.Mergeable == "UNKNOWN" {

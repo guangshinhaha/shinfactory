@@ -521,3 +521,36 @@ func TestParkedPRWithUnknownMergeabilityStopsAfterTheTimeout(t *testing.T) {
 		t.Fatalf("stop calls = %v, want the person told once", h.ar.stopCalls)
 	}
 }
+
+// #129: a required check that never turns green stops the order with a reason
+// that names the check, not a bare merge error.
+func TestParkedPRWithAStuckRedCheckStopsNamingTheCheck(t *testing.T) {
+	h := newGateHarness(t, "none", "execute")
+	h.ln.pending = 1000
+	h.ln.pendingDetail = redCheckDetail("verdict-check / verdict-check")
+	h.next(t)
+	if _, ok := h.l.cooks.pendingReview["42"]; !ok {
+		t.Fatal("order did not park")
+	}
+	clock := time.Now()
+	h.l.deps.Now = func() time.Time { return clock }
+	poll := func() {
+		t.Helper()
+		h.l.lastChecksPoll = time.Time{}
+		if err := h.l.Cycle(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	poll()
+	clock = clock.Add(checkWaitTimeout - time.Minute)
+	poll()
+	if _, ok := h.l.cooks.pendingReview["42"]; !ok || h.order(t).Status == OrderStatusFailed {
+		t.Fatal("order stopped before the timeout")
+	}
+	clock = clock.Add(2 * time.Minute)
+	poll()
+	h.failedWith(t, "verdict-check / verdict-check")
+	if !strings.Contains(actionNeeded(t, h), "verdict-check / verdict-check") {
+		t.Fatalf("action_needed = %q, want the check named", actionNeeded(t, h))
+	}
+}
