@@ -30,6 +30,8 @@ type fakeLander struct {
 	// rebaseErr is returned by RebaseOntoBase; rebases counts the calls.
 	rebaseErr error
 	rebases   int
+	// afterRebase runs inside RebaseOntoBase, once the head has moved.
+	afterRebase func()
 	// verdicts are the bodies PostVerdict received; verdictErr fails it.
 	verdicts   []string
 	verdictErr error
@@ -41,6 +43,9 @@ type fakeLander struct {
 
 func (f *fakeLander) RebaseOntoBase(context.Context, string, string) error {
 	f.rebases++
+	if f.afterRebase != nil {
+		f.afterRebase()
+	}
 	return f.rebaseErr
 }
 

@@ -169,3 +169,25 @@ func TestStageBlockedByAParkedOrderFlagsActionNeededOnce(t *testing.T) {
 		t.Fatalf("action_needed = %q, want one line naming parked order a", orders.ActionNeeded)
 	}
 }
+
+// The line goes away when the hold ends, whichever way it ends.
+func TestParkedHoldActionNeededLineClearsWhenTheHoldEnds(t *testing.T) {
+	h := newGateHarness(t, "none", "execute")
+	cand := []dispatchCandidate{{OrderID: "b", Stage: writesStage("brain/index.md")}}
+	h.l.cooks.pendingReview["a"] = &pendingReviewCook{cookIdentity: cookIdentity{orderID: "a", stage: writesStage("brain/index.md")}}
+	h.l.withoutWriteClashes(cand)
+	if got := actionNeeded(t, h); !strings.Contains(got, "parked in pending review") {
+		t.Fatalf("action_needed = %q, want the hold flagged", got)
+	}
+	if err := h.l.flagActionNeeded("42: unrelated stop"); err != nil {
+		t.Fatal(err)
+	}
+
+	delete(h.l.cooks.pendingReview, "a") // approved, rejected or skipped
+	if got := h.l.withoutWriteClashes(cand); len(got) != 1 {
+		t.Fatalf("kept %v, want the waiter dispatched once the hold ends", got)
+	}
+	if got := actionNeeded(t, h); got != "42: unrelated stop" {
+		t.Fatalf("action_needed = %q, want only the unrelated line left", got)
+	}
+}
