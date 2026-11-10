@@ -515,15 +515,19 @@ func (l *Loop) buildBriefWithRetry(ctx context.Context) (brief mise.Brief, warni
 	if r := l.backlogRetry; r != nil && now.Before(r.nextAttempt) {
 		return mise.Brief{}, []string{backlogRetryWarning(r, r.nextAttempt.Sub(now))}, false, true, nil
 	}
+	started := now
 	brief, warnings, changed, err = l.deps.Mise.Build(ctx, l.snapshotActiveSummary(), l.snapshotRecentHistory())
-	if err == nil || ctx.Err() != nil || !isTransientBacklogError(err) {
+	if ctx.Err() != nil {
+		return brief, warnings, changed, false, err
+	}
+	if err == nil || !isTransientBacklogError(err) {
 		l.backlogRetry = nil
 		return brief, warnings, changed, false, err
 	}
 	now = l.deps.Now()
 	r := l.backlogRetry
 	if r == nil {
-		r = &backlogRetry{firstFailure: now, backoff: defaultBacklogRetryBackoff}
+		r = &backlogRetry{firstFailure: started, backoff: defaultBacklogRetryBackoff}
 		l.backlogRetry = r
 	}
 	r.attempts++

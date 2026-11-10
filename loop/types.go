@@ -186,13 +186,13 @@ type Loop struct {
 	registryStale     atomic.Bool
 	registryFailCount int
 
-	watcherWG    sync.WaitGroup
-	shutdownOnce sync.Once
-	watcherCount atomic.Int64
+	watcherWG          sync.WaitGroup
+	shutdownOnce       sync.Once
+	watcherCount       atomic.Int64
 	// watchedDone maps a watched session ID to its Done channel, from the
 	// watcher's start until its result is queued, so a drain can tell a
 	// finished session whose result is in flight from one still running.
-	watchedDone        sync.Map
+	watchedDone sync.Map
 	dispatchGeneration atomic.Uint64
 
 	bootstrapAttempts  int
@@ -225,7 +225,7 @@ type Loop struct {
 	reconciledFailures []reconciledFailure
 	lastMiseWarnings   []string
 	backlogRetry       *backlogRetry // pending transient backlog failure; nil when synced
-	lastChecksPoll     time.Time     // last time parked PRs were re-checked for merge
+	lastChecksPoll     time.Time // last time parked PRs were re-checked for merge
 
 	lastLoopFailure *LoopFailureEnvelope
 

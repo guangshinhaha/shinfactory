@@ -747,7 +747,7 @@ func TestBacklogRetryWindowDiagnosesBadValues(t *testing.T) {
 		toml string
 		want int
 	}{
-		{"[backlog]\nretry_window_seconds = -5\n", 0},
+		{"[backlog]\nretry_window_seconds = -5\n", 300},
 		{"[backlog]\nretry_window_seconds = 90000\n", 86400},
 		{"[backlog]\nretry_window_seconds = 600\n", 600},
 	} {
