@@ -458,20 +458,19 @@ func (l *Loop) spawnPlannedCandidates(ctx context.Context, candidates []dispatch
 
 // backlogSyncAttempts bounds how often a cycle tries the backlog sync when it
 // keeps failing with a transient error.
-const backlogSyncAttempts = 5
+const backlogSyncAttempts = 4
 
-const defaultBacklogRetryBackoff = 2 * time.Second
+const defaultBacklogRetryBackoff = time.Second
 
 // transientMarkers are lowercase fragments of network and 5xx failures from the
 // backlog adapter (gh, curl, DNS). Anything else, such as bad credentials or a
 // missing repo, fails at once.
 var transientMarkers = []string{
 	"no such host", "temporary failure in name resolution", "could not resolve host",
-	"connection refused", "connection reset", "i/o timeout", "timed out", "timeout",
+	"connection refused", "connection reset", "i/o timeout", "operation timed out",
 	"tls handshake", "network is unreachable", "no route to host", "unexpected eof",
 	"error connecting to", "http 500", "http 502", "http 503", "http 504",
 	"500 internal server error", "bad gateway", "service unavailable", "gateway timeout",
-	"rate limit", "http 429",
 }
 
 func isTransientBacklogError(err error) bool {
@@ -493,7 +492,7 @@ func (l *Loop) buildBriefWithRetry(ctx context.Context) (mise.Brief, []string, b
 	}
 	for attempt := 1; ; attempt++ {
 		brief, warnings, changed, err := l.deps.Mise.Build(ctx, l.snapshotActiveSummary(), l.snapshotRecentHistory())
-		if err == nil || !isTransientBacklogError(err) {
+		if err == nil || ctx.Err() != nil || !isTransientBacklogError(err) {
 			return brief, warnings, changed, err
 		}
 		if attempt >= backlogSyncAttempts {
