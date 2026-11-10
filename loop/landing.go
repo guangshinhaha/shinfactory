@@ -614,12 +614,20 @@ func (l *Loop) retryAwaitingChecks(ctx context.Context) error {
 		case err == nil:
 		case errors.Is(err, ErrChecksPending):
 			// Show what it waits on now, not on the first poll.
-			if errors.As(err, &pe) {
-				if strings.HasPrefix(pending.reason, approvedAwaitingChecksPrefix) {
-					pending.reason = approvedAwaitingChecksReason(err)
-				} else {
-					pending.reason = awaitingChecksReason(pe.url, err)
-				}
+			if !errors.As(err, &pe) {
+				break
+			}
+			reason := awaitingChecksReason(pe.url, err)
+			if strings.HasPrefix(pending.reason, approvedAwaitingChecksPrefix) {
+				reason = approvedAwaitingChecksReason(err)
+			}
+			if reason == pending.reason {
+				break
+			}
+			// Persist it: the projection reloads from canonical state.
+			pending.reason = reason
+			if perr := l.parkPendingReview(cook, reason); perr != nil {
+				return perr
 			}
 		default:
 			l.logger.Warn("parked PR could not merge", "order", cook.orderID, "error", err)

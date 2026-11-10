@@ -1039,3 +1039,31 @@ func fixtureStateForLifecycle() state.State {
 func fixtureTime() time.Time {
 	return time.Date(2026, 2, 28, 18, 30, 0, 0, time.UTC)
 }
+
+// Parking a stage that is already parked only refreshes the reason; it adds
+// no attempt to the stage history.
+func TestStageReviewParkedAgainRefreshesReasonOnly(t *testing.T) {
+	ts := fixtureTime()
+	current := state.State{Orders: map[string]state.OrderNode{
+		"o1": {OrderID: "o1", Status: state.OrderActive, Stages: []state.StageNode{{StageIndex: 0, Status: state.StageRunning}}},
+	}}
+	park := func(id ingest.EventID, reason string) ingest.StateEvent {
+		return mustStateEvent(id, ingest.EventStageReviewParked, map[string]any{
+			"order_id": "o1", "stage_index": 0, "reason": reason,
+		}, ts)
+	}
+	next, _, err := Reduce(current, park(80, "waiting: lint pending"))
+	if err != nil {
+		t.Fatalf("first park: %v", err)
+	}
+	next, _, err = Reduce(next, park(81, "waiting: test pending"))
+	if err != nil {
+		t.Fatalf("second park: %v", err)
+	}
+	if got := len(next.Orders["o1"].Stages[0].Attempts); got != 1 {
+		t.Fatalf("attempts after re-park = %d, want 1", got)
+	}
+	if got := next.PendingReviews["o1"].Reason; got != "waiting: test pending" {
+		t.Fatalf("reason = %q, want the latest", got)
+	}
+}

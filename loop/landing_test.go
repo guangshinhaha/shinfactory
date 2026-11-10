@@ -23,6 +23,8 @@ type fakeLander struct {
 	mergeErr error
 	deadline bool // the last MarkReadyAndMerge context had a deadline
 	pending  int  // MarkReadyAndMerge returns ErrChecksPending this many times first
+	// pendingDetail, when set, makes those errors say what the PR waits on.
+	pendingDetail string
 	// conflicts makes MarkReadyAndMerge return ErrPRConflict this many times.
 	conflicts int
 	// rebaseErr is returned by RebaseOntoBase; rebases counts the calls.
@@ -58,6 +60,9 @@ func (f *fakeLander) MarkReadyAndMerge(ctx context.Context, _ string, pr PullReq
 	}
 	if f.pending > 0 {
 		f.pending--
+		if f.pendingDetail != "" {
+			return pendingError{pr.URL, f.pendingDetail}
+		}
 		return ErrChecksPending
 	}
 	if f.mergeErr != nil {
@@ -280,6 +285,61 @@ func TestPRLandingWaitsForChecksThenMerges(t *testing.T) {
 	}
 	if len(h.ar.doneCalls) != 1 || len(h.wt.cleaned) != 1 {
 		t.Fatalf("done=%v cleaned=%v, want both once merged", h.ar.doneCalls, h.wt.cleaned)
+	}
+}
+
+// The refreshed reason must survive the projection reload, not live in memory.
+func TestPRLandingRefreshedWaitReasonIsPersisted(t *testing.T) {
+	for _, tc := range []struct{ mode, prefix string }{
+		{"auto", awaitingChecksPrefix},
+		{"supervised", approvedAwaitingChecksPrefix},
+	} {
+		t.Run(tc.mode, func(t *testing.T) {
+			h := newLandingHarness(t, tc.mode, 1)
+			h.ln.pending = 1
+			h.ln.pendingDetail = "lint pending"
+			h.runStage(t, 1)
+			if tc.mode == "supervised" {
+				// Park as approved while checks run.
+				h.ln.pending = 1
+				if err := h.l.controlMerge("42"); err != nil {
+					t.Fatal(err)
+				}
+			}
+			h.ln.pending = 1
+			h.ln.pendingDetail = "test pending"
+			h.l.lastChecksPoll = time.Time{}
+			if err := h.l.Cycle(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+			if err := h.l.syncPendingReviewProjection(); err != nil {
+				t.Fatal(err)
+			}
+			canon := h.l.canonical.Orders["42"].Stages[0]
+			if len(canon.Attempts) != 1 {
+				t.Fatalf("attempts after re-park = %d, want 1 (re-park adds none)", len(canon.Attempts))
+			}
+			got := h.l.cooks.pendingReview["42"].reason
+			if !strings.HasPrefix(got, tc.prefix) || !strings.Contains(got, "test pending") {
+				t.Fatalf("reason after reload = %q, want %q prefix and the refreshed detail", got, tc.prefix)
+			}
+		})
+	}
+}
+
+// Without auto mode, a waiting PR nobody approved must not merge by itself.
+func TestPRLandingSupervisedDoesNotMergeUnapprovedWaitingPR(t *testing.T) {
+	h := newLandingHarness(t, "supervised", 1)
+	h.l.cooks.pendingReview["42"] = &pendingReviewCook{
+		cookIdentity: cookIdentity{orderID: "42", stage: Stage{TaskKey: "execute", Skill: "execute"}},
+		reason:       awaitingChecksPrefix + " (https://example.test/pr/1): lint pending",
+	}
+	h.l.lastChecksPoll = time.Time{}
+	if err := h.l.retryAwaitingChecks(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(h.ln.pushes) != 0 || len(h.ln.merged) != 0 {
+		t.Fatalf("pushes=%d merges=%d, want an unapproved PR left alone", len(h.ln.pushes), len(h.ln.merged))
 	}
 }
 
