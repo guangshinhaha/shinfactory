@@ -295,10 +295,6 @@ func (s *orcaSession) appendCanonical(kind parse.EventType, message string) {
 func (s *orcaSession) Terminate() error {
 	s.terminating.Store(true)
 	err := stopOrcaWorker(s.run, s.bin, s.dispatchID)
-	if err != nil {
-		// The worker may still be running; let the poll loop report it.
-		s.terminating.Store(false)
-	}
 	s.finish(SessionOutcome{Status: StatusKilled, Reason: "orca worker stopped"})
 	return err
 }

@@ -13,7 +13,7 @@ import (
 )
 
 // pipeDrainGrace is how long after exit the read ends stay open.
-const pipeDrainGrace = 2 * time.Second
+const pipeDrainGrace = 10 * time.Second
 
 // ProcessHandle wraps an os/exec.Cmd with lifecycle primitives for child
 // process management. It replaces what the tmux dispatcher provided: process isolation,
