@@ -28,13 +28,17 @@ type Config struct {
 	Backlog     BacklogConfig            `toml:"backlog"`
 }
 
-const defaultBacklogRetryWindow = 5 * time.Minute
+const (
+	defaultBacklogRetryWindow    = 5 * time.Minute
+	maxBacklogRetryWindowSeconds = 24 * 60 * 60 // a day; larger values would only risk overflow
+)
 
 // BacklogConfig tunes how the loop treats a backlog sync that fails with a
 // transient network or 5xx error.
 type BacklogConfig struct {
 	// RetryWindowSeconds is the total time the loop keeps retrying a transient
-	// backlog failure, with capped exponential backoff, before it stops.
+	// backlog failure, with capped exponential backoff, before it stops. Only
+	// time spent waiting between tries counts; capped at one day.
 	// 0 = five minutes.
 	RetryWindowSeconds int `toml:"retry_window_seconds"`
 }
@@ -44,7 +48,7 @@ func (c BacklogConfig) RetryWindow() time.Duration {
 	if c.RetryWindowSeconds <= 0 {
 		return defaultBacklogRetryWindow
 	}
-	return time.Duration(c.RetryWindowSeconds) * time.Second
+	return time.Duration(min(c.RetryWindowSeconds, maxBacklogRetryWindowSeconds)) * time.Second
 }
 
 const (

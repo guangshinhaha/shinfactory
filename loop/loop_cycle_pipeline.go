@@ -487,7 +487,7 @@ func isTransientBacklogError(err error) bool {
 
 // buildBriefWithRetry builds the brief, retrying a transient backlog failure
 // with capped exponential backoff until the configured retry window has been
-// spent waiting. A persistent failure returns an error that says so.
+// spent waiting (time inside the sync call itself is not counted). A persistent failure returns an error that says so.
 func (l *Loop) buildBriefWithRetry(ctx context.Context) (mise.Brief, []string, bool, error) {
 	wait := l.deps.BacklogRetryBackoff
 	if wait <= 0 {
@@ -516,7 +516,7 @@ func (l *Loop) buildBriefWithRetry(ctx context.Context) (mise.Brief, []string, b
 			return brief, warnings, changed, err
 		}
 		waited += step
-		wait *= 2
+		wait = min(wait*2, maxBacklogRetryBackoff)
 	}
 }
 
