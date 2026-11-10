@@ -49,6 +49,11 @@ case "$1 $2" in
   if [ -f "` + state + `/merged" ]; then st=MERGED; else st=OPEN; fi
   if [ -f "` + state + `/pending" ]; then r='[{"status":"IN_PROGRESS"}]'; else r='[{"status":"COMPLETED"}]'; fi
   mg=MERGEABLE; ms=CLEAN
+  if [ -f "` + state + `/red" ]; then
+    # The race from #129: the required check still shows its pre-verdict
+    # failure, so GitHub reports the PR as blocked until the re-run lands.
+    r='[{"name":"verdict-check / verdict-check","status":"COMPLETED","conclusion":"FAILURE"}]'; ms=BLOCKED
+  fi
   if [ -n "$STUB_MERGEABLE_BY_GIT" ]; then
     # A repository that requires branches to be up to date: a branch that does
     # not contain origin/main reports as conflicting until it is rebased.
@@ -58,7 +63,11 @@ case "$1 $2" in
   echo "{\"headRefName\":\"${STUB_BRANCH:-order-42}\",\"headRefOid\":\"$(git rev-parse HEAD)\",\"state\":\"$st\",\"isDraft\":$d,\"isCrossRepository\":false,\"mergeStateStatus\":\"$ms\",\"mergeable\":\"$mg\",\"statusCheckRollup\":$r}" ;;
 "pr create") touch "` + state + `/pr"; echo https://github.test/o/r/pull/7 ;;
 "pr ready") touch "` + state + `/ready" ;;
-"pr merge") touch "` + state + `/merged" ;;
+"pr merge")
+  if [ -f "` + state + `/red" ]; then
+    echo "X Pull request o/r#7 is not mergeable: the base branch policy prohibits the merge." >&2; exit 1
+  fi
+  touch "` + state + `/merged" ;;
 "pr comment")
   # gh pr comment <branch> --body <text>: keep each body, separated by a marker line.
   printf '%s\n---\n' "$5" >> "` + state + `/comments.log" ;;
@@ -208,5 +217,44 @@ func TestGHLanderWaitsWhileChecksArePendingAndNeverMergesEarly(t *testing.T) {
 	// A repeat on an already merged PR is a no-op, not an error.
 	if err := (ghLander{}).MarkReadyAndMerge(ctx, work, pr); err != nil {
 		t.Fatalf("repeat on merged PR: %v", err)
+	}
+}
+
+// #129: the verdict comment turns the required check green only after a
+// GitHub Actions re-run. Until then the check shows its old failure and the
+// PR is blocked. Ship must wait for it, never fail the merge, and merge once
+// it is green.
+func TestGHLanderWaitsForARedRequiredCheckToRerunThenMerges(t *testing.T) {
+	logPath := stubGH(t)
+	work := newOrderRepo(t, "order-42")
+	ctx := context.Background()
+	pr, err := (ghLander{}).PushAndEnsureDraft(ctx, work, PRSpec{Title: "T", Branch: "order-42"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	red := filepath.Join(filepath.Dir(logPath), "red")
+	if err := os.WriteFile(red, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	err = (ghLander{}).MarkReadyAndMerge(ctx, work, pr)
+	if !errors.Is(err, ErrChecksPending) {
+		t.Fatalf("err = %v, want ErrChecksPending while the required check is red", err)
+	}
+	if !strings.Contains(err.Error(), "verdict-check / verdict-check") {
+		t.Fatalf("err = %v, want the waiting check named", err)
+	}
+	if strings.Contains(ghCalls(logPath), "pr merge") {
+		t.Fatalf("tried to merge with a red required check:\n%s", ghCalls(logPath))
+	}
+
+	if err := os.Remove(red); err != nil { // the re-run finished green
+		t.Fatal(err)
+	}
+	if err := (ghLander{}).MarkReadyAndMerge(ctx, work, pr); err != nil {
+		t.Fatalf("merge after the check went green: %v", err)
+	}
+	if strings.Contains(ghCalls(logPath), "--admin") {
+		t.Fatal("merge must never use --admin")
 	}
 }

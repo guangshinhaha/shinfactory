@@ -205,19 +205,42 @@ func (g ghLander) find(ctx context.Context, dir, branch, base string) (PullReque
 	return PullRequest{URL: prs[0].URL, Branch: branch, IsDraft: prs[0].IsDraft}, true, nil
 }
 
+// rollupCheck is one entry of a PR's statusCheckRollup: a CheckRun or a
+// StatusContext, each filling its own fields.
+type rollupCheck struct {
+	Name       string `json:"name"`       // CheckRun
+	Context    string `json:"context"`    // StatusContext
+	Status     string `json:"status"`     // CheckRun: QUEUED, IN_PROGRESS, COMPLETED
+	Conclusion string `json:"conclusion"` // CheckRun: SUCCESS, FAILURE, ...
+	State      string `json:"state"`      // StatusContext: PENDING, EXPECTED, SUCCESS, ...
+}
+
+// failing reports a finished check that did not pass.
+func (c rollupCheck) failing() bool {
+	switch c.Conclusion {
+	case "FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE", "STALE":
+		return true
+	}
+	return c.State == "FAILURE" || c.State == "ERROR"
+}
+
+func (c rollupCheck) label() string {
+	if c.Name != "" {
+		return c.Name
+	}
+	return c.Context
+}
+
 // prState is the slice of `gh pr view` the ship step decides on.
 type prState struct {
-	HeadRefName       string `json:"headRefName"`
-	HeadRefOid        string `json:"headRefOid"`
-	State             string `json:"state"`
-	IsDraft           bool   `json:"isDraft"`
-	IsCrossRepository bool   `json:"isCrossRepository"`
-	MergeStateStatus  string `json:"mergeStateStatus"`
-	Mergeable         string `json:"mergeable"` // MERGEABLE, CONFLICTING, UNKNOWN
-	StatusCheckRollup []struct {
-		Status string `json:"status"` // CheckRun: QUEUED, IN_PROGRESS, COMPLETED
-		State  string `json:"state"`  // StatusContext: PENDING, EXPECTED, SUCCESS, ...
-	} `json:"statusCheckRollup"`
+	HeadRefName       string        `json:"headRefName"`
+	HeadRefOid        string        `json:"headRefOid"`
+	State             string        `json:"state"`
+	IsDraft           bool          `json:"isDraft"`
+	IsCrossRepository bool          `json:"isCrossRepository"`
+	MergeStateStatus  string        `json:"mergeStateStatus"`
+	Mergeable         string        `json:"mergeable"` // MERGEABLE, CONFLICTING, UNKNOWN
+	StatusCheckRollup []rollupCheck `json:"statusCheckRollup"`
 }
 
 // unknownMergeabilityDetail is what a PR waits on while GitHub has not
@@ -227,6 +250,32 @@ const unknownMergeabilityDetail = "GitHub has not computed mergeability yet"
 // unknownMergeabilityTimeout bounds that wait. GitHub computes mergeability
 // within seconds; past this the PR is stuck and a person must look.
 const unknownMergeabilityTimeout = 10 * time.Minute
+
+// checkWaitTimeout bounds how long a PR may wait on a check that GitHub shows
+// red, or on mergeability it has not computed. A re-run takes seconds to a few
+// minutes; past this the check is stuck and a person must look.
+const checkWaitTimeout = unknownMergeabilityTimeout
+
+// redCheckDetail is what a blocked PR waits on while a check still shows its
+// failure from before the latest comment or push.
+func redCheckDetail(names ...string) string {
+	return redCheckPrefix + strings.Join(names, ", ") + " (waiting for a re-run; a required check goes green after the verdict comment re-runs it)"
+}
+
+const redCheckPrefix = "check not green at the head: "
+
+// waitKind names the kind of timed wait detail is.
+func waitKind(detail string) string {
+	if strings.HasPrefix(detail, redCheckPrefix) {
+		return "red-check"
+	}
+	return "mergeability"
+}
+
+// timedWait reports whether detail is a wait that checkWaitTimeout bounds.
+func timedWait(detail string) bool {
+	return detail == unknownMergeabilityDetail || strings.HasPrefix(detail, redCheckPrefix)
+}
 
 // checksPending reports what the PR still waits on, or "" when nothing.
 func (p prState) checksPending() string {
@@ -245,6 +294,21 @@ func (p prState) checksPending() string {
 		}
 		if c.State == "PENDING" || c.State == "EXPECTED" {
 			return "checks are still running"
+		}
+	}
+	// A blocked PR with a red check: the check may be stale, shown from before
+	// a verdict comment whose Actions re-run has not landed (#129). Wait for it
+	// instead of merging into a policy refusal; checkWaitTimeout stops a check
+	// that really is failing, naming it.
+	if p.MergeStateStatus == "BLOCKED" {
+		var red []string
+		for _, c := range p.StatusCheckRollup {
+			if c.failing() {
+				red = append(red, c.label())
+			}
+		}
+		if len(red) > 0 {
+			return redCheckDetail(red...)
 		}
 	}
 	return ""
@@ -597,36 +661,49 @@ func pendingDetail(err error) string {
 	return err.Error()
 }
 
-// noteMergeabilityWait tracks how long a parked PR has waited on GitHub's
-// mergeability and reports whether the wait passed unknownMergeabilityTimeout.
-// Any other wait, or none, forgets the order.
-func (l *Loop) noteMergeabilityWait(orderID, detail string, now time.Time) bool {
-	if detail != unknownMergeabilityDetail {
-		delete(l.mergeabilityUnknownSince, orderID)
+// noteCheckWait tracks how long a parked PR has waited on GitHub's
+// mergeability or on a red check's re-run, and reports whether the wait passed
+// checkWaitTimeout. Any other wait, or none, forgets the order.
+func (l *Loop) noteCheckWait(orderID, detail string, now time.Time) bool {
+	if !timedWait(detail) {
+		delete(l.checkWaitSince, orderID)
+		delete(l.checkWaitKind, orderID)
 		return false
 	}
-	if l.mergeabilityUnknownSince == nil {
-		l.mergeabilityUnknownSince = map[string]time.Time{}
+	if l.checkWaitSince == nil {
+		l.checkWaitSince = map[string]time.Time{}
 	}
-	since, ok := l.mergeabilityUnknownSince[orderID]
-	if !ok {
-		l.mergeabilityUnknownSince[orderID] = now
+	// A different kind of wait (mergeability, then a red check) is a new
+	// wait, so it gets a fresh clock.
+	kind := waitKind(detail)
+	since, ok := l.checkWaitSince[orderID]
+	if !ok || l.checkWaitKind[orderID] != kind {
+		l.checkWaitSince[orderID] = now
+		if l.checkWaitKind == nil {
+			l.checkWaitKind = map[string]string{}
+		}
+		l.checkWaitKind[orderID] = kind
 		return false
 	}
-	return now.Sub(since) >= unknownMergeabilityTimeout
+	return now.Sub(since) >= checkWaitTimeout
 }
 
-// stopUnknownMergeability ends an order whose PR GitHub never reported on:
-// the stage fails, action_needed names the PR, and the issue goes to a person.
-func (l *Loop) stopUnknownMergeability(ctx context.Context, cook *cookHandle, prURL string) error {
-	msg := fmt.Sprintf("GitHub has not computed mergeability for %s in %s, needs a person", prURL, unknownMergeabilityTimeout)
-	l.logger.Warn("PR mergeability unknown too long, stopping order", "order", cook.orderID, "pr", prURL)
+// stopStuckWait ends an order whose PR stayed blocked on detail past
+// checkWaitTimeout: the stage fails, action_needed names what it waits on, and
+// the issue goes to a person.
+func (l *Loop) stopStuckWait(ctx context.Context, cook *cookHandle, prURL, detail string) error {
+	msg := fmt.Sprintf("%s: %s for over %s, needs a person", prURL, detail, checkWaitTimeout)
+	l.logger.Warn("PR wait is stuck, stopping order", "order", cook.orderID, "pr", prURL, "waiting_on", detail)
 	flagErr := l.flagActionNeeded(cook.orderID + ": " + msg)
-	l.stopForPerson(ctx, cook.orderID,
-		"GitHub never reported whether the PR can merge. Check the PR, then put ready back. PR:", prURL)
+	why := "A check blocking the PR never went green at its head. Check it, then put ready back. PR:"
+	if detail == unknownMergeabilityDetail {
+		why = "GitHub never reported whether the PR can merge. Check the PR, then put ready back. PR:"
+	}
+	l.stopForPerson(ctx, cook.orderID, why, prURL)
 	err := errors.Join(flagErr, l.failStage(ctx, cook, msg))
 	if err == nil {
-		delete(l.mergeabilityUnknownSince, cook.orderID)
+		delete(l.checkWaitSince, cook.orderID)
+		delete(l.checkWaitKind, cook.orderID)
 	}
 	return err
 }
@@ -652,9 +729,10 @@ func (l *Loop) retryAwaitingChecks(ctx context.Context) error {
 	}
 	// Forget orders that left the wait by another path (approved, rejected,
 	// skipped), so a later park starts a fresh clock.
-	for id := range l.mergeabilityUnknownSince {
+	for id := range l.checkWaitSince {
 		if !slices.ContainsFunc(waiting, func(p *pendingReviewCook) bool { return p.orderID == id }) {
-			delete(l.mergeabilityUnknownSince, id)
+			delete(l.checkWaitSince, id)
+			delete(l.checkWaitKind, id)
 		}
 	}
 	if len(waiting) == 0 {
@@ -673,14 +751,15 @@ func (l *Loop) retryAwaitingChecks(ctx context.Context) error {
 		var pe pendingError
 		switch {
 		case err == nil:
-			delete(l.mergeabilityUnknownSince, cook.orderID)
+			delete(l.checkWaitSince, cook.orderID)
+			delete(l.checkWaitKind, cook.orderID)
 		case errors.Is(err, ErrChecksPending):
 			// Show what it waits on now, not on the first poll.
 			if !errors.As(err, &pe) {
 				break
 			}
-			if stuck := l.noteMergeabilityWait(cook.orderID, pe.detail, now); stuck {
-				if serr := l.stopUnknownMergeability(ctx, cook, pe.url); serr != nil {
+			if stuck := l.noteCheckWait(cook.orderID, pe.detail, now); stuck {
+				if serr := l.stopStuckWait(ctx, cook, pe.url, pe.detail); serr != nil {
 					return serr
 				}
 				break
