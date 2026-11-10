@@ -218,7 +218,7 @@ type rollupCheck struct {
 // failing reports a finished check that did not pass.
 func (c rollupCheck) failing() bool {
 	switch c.Conclusion {
-	case "FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE":
+	case "FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE", "STALE":
 		return true
 	}
 	return c.State == "FAILURE" || c.State == "ERROR"
@@ -259,10 +259,18 @@ const checkWaitTimeout = unknownMergeabilityTimeout
 // redCheckDetail is what a blocked PR waits on while a check still shows its
 // failure from before the latest comment or push.
 func redCheckDetail(names ...string) string {
-	return redCheckPrefix + strings.Join(names, ", ") + " not green at the head yet (waiting for a re-run)"
+	return redCheckPrefix + strings.Join(names, ", ") + " (waiting for a re-run; a required check goes green after the verdict comment re-runs it)"
 }
 
-const redCheckPrefix = "required check "
+const redCheckPrefix = "check not green at the head: "
+
+// waitKind names the kind of timed wait detail is.
+func waitKind(detail string) string {
+	if strings.HasPrefix(detail, redCheckPrefix) {
+		return "red-check"
+	}
+	return "mergeability"
+}
 
 // timedWait reports whether detail is a wait that checkWaitTimeout bounds.
 func timedWait(detail string) bool {
@@ -659,17 +667,25 @@ func pendingDetail(err error) string {
 func (l *Loop) noteCheckWait(orderID, detail string, now time.Time) bool {
 	if !timedWait(detail) {
 		delete(l.checkWaitSince, orderID)
+		delete(l.checkWaitKind, orderID)
 		return false
 	}
 	if l.checkWaitSince == nil {
 		l.checkWaitSince = map[string]time.Time{}
 	}
+	// A different kind of wait (mergeability, then a red check) is a new
+	// wait, so it gets a fresh clock.
+	kind := waitKind(detail)
 	since, ok := l.checkWaitSince[orderID]
-	if !ok {
+	if !ok || l.checkWaitKind[orderID] != kind {
 		l.checkWaitSince[orderID] = now
+		if l.checkWaitKind == nil {
+			l.checkWaitKind = map[string]string{}
+		}
+		l.checkWaitKind[orderID] = kind
 		return false
 	}
-	return now.Sub(since) >= unknownMergeabilityTimeout
+	return now.Sub(since) >= checkWaitTimeout
 }
 
 // stopStuckWait ends an order whose PR stayed blocked on detail past
@@ -679,7 +695,7 @@ func (l *Loop) stopStuckWait(ctx context.Context, cook *cookHandle, prURL, detai
 	msg := fmt.Sprintf("%s: %s for over %s, needs a person", prURL, detail, checkWaitTimeout)
 	l.logger.Warn("PR wait is stuck, stopping order", "order", cook.orderID, "pr", prURL, "waiting_on", detail)
 	flagErr := l.flagActionNeeded(cook.orderID + ": " + msg)
-	why := "A required check never went green at the PR head. Check it, then put ready back. PR:"
+	why := "A check blocking the PR never went green at its head. Check it, then put ready back. PR:"
 	if detail == unknownMergeabilityDetail {
 		why = "GitHub never reported whether the PR can merge. Check the PR, then put ready back. PR:"
 	}
@@ -687,6 +703,7 @@ func (l *Loop) stopStuckWait(ctx context.Context, cook *cookHandle, prURL, detai
 	err := errors.Join(flagErr, l.failStage(ctx, cook, msg))
 	if err == nil {
 		delete(l.checkWaitSince, cook.orderID)
+		delete(l.checkWaitKind, cook.orderID)
 	}
 	return err
 }
@@ -715,6 +732,7 @@ func (l *Loop) retryAwaitingChecks(ctx context.Context) error {
 	for id := range l.checkWaitSince {
 		if !slices.ContainsFunc(waiting, func(p *pendingReviewCook) bool { return p.orderID == id }) {
 			delete(l.checkWaitSince, id)
+			delete(l.checkWaitKind, id)
 		}
 	}
 	if len(waiting) == 0 {
@@ -734,6 +752,7 @@ func (l *Loop) retryAwaitingChecks(ctx context.Context) error {
 		switch {
 		case err == nil:
 			delete(l.checkWaitSince, cook.orderID)
+			delete(l.checkWaitKind, cook.orderID)
 		case errors.Is(err, ErrChecksPending):
 			// Show what it waits on now, not on the first poll.
 			if !errors.As(err, &pe) {

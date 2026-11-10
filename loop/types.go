@@ -230,6 +230,7 @@ type Loop struct {
 	// mergeability or a red check's re-run; in memory, so a restart restarts
 	// the wait.
 	checkWaitSince map[string]time.Time
+	checkWaitKind  map[string]string
 
 	lastLoopFailure *LoopFailureEnvelope
 
