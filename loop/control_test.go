@@ -97,12 +97,16 @@ func TestControlRejectClearsOrderSpend(t *testing.T) {
 	l := newControlTestLoop(t, &fakeWorktree{}, newMockRuntime())
 	l.recordStageLaunch("42", "execute", 0)
 	l.recordStageCost("42", 3)
+	l.bumpFailedRounds("42")
 
 	if err := l.controlReject("42"); err != nil {
 		t.Fatalf("controlReject: %v", err)
 	}
 	if spend := l.orderSpendOf("42"); spend.CostUSD != 0 || spend.totalAttempts() != 0 {
 		t.Fatalf("spend after reject = %+v, want empty", spend)
+	}
+	if rounds := l.readFailedRounds()["42"]; rounds.Count != 0 {
+		t.Fatalf("failed rounds after reject = %+v, want none", rounds)
 	}
 }
 
