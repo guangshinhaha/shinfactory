@@ -9,12 +9,18 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/guangshinhaha/shinfactory/internal/filex"
 )
 
 // A conflict at ship is cleared once by rebasing the order's branch onto the
 // current base and running review (and verify, for high tier) again on the new
 // head. If the rebase conflicts, or the branch conflicts again after it, the
 // order stops with the conflicting files named. Nothing retries it silently.
+//
+// The count is per order, not per base: a conflict long after the one rebase
+// still stops the order, even if the base has moved on since. That keeps
+// "once" simple and bounded; a person reshapes the issue and puts it back.
 
 // rebaseTimeout bounds the fetch, rebase and push of one rebase.
 const rebaseTimeout = 3 * time.Minute
@@ -43,7 +49,7 @@ func (l *Loop) readRebased() map[string]int {
 func (l *Loop) writeRebased(counts map[string]int) error {
 	data, err := json.Marshal(counts)
 	if err == nil {
-		err = os.WriteFile(l.rebasedFile(), data, 0o644)
+		err = filex.WriteFileAtomic(l.rebasedFile(), data)
 	}
 	return err
 }
@@ -123,7 +129,6 @@ func (l *Loop) onShipConflict(ctx context.Context, cook *cookHandle, pr PullRequ
 		if errors.As(err, &ce) {
 			return true, l.stopConflicted(ctx, cook, ce.Files, "the rebase onto the base branch conflicts")
 		}
-		l.clearRebased(cook.orderID)
 		return true, l.failStage(ctx, cook, "rebase onto the base branch: "+err.Error())
 	}
 	l.logger.Info("order rebased onto the base branch", "order", cook.orderID, "pr", pr.URL)
@@ -137,10 +142,16 @@ func (l *Loop) onShipConflict(ctx context.Context, cook *cookHandle, pr PullRequ
 		}
 		return false, err
 	}
+	// reopenStages checkpoints the canonical state, so the parked entry must
+	// be gone first; put it back if the reopen fails so the order is not lost.
+	prevPending, hadPending := l.canonical.PendingReviews[cook.orderID]
 	if parked {
 		delete(l.canonical.PendingReviews, cook.orderID)
 	}
 	if err := l.reopenStages(cook.orderID, idx, cook.stageIndex, order.Round); err != nil {
+		if parked && hadPending {
+			l.canonical.PendingReviews[cook.orderID] = prevPending
+		}
 		return true, err
 	}
 	if parked {
@@ -179,12 +190,11 @@ func (l *Loop) stopConflicted(ctx context.Context, cook *cookHandle, files []str
 		WorktreeName: cook.worktreeName,
 		Files:        files,
 	})
-	if err := l.flagActionNeeded(cook.orderID + ": " + msg); err != nil {
-		return err
-	}
+	// A failed flag write must not skip the stop (failStage clears the count): the order
+	// would stay claimed with nobody told. Report both errors.
+	flagErr := l.flagActionNeeded(cook.orderID + ": " + msg)
 	l.stopForPerson(ctx, cook.orderID,
 		"A merge conflict the factory cannot resolve. Resolve it by hand or reshape the issue, then put ready back. Conflict:",
 		msg)
-	l.clearRebased(cook.orderID)
-	return l.failStage(ctx, cook, msg)
+	return errors.Join(flagErr, l.failStage(ctx, cook, msg))
 }

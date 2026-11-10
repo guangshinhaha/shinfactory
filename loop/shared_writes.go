@@ -36,38 +36,90 @@ func stageWrites(s Stage) []string {
 	return out
 }
 
-// sharedWriteHolders maps each shared path to the order whose running stage
-// holds it.
-func (l *Loop) sharedWriteHolders() map[string]string {
-	held := map[string]string{}
+// writeHold is one shared path and the order whose stage holds it.
+type writeHold struct{ path, orderID string }
+
+// sharedWriteHolders lists the paths held by stages that are live: running,
+// adopted from an earlier run, or parked in pending review. A parked order
+// still owns its worktree and will ship or resume it, so its files stay held.
+func (l *Loop) sharedWriteHolders() []writeHold {
+	var held []writeHold
+	add := func(orderID string, s Stage) {
+		for _, p := range stageWrites(s) {
+			held = append(held, writeHold{p, orderID})
+		}
+	}
 	for orderID, cook := range l.cooks.activeCooksByOrder {
-		for _, p := range stageWrites(cook.stage) {
-			held[p] = orderID
+		add(orderID, cook.stage)
+	}
+	// A parked cook is rebuilt from canonical state after a restart without
+	// its stage's Extra, so read the stage from orders.json, falling back to
+	// the cook's own copy.
+	for orderID, cook := range l.cooks.pendingReview {
+		stage := cook.stage
+		if order, ok := l.orderByID(orderID); ok && cook.stageIndex < len(order.Stages) {
+			stage = order.Stages[cook.stageIndex]
+		}
+		add(orderID, stage)
+	}
+	// An adopted session runs the order's first active stage.
+	for orderID := range l.cooks.adoptedTargets {
+		if _, running := l.cooks.activeCooksByOrder[orderID]; running {
+			continue
+		}
+		order, ok := l.orderByID(orderID)
+		if !ok {
+			continue
+		}
+		for _, st := range order.Stages {
+			if st.Status == StageStatusActive {
+				add(orderID, st)
+				break
+			}
 		}
 	}
 	return held
 }
 
-// withoutWriteClashes drops candidates whose stage writes a shared file that a
-// running stage, or an earlier candidate in the same batch, already holds.
+// writePathsOverlap reports whether two normalized shared paths name the same
+// file or one is a directory holding the other. Case is folded: holding back a
+// stage on a case-sensitive file system costs a wait, while missing a clash on
+// a case-insensitive one costs a conflict at ship.
+func writePathsOverlap(a, b string) bool {
+	a, b = strings.ToLower(a), strings.ToLower(b)
+	return a == b || strings.HasPrefix(a, b+"/") || strings.HasPrefix(b, a+"/")
+}
+
+// clashWith returns the held path that overlaps p and is held by another
+// order, or "".
+func clashWith(held []writeHold, p, orderID string) (path, holder string) {
+	for _, h := range held {
+		if h.orderID != orderID && writePathsOverlap(h.path, p) {
+			return h.path, h.orderID
+		}
+	}
+	return "", ""
+}
+
+// withoutWriteClashes drops candidates whose stage writes a shared path that a
+// live stage, or an earlier candidate in the same batch, already holds.
 func (l *Loop) withoutWriteClashes(candidates []dispatchCandidate) []dispatchCandidate {
 	held := l.sharedWriteHolders()
 	kept := candidates[:0:0]
 	for _, c := range candidates {
 		writes := stageWrites(c.Stage)
-		clash := ""
+		clash, holder := "", ""
 		for _, p := range writes {
-			if holder, ok := held[p]; ok && holder != c.OrderID {
-				clash = p
+			if clash, holder = clashWith(held, p, c.OrderID); clash != "" {
 				break
 			}
 		}
 		if clash != "" {
-			l.logger.Info("stage waits for a shared file", "order", c.OrderID, "stage", c.StageIndex, "file", clash, "held_by", held[clash])
+			l.logger.Info("stage waits for a shared file", "order", c.OrderID, "stage", c.StageIndex, "file", clash, "held_by", holder)
 			continue
 		}
 		for _, p := range writes {
-			held[p] = c.OrderID
+			held = append(held, writeHold{p, c.OrderID})
 		}
 		kept = append(kept, c)
 	}

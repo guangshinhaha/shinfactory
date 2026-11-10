@@ -94,3 +94,51 @@ func TestCycleDispatchesBothOrdersWhenTheirFilesDiffer(t *testing.T) {
 		t.Fatalf("sessions = %d, want 2 (control: no shared file)", n)
 	}
 }
+
+func TestParkedAndAdoptedStagesHoldTheirSharedFiles(t *testing.T) {
+	h := newGateHarness(t, "none", "execute")
+	cand := []dispatchCandidate{{OrderID: "b", Stage: writesStage("brain/index.md")}}
+
+	h.l.cooks.pendingReview["a"] = &pendingReviewCook{cookIdentity: cookIdentity{orderID: "a", stage: writesStage("brain/index.md")}}
+	if got := h.l.withoutWriteClashes(cand); len(got) != 0 {
+		t.Fatalf("parked order's file not held: kept %v", got)
+	}
+	delete(h.l.cooks.pendingReview, "a")
+
+	active := writesStage("brain/index.md")
+	active.Status = StageStatusActive
+	writeTestOrders(t, h.l.runtimeDir, OrdersFile{Orders: []Order{{ID: "a", Status: OrderStatusActive, Stages: []Stage{active}}}})
+	h.l.ordersLoaded = false
+	h.l.cooks.adoptedTargets["a"] = "session"
+	if got := h.l.withoutWriteClashes(cand); len(got) != 0 {
+		t.Fatalf("adopted order's file not held: kept %v", got)
+	}
+}
+
+func TestSharedWritesClashOnCaseAndDirectoryOverlap(t *testing.T) {
+	for _, c := range []struct {
+		a, b string
+		want bool
+	}{
+		{"brain/index.md", "Brain/Index.md", true},
+		{"brain", "brain/index.md", true},
+		{"brain/index.md", "brain", true},
+		{"brain", "brainstorm/x.md", false},
+		{"a.md", "b.md", false},
+	} {
+		if got := writePathsOverlap(c.a, c.b); got != c.want {
+			t.Errorf("writePathsOverlap(%q, %q) = %v, want %v", c.a, c.b, got, c.want)
+		}
+	}
+}
+
+func TestParkedOrderHoldsFilesFromOrdersJSONAfterARestart(t *testing.T) {
+	h := newGateHarness(t, "none", "execute")
+	writeTestOrders(t, h.l.runtimeDir, OrdersFile{Orders: []Order{{ID: "a", Status: OrderStatusActive, Stages: []Stage{writesStage("brain/index.md")}}}})
+	h.l.ordersLoaded = false
+	// The reloaded cook has no Extra on its stage.
+	h.l.cooks.pendingReview["a"] = &pendingReviewCook{cookIdentity: cookIdentity{orderID: "a", stageIndex: 0}}
+	if got := h.l.withoutWriteClashes([]dispatchCandidate{{OrderID: "b", Stage: writesStage("brain/index.md")}}); len(got) != 0 {
+		t.Fatalf("restarted parked order's file not held: kept %v", got)
+	}
+}
