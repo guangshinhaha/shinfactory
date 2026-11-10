@@ -16,6 +16,10 @@ import (
 	"github.com/guangshinhaha/shinfactory/internal/stringx"
 )
 
+// finishedSessionWait bounds how long a drain waits for the result of a session
+// that has already finished.
+const finishedSessionWait = 2 * time.Second
+
 func (l *Loop) drainCompletions(ctx context.Context) error {
 	if err := l.finishEvidenceChecks(ctx); err != nil {
 		return err
@@ -39,6 +43,12 @@ drainedChannel:
 		if waitCtx == nil {
 			waitCtx = context.Background()
 		}
+		// A watcher that is only slow to run must not make the cycle miss a
+		// session that already finished: its result is certain, so wait for it.
+		wait := 2 * time.Millisecond
+		if l.finishedSessionInFlight() {
+			wait = finishedSessionWait
+		}
 		select {
 		case result := <-l.completionBuf.completions:
 			if err := l.applyStageResult(waitCtx, result); err != nil {
@@ -54,7 +64,7 @@ drainedChannel:
 					goto lateDrainDone
 				}
 			}
-		case <-time.After(2 * time.Millisecond):
+		case <-time.After(wait):
 		case <-waitCtx.Done():
 		}
 	}

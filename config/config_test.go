@@ -698,7 +698,7 @@ func TestParseLandingMode(t *testing.T) {
 		"pr":      LandingModePR,
 		" PR ":    LandingModePR,
 		"local":   LandingModeLocal,
-		"nonsens": LandingModePR,
+		"nonsens": LandingModeLocal, // a typo must not enable remote writes
 	}
 	for in, want := range cases {
 		cfg, err := Parse([]byte("[landing]\nmode = \"" + in + "\"\nbase = \" develop \"\n"))

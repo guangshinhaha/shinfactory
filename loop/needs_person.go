@@ -83,20 +83,31 @@ func (l *Loop) failedRoundsFile() string {
 	return filepath.Join(l.runtimeDir, "failed-rounds.json")
 }
 
-func (l *Loop) readFailedRounds() map[string]int {
-	counts := map[string]int{}
+// failedRound is one order's rejected-round count and when the latest landed.
+type failedRound struct {
+	Count int       `json:"count"`
+	At    time.Time `json:"at"`
+}
+
+// failedRoundsWindow is how long a rejection counts toward the two-round stop.
+// A rejection older than this belongs to an earlier attempt: it no longer
+// combines with a new one.
+const failedRoundsWindow = 24 * time.Hour
+
+func (l *Loop) readFailedRounds() map[string]failedRound {
+	counts := map[string]failedRound{}
 	data, err := os.ReadFile(l.failedRoundsFile())
 	if err != nil {
 		return counts
 	}
 	if err := json.Unmarshal(data, &counts); err != nil {
 		l.logger.Warn("failed-rounds.json unreadable; counting from zero", "error", err)
-		return map[string]int{}
+		return map[string]failedRound{}
 	}
 	return counts
 }
 
-func (l *Loop) writeFailedRounds(counts map[string]int) {
+func (l *Loop) writeFailedRounds(counts map[string]failedRound) {
 	data, err := json.Marshal(counts)
 	if err == nil {
 		err = filex.WriteFileAtomic(l.failedRoundsFile(), data)
@@ -114,9 +125,16 @@ func (l *Loop) bumpFailedRounds(orderID string) int {
 	failedRoundsMu.Lock()
 	defer failedRoundsMu.Unlock()
 	counts := l.readFailedRounds()
-	counts[orderID]++
+	now := l.deps.Now()
+	round := counts[orderID]
+	if now.Sub(round.At) > failedRoundsWindow {
+		round.Count = 0
+	}
+	round.Count++
+	round.At = now.UTC()
+	counts[orderID] = round
 	l.writeFailedRounds(counts)
-	return counts[orderID]
+	return round.Count
 }
 
 func (l *Loop) clearFailedRounds(orderID string) {

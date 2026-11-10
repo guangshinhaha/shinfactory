@@ -20,6 +20,7 @@ func (l *Loop) startSessionWatcher(ctx context.Context, cook *cookHandle, isBoot
 
 	l.watcherWG.Add(1)
 	l.watcherCount.Add(1)
+	l.watchedDone.Store(cook.session.ID(), cook.session.Done())
 	go func(sessionID string, handle *cookHandle, watcherCtx context.Context) {
 		defer l.watcherWG.Done()
 		defer l.watcherCount.Add(-1)
@@ -39,6 +40,7 @@ func (l *Loop) startSessionWatcher(ctx context.Context, cook *cookHandle, isBoot
 			CompletedAt:  l.deps.Now(),
 		}
 		l.enqueueCompletion(watcherCtx, result)
+		l.watchedDone.Delete(sessionID)
 	}(cook.session.ID(), cook, ctx)
 }
 
@@ -51,4 +53,20 @@ func stageResultFromOutcome(outcome loopruntime.SessionOutcome) StageResultStatu
 	default:
 		return StageResultFailed
 	}
+}
+
+// finishedSessionInFlight reports whether a watched session has finished but
+// its watcher has not queued the result yet. That result is certain to arrive.
+func (l *Loop) finishedSessionInFlight() bool {
+	found := false
+	l.watchedDone.Range(func(_, done any) bool {
+		select {
+		case <-done.(<-chan struct{}):
+			found = true
+			return false
+		default:
+			return true
+		}
+	})
+	return found
 }

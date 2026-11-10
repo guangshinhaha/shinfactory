@@ -39,17 +39,17 @@ func hasGitHubRemote(projectDir string) bool {
 // before ":" or "/".
 var githubRemoteURL = regexp.MustCompile(`(?i)(@|//)(www\.)?github\.com[:/]`)
 
-// fetchMu serializes fetches: concurrent dispatches update the same ref.
+// fetchMu serializes the fetch itself: concurrent dispatches update the same
+// ref. The default-branch lookup does not write, so it runs outside the lock.
 var fetchMu sync.Mutex
 
-// fetchTimeout bounds one git network call on the dispatch path.
-const fetchTimeout = time.Minute
+// fetchTimeout bounds all of one dispatch's git network calls together, so a
+// hung remote stalls the loop for this long once, not once per call.
+var fetchTimeout = time.Minute
 
 // gitRemote runs git against the project's origin without ever prompting for
 // credentials, so a missing login fails instead of hanging the loop.
-func gitRemote(projectDir string, args ...string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), fetchTimeout)
-	defer cancel()
+func gitRemote(ctx context.Context, projectDir string, args ...string) (string, error) {
 	cmd := exec.CommandContext(ctx, "git", append([]string{"-C", projectDir}, args...)...)
 	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
 	out, err := cmd.CombinedOutput()
@@ -64,10 +64,10 @@ var fetchBase = fetchLandingBase
 // returns the remote-tracking ref a new order worktree branches from. A failed
 // fetch is an error: branching from a stale local main is what this prevents.
 func fetchLandingBase(projectDir, base string) (string, error) {
-	fetchMu.Lock()
-	defer fetchMu.Unlock()
+	ctx, cancel := context.WithTimeout(context.Background(), fetchTimeout)
+	defer cancel()
 	if base == "" {
-		out, err := gitRemote(projectDir, "ls-remote", "--symref", "origin", "HEAD")
+		out, err := gitRemote(ctx, projectDir, "ls-remote", "--symref", "origin", "HEAD")
 		if err != nil {
 			return "", fmt.Errorf("resolve origin default branch: %w: %s", err, strings.TrimSpace(out))
 		}
@@ -82,7 +82,9 @@ func fetchLandingBase(projectDir, base string) (string, error) {
 		}
 	}
 	ref := "refs/remotes/origin/" + base
-	if out, err := gitRemote(projectDir, "fetch", "origin", "+refs/heads/"+base+":"+ref); err != nil {
+	fetchMu.Lock()
+	defer fetchMu.Unlock()
+	if out, err := gitRemote(ctx, projectDir, "fetch", "origin", "+refs/heads/"+base+":"+ref); err != nil {
 		return "", fmt.Errorf("fetch origin %s: %w: %s", base, err, strings.TrimSpace(out))
 	}
 	return ref, nil

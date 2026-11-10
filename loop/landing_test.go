@@ -411,6 +411,34 @@ func TestPRLandingApprovingNonFinalStageDoesNotShip(t *testing.T) {
 	}
 }
 
+// A network blip while a parked PR retries is not a merge refusal: the order
+// keeps its waiting reason and merges on a later poll.
+func TestPRLandingWaitingPRTransientErrorKeepsWaitingAndRetries(t *testing.T) {
+	h := newLandingHarness(t, "auto", 1)
+	h.ln.pending = 1
+	h.runStage(t, 1)
+	waiting := h.l.cooks.pendingReview["42"].reason
+
+	h.ln.mergeErr = errors.New("gh pr merge: HTTP 502: Bad Gateway")
+	h.l.lastChecksPoll = time.Time{}
+	if err := h.l.Cycle(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	review, parked := h.l.cooks.pendingReview["42"]
+	if !parked || review.reason != waiting || strings.Contains(review.reason, "merge refused") {
+		t.Fatalf("pending review = %+v (parked=%v), want still parked as %q", review, parked, waiting)
+	}
+
+	h.ln.mergeErr = nil
+	h.l.lastChecksPoll = time.Time{}
+	if err := h.l.Cycle(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(h.ln.merged) != 1 {
+		t.Fatalf("merged=%d, want the retry to merge once the blip clears", len(h.ln.merged))
+	}
+}
+
 // localLandingConfig is the default config with landing mode "local". Most
 // loop tests exercise the local merge pipeline; PR landing tests set "pr".
 func localLandingConfig() config.Config {

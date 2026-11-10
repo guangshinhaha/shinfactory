@@ -5,11 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"os/exec"
 	"regexp"
 	"strings"
-	"testing"
 	"time"
 
 	"github.com/guangshinhaha/shinfactory/internal/ingest"
@@ -77,6 +75,10 @@ func (e *RebaseConflictError) Error() string {
 	return "rebase conflicts in " + strings.Join(e.Files, ", ")
 }
 
+// ghRunGuard, when set, can refuse to run gh or git. Test binaries set it so a
+// test never reaches the real CLIs; production leaves it nil.
+var ghRunGuard func(bin string) error
+
 // realGHEnv lets a test run the real gh and git. A test binary refuses to
 // otherwise, so no test can act on a real PR by accident.
 const realGHEnv = "SHINFACTORY_ALLOW_REAL_GH"
@@ -90,8 +92,10 @@ var defaultLander = func() Lander { return ghLander{} }
 type ghLander struct{}
 
 func (ghLander) run(ctx context.Context, dir, bin string, args ...string) (string, error) {
-	if testing.Testing() && os.Getenv(realGHEnv) == "" {
-		return "", fmt.Errorf("refusing to run %s in a test binary: set %s=1 only in a test that stubs it", bin, realGHEnv)
+	if ghRunGuard != nil {
+		if err := ghRunGuard(bin); err != nil {
+			return "", err
+		}
 	}
 	cmd := exec.CommandContext(ctx, bin, args...)
 	cmd.Dir = dir
@@ -636,6 +640,10 @@ func (l *Loop) retryAwaitingChecks(ctx context.Context) error {
 			if perr := l.parkPendingReview(cook, reason); perr != nil {
 				return perr
 			}
+		case isTransientBacklogError(err):
+			// A network or 5xx blip is not a refusal: keep the waiting reason
+			// and retry on the next poll.
+			l.logger.Warn("parked PR merge hit a transient error; will retry", "order", cook.orderID, "error", err)
 		default:
 			l.logger.Warn("parked PR could not merge", "order", cook.orderID, "error", err)
 			pending.reason = "merge refused: " + err.Error()

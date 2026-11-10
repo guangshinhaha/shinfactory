@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/guangshinhaha/shinfactory/config"
 	"github.com/guangshinhaha/shinfactory/worktree"
@@ -162,4 +163,24 @@ func (o *optsWorktree) Create(name string, opts ...worktree.CreateOpts) error {
 	}
 	o.from = append(o.from, from)
 	return nil
+}
+
+// A slow remote must stall dispatch once: the lookup and the fetch share one
+// deadline. Each fake git call takes 500ms, under the 800ms limit, but the two
+// together exceed it.
+func TestFetchLandingBaseSharesOneDeadlineAcrossGitCalls(t *testing.T) {
+	bin := t.TempDir()
+	script := "#!/bin/sh\ncase \"$*\" in\n*ls-remote*) printf 'ref: refs/heads/main\\tHEAD\\n'; exec sleep 0.5 ;;\n*) exec sleep 0.5 ;;\nesac\n"
+	writeFile(t, filepath.Join(bin, "git"), script)
+	if err := os.Chmod(filepath.Join(bin, "git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	prev := fetchTimeout
+	fetchTimeout = 800 * time.Millisecond
+	t.Cleanup(func() { fetchTimeout = prev })
+
+	if _, err := fetchLandingBase(t.TempDir(), ""); err == nil {
+		t.Fatal("fetchLandingBase succeeded though lookup and fetch together outlast the deadline")
+	}
 }
