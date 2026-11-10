@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/guangshinhaha/shinfactory/adapter"
@@ -146,5 +147,25 @@ func TestParkedOrderHoldsFilesFromOrdersJSONAfterARestart(t *testing.T) {
 func TestWholeRepoWriteOverlapsEveryPath(t *testing.T) {
 	if !writePathsOverlap(wholeRepoWrite, "brain/index.md") || !writePathsOverlap("a/b.go", wholeRepoWrite) {
 		t.Fatal("a bare . must overlap every path")
+	}
+}
+
+// A stage held back by a parked order's files tells a person once, naming the
+// parked order; a running holder needs no signal.
+func TestStageBlockedByAParkedOrderFlagsActionNeededOnce(t *testing.T) {
+	h := newGateHarness(t, "none", "execute")
+	cand := []dispatchCandidate{{OrderID: "b", Stage: writesStage("brain/index.md")}}
+	h.l.cooks.pendingReview["a"] = &pendingReviewCook{cookIdentity: cookIdentity{orderID: "a", stage: writesStage("brain/index.md")}}
+	for i := 0; i < 3; i++ {
+		if got := h.l.withoutWriteClashes(cand); len(got) != 0 {
+			t.Fatalf("parked order's file not held: kept %v", got)
+		}
+	}
+	orders, err := h.l.currentOrders()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(orders.ActionNeeded) != 1 || !strings.Contains(orders.ActionNeeded[0], "parked in pending review") || !strings.Contains(orders.ActionNeeded[0], "order a") {
+		t.Fatalf("action_needed = %q, want one line naming parked order a", orders.ActionNeeded)
 	}
 }

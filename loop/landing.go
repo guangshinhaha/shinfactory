@@ -219,10 +219,18 @@ type prState struct {
 	} `json:"statusCheckRollup"`
 }
 
+// unknownMergeabilityDetail is what a PR waits on while GitHub has not
+// computed whether it can merge.
+const unknownMergeabilityDetail = "GitHub has not computed mergeability yet"
+
+// unknownMergeabilityTimeout bounds that wait. GitHub computes mergeability
+// within seconds; past this the PR is stuck and a person must look.
+const unknownMergeabilityTimeout = 10 * time.Minute
+
 // checksPending reports what the PR still waits on, or "" when nothing.
 func (p prState) checksPending() string {
 	if p.MergeStateStatus == "UNKNOWN" || p.Mergeable == "UNKNOWN" {
-		return "GitHub has not computed mergeability yet"
+		return unknownMergeabilityDetail
 	}
 	// Right after a push GitHub reports no checks yet and the PR as BLOCKED
 	// by the ruleset that is about to attach them. Wait; a PR blocked for
@@ -588,6 +596,37 @@ func pendingDetail(err error) string {
 	return err.Error()
 }
 
+// noteMergeabilityWait tracks how long a parked PR has waited on GitHub's
+// mergeability and reports whether the wait passed unknownMergeabilityTimeout.
+// Any other wait, or none, forgets the order.
+func (l *Loop) noteMergeabilityWait(orderID, detail string, now time.Time) bool {
+	if detail != unknownMergeabilityDetail {
+		delete(l.mergeabilityUnknownSince, orderID)
+		return false
+	}
+	if l.mergeabilityUnknownSince == nil {
+		l.mergeabilityUnknownSince = map[string]time.Time{}
+	}
+	since, ok := l.mergeabilityUnknownSince[orderID]
+	if !ok {
+		l.mergeabilityUnknownSince[orderID] = now
+		return false
+	}
+	return now.Sub(since) >= unknownMergeabilityTimeout
+}
+
+// stopUnknownMergeability ends an order whose PR GitHub never reported on:
+// the stage fails, action_needed names the PR, and the issue goes to a person.
+func (l *Loop) stopUnknownMergeability(ctx context.Context, cook *cookHandle, prURL string) error {
+	delete(l.mergeabilityUnknownSince, cook.orderID)
+	msg := fmt.Sprintf("GitHub has not computed mergeability for %s in %s, needs a person", prURL, unknownMergeabilityTimeout)
+	l.logger.Warn("PR mergeability unknown too long, stopping order", "order", cook.orderID, "pr", prURL)
+	flagErr := l.flagActionNeeded(cook.orderID + ": " + msg)
+	l.stopForPerson(ctx, cook.orderID,
+		"GitHub never reported whether the PR can merge. Check the PR, then put ready back. PR:", prURL)
+	return errors.Join(flagErr, l.failStage(ctx, cook, msg))
+}
+
 // retryAwaitingChecks merges parked PRs whose checks have finished. A PR whose
 // merge is refused stays parked with the refusal as its reason, for a human.
 func (l *Loop) retryAwaitingChecks(ctx context.Context) error {
@@ -623,9 +662,16 @@ func (l *Loop) retryAwaitingChecks(ctx context.Context) error {
 		var pe pendingError
 		switch {
 		case err == nil:
+			delete(l.mergeabilityUnknownSince, cook.orderID)
 		case errors.Is(err, ErrChecksPending):
 			// Show what it waits on now, not on the first poll.
 			if !errors.As(err, &pe) {
+				break
+			}
+			if stuck := l.noteMergeabilityWait(cook.orderID, pe.detail, now); stuck {
+				if serr := l.stopUnknownMergeability(ctx, cook, pe.url); serr != nil {
+					return serr
+				}
 				break
 			}
 			reason := awaitingChecksReason(pe.url, err)

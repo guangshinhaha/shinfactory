@@ -86,6 +86,21 @@ func (l *Loop) recordStageLaunch(orderID, taskKey string, round int) {
 	l.writeOrderSpend(ledger)
 }
 
+// refundStageLaunch takes back one launch counted by recordStageLaunch, for a
+// launch that died on a usage limit before it could do any work.
+func (l *Loop) refundStageLaunch(orderID, taskKey string, round int) {
+	orderSpendMu.Lock()
+	defer orderSpendMu.Unlock()
+	ledger := l.readOrderSpend()
+	spend, ok := ledger[orderID]
+	if !ok || round > spend.Round || spend.Attempts[taskKey] <= 0 {
+		return
+	}
+	spend.Attempts[taskKey]--
+	ledger[orderID] = spend
+	l.writeOrderSpend(ledger)
+}
+
 // recordStageCost adds a finished stage's reported cost to the order.
 func (l *Loop) recordStageCost(orderID string, costUSD float64) {
 	if costUSD <= 0 {
@@ -117,8 +132,7 @@ func (l *Loop) clearOrderSpend(orderID string) {
 }
 
 // overSpendCap reports why the order may not launch another attempt of the
-// stage, or "" when it may. A cap of zero or less is off; config normalizes a configured zero to the
-// default, so only an unconfigured Config value reaches that case.
+// stage, or "" when it may. A cap of zero or less is off.
 func (l *Loop) overSpendCap(orderID, taskKey string, round int) string {
 	spend := l.orderSpendOf(orderID)
 	caps := l.config.Spend

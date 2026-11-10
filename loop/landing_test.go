@@ -486,3 +486,38 @@ func TestPRLandingMarkDoneRunsOutsideTheShipDeadline(t *testing.T) {
 		t.Fatal("the merge itself lost its deadline")
 	}
 }
+
+// GitHub that never computes mergeability must not park an order forever.
+func TestParkedPRWithUnknownMergeabilityStopsAfterTheTimeout(t *testing.T) {
+	h := newGateHarness(t, "none", "execute")
+	h.ln.pending = 1000
+	h.ln.pendingDetail = unknownMergeabilityDetail
+	h.next(t)
+	if _, ok := h.l.cooks.pendingReview["42"]; !ok {
+		t.Fatal("order did not park")
+	}
+	clock := time.Now()
+	h.l.deps.Now = func() time.Time { return clock }
+	poll := func() {
+		t.Helper()
+		h.l.lastChecksPoll = time.Time{}
+		if err := h.l.Cycle(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	poll() // first sight of the unknown state
+	clock = clock.Add(unknownMergeabilityTimeout - time.Minute)
+	poll()
+	if _, ok := h.l.cooks.pendingReview["42"]; !ok || h.order(t).Status == OrderStatusFailed {
+		t.Fatal("order stopped before the timeout")
+	}
+	clock = clock.Add(2 * time.Minute)
+	poll()
+	h.failedWith(t, "mergeability unknown past the timeout")
+	if !strings.Contains(actionNeeded(t, h), "mergeability") {
+		t.Fatalf("action_needed = %q, want the stuck PR named", actionNeeded(t, h))
+	}
+	if len(h.ar.stopCalls) != 1 {
+		t.Fatalf("stop calls = %v, want the person told once", h.ar.stopCalls)
+	}
+}

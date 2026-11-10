@@ -3,6 +3,7 @@ package loop
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"github.com/guangshinhaha/shinfactory/internal/linestatus"
 	"os"
 	"path/filepath"
@@ -419,5 +420,24 @@ func TestSpendLedgerIgnoresLowerRoundsAndClearedOrders(t *testing.T) {
 	env.loop.recordStageCost("7", 3)
 	if spend := env.loop.orderSpendOf("7"); spend.CostUSD != 0 {
 		t.Fatalf("cost after clear = %v, want 0", spend.CostUSD)
+	}
+}
+
+// A requeue starts the order over, so it must not stay stopped by the spend
+// that stopped it the first time.
+func TestControlRequeueClearsTheOrdersSpend(t *testing.T) {
+	h := newGateHarness(t, "none", "execute")
+	h.ln.mergeErr = errors.New("boom")
+	h.next(t)
+	h.failedWith(t, "ship error")
+	h.l.recordStageLaunch("42", "execute", 0)
+	if h.l.orderSpendOf("42").totalAttempts() == 0 {
+		t.Fatal("fixture recorded no spend")
+	}
+	if err := h.l.controlRequeue("42"); err != nil {
+		t.Fatal(err)
+	}
+	if n := h.l.orderSpendOf("42").totalAttempts(); n != 0 {
+		t.Fatalf("attempts after requeue = %d, want 0", n)
 	}
 }

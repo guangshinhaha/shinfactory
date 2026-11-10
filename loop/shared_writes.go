@@ -2,6 +2,8 @@ package loop
 
 import (
 	"encoding/json"
+	"fmt"
+	"slices"
 	"path"
 	"strings"
 )
@@ -51,20 +53,24 @@ func stageWrites(s Stage) []string {
 }
 
 // writeHold is one shared path and the order whose stage holds it.
-type writeHold struct{ path, orderID string }
+// parked is true when the holder waits in pending review.
+type writeHold struct {
+	path, orderID string
+	parked        bool
+}
 
 // sharedWriteHolders lists the paths held by stages that are live: running,
 // adopted from an earlier run, or parked in pending review. A parked order
 // still owns its worktree and will ship or resume it, so its files stay held.
 func (l *Loop) sharedWriteHolders() []writeHold {
 	var held []writeHold
-	add := func(orderID string, s Stage) {
+	add := func(orderID string, s Stage, parked bool) {
 		for _, p := range stageWrites(s) {
-			held = append(held, writeHold{p, orderID})
+			held = append(held, writeHold{p, orderID, parked})
 		}
 	}
 	for orderID, cook := range l.cooks.activeCooksByOrder {
-		add(orderID, cook.stage)
+		add(orderID, cook.stage, false)
 	}
 	// A parked cook is rebuilt from canonical state after a restart without
 	// its stage's Extra, so read the stage from orders.json, falling back to
@@ -74,7 +80,7 @@ func (l *Loop) sharedWriteHolders() []writeHold {
 		if order, ok := l.orderByID(orderID); ok && cook.stageIndex < len(order.Stages) {
 			stage = order.Stages[cook.stageIndex]
 		}
-		add(orderID, stage)
+		add(orderID, stage, true)
 	}
 	// An adopted session runs the order's first active stage.
 	for orderID := range l.cooks.adoptedTargets {
@@ -87,7 +93,7 @@ func (l *Loop) sharedWriteHolders() []writeHold {
 		}
 		for _, st := range order.Stages {
 			if st.Status == StageStatusActive {
-				add(orderID, st)
+				add(orderID, st, false)
 				break
 			}
 		}
@@ -109,13 +115,28 @@ func writePathsOverlap(a, b string) bool {
 
 // clashWith returns the held path that overlaps p and is held by another
 // order, or "".
-func clashWith(held []writeHold, p, orderID string) (path, holder string) {
+func clashWith(held []writeHold, p, orderID string) (writeHold, bool) {
 	for _, h := range held {
 		if h.orderID != orderID && writePathsOverlap(h.path, p) {
-			return h.path, h.orderID
+			return h, true
 		}
 	}
-	return "", ""
+	return writeHold{}, false
+}
+
+// flagParkedHold tells a person that a parked order is holding up another
+// stage. A parked order waits on a human and holds its files until then; the
+// hold has no timeout, because releasing it early brings back the conflict at
+// ship that the hold prevents. One line per pair, however many cycles it waits.
+func (l *Loop) flagParkedHold(waiter string, h writeHold) {
+	line := fmt.Sprintf("order %s waits for %s, held by order %s, which is parked in pending review: approve, reject or skip order %s", waiter, h.path, h.orderID, h.orderID)
+	orders, err := l.currentOrders()
+	if err == nil && slices.Contains(orders.ActionNeeded, line) {
+		return
+	}
+	if err := l.flagActionNeeded(line); err != nil {
+		l.logger.Warn("could not flag a parked shared-file hold", "order", waiter, "held_by", h.orderID, "error", err)
+	}
 }
 
 // withoutWriteClashes drops candidates whose stage writes a shared path that a
@@ -125,18 +146,22 @@ func (l *Loop) withoutWriteClashes(candidates []dispatchCandidate) []dispatchCan
 	kept := candidates[:0:0]
 	for _, c := range candidates {
 		writes := stageWrites(c.Stage)
-		clash, holder := "", ""
+		var clash writeHold
+		clashed := false
 		for _, p := range writes {
-			if clash, holder = clashWith(held, p, c.OrderID); clash != "" {
+			if clash, clashed = clashWith(held, p, c.OrderID); clashed {
 				break
 			}
 		}
-		if clash != "" {
-			l.logger.Info("stage waits for a shared file", "order", c.OrderID, "stage", c.StageIndex, "file", clash, "held_by", holder)
+		if clashed {
+			l.logger.Info("stage waits for a shared file", "order", c.OrderID, "stage", c.StageIndex, "file", clash.path, "held_by", clash.orderID)
+			if clash.parked {
+				l.flagParkedHold(c.OrderID, clash)
+			}
 			continue
 		}
 		for _, p := range writes {
-			held = append(held, writeHold{p, c.OrderID})
+			held = append(held, writeHold{p, c.OrderID, false})
 		}
 		kept = append(kept, c)
 	}

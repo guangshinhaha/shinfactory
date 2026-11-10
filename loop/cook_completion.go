@@ -132,6 +132,11 @@ func (l *Loop) handleCompletion(ctx context.Context, cook *cookHandle, resultSta
 		status = stringx.Normalize(cook.session.Outcome().Status.String())
 	}
 
+	if !cook.session.Outcome().UsageLimit {
+		// Only consecutive usage-limit deaths count toward the requeue bound.
+		l.limitRequeues.reset(cook.orderID, cook.stageIndex)
+	}
+
 	if !isScheduleStage(cook.stage) {
 		if fail := l.readStageFail(cook.session.ID()); fail != nil {
 			reason := strings.TrimSpace(fail.Message)

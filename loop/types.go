@@ -231,6 +231,9 @@ type Loop struct {
 	reconciledFailures []reconciledFailure
 	lastMiseWarnings   []string
 	lastChecksPoll     time.Time // last time parked PRs were re-checked for merge
+	// mergeabilityUnknownSince is when each parked order's PR first reported
+	// no computed mergeability; in memory, so a restart restarts the wait.
+	mergeabilityUnknownSince map[string]time.Time
 
 	lastLoopFailure *LoopFailureEnvelope
 
