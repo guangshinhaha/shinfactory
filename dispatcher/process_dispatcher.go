@@ -176,12 +176,10 @@ func (d *ProcessDispatcher) sessionEnv(req DispatchRequest, sessionID string) []
 	)
 }
 
-// denyShimEnv returns the PATH entry that puts deny shims first. Only claude
-// has tool denials, so every other provider gets shims.
+// denyShimEnv returns the PATH entry that puts deny shims first. Every provider
+// gets shims: claude's tool denial misses `sh -c` and names built from variables.
+// Custom runtime templates run as child processes too, so they inherit it.
 func (d *ProcessDispatcher) denyShimEnv(req DispatchRequest) ([]string, error) {
-	if stringx.Normalize(req.Provider) == "claude" {
-		return nil, nil
-	}
 	shimDir, err := writeDenyShims(d.runtimeDir, req.DenyProviders)
 	if err != nil || shimDir == "" {
 		return nil, err

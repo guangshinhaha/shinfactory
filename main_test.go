@@ -403,3 +403,14 @@ func TestRepairRefusesSecondProviderOnSensitiveRepo(t *testing.T) {
 		t.Errorf("repair DenyProviders = %v, want [codex]", req.DenyProviders)
 	}
 }
+
+// The launch itself, not just the helper, refuses a forbidden repair provider,
+// and does so before it creates a worktree.
+func TestStartRepairSessionRefusesForbiddenProvider(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.Routing.Sensitive = true
+	_, err := startRepairSession(context.Background(), &App{Config: cfg}, "codex", "synthetic")
+	if err == nil || !strings.Contains(err.Error(), "routing.sensitive") {
+		t.Fatalf("err = %v, want routing.sensitive rejection from the launch", err)
+	}
+}

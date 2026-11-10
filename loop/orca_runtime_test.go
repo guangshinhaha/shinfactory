@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -419,6 +420,27 @@ func TestOrcaRuntimeAbsentFallsBackToProcess(t *testing.T) {
 	}
 	if got := l.stageRuntime(Stage{Runtime: "process"}); got != "process" {
 		t.Fatalf("explicit process stage = %q, want process", got)
+	}
+}
+
+// Orca starts the agent, so the factory cannot enforce routing.sensitive there.
+// A sensitive repo resolves orca to process, whether orca is the default or asked for.
+func TestSensitiveRepoNeverResolvesToOrca(t *testing.T) {
+	cfg := localLandingConfig()
+	cfg.Runtime.Default = "orca"
+	cfg.Routing.Sensitive = true
+	rts := map[string]loopruntime.Runtime{"process": newMockRuntime(), "orca": newMockRuntime()}
+	l := &Loop{config: cfg, logger: slog.New(slog.DiscardHandler), deps: Dependencies{Runtimes: rts}}
+	if got := l.stageRuntime(Stage{}); got != "process" {
+		t.Errorf("stageRuntime = %q, want process", got)
+	}
+	if got := l.dispatchRuntime("orca"); got != "process" {
+		t.Errorf("dispatchRuntime(orca) = %q, want process", got)
+	}
+	cfg.Routing.Sensitive = false
+	l = &Loop{config: cfg, logger: slog.New(slog.DiscardHandler), deps: Dependencies{Runtimes: rts}}
+	if got := l.dispatchRuntime("orca"); got != "orca" {
+		t.Errorf("non-sensitive dispatchRuntime(orca) = %q, want orca", got)
 	}
 }
 

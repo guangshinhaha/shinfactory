@@ -1,6 +1,7 @@
 package dispatcher
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -71,16 +72,61 @@ func TestCodexStageCannotRunClaudeCLI(t *testing.T) {
 	}
 }
 
-func TestDenyShimEnvAppliesToCodexOnly(t *testing.T) {
+func TestDenyShimEnvAppliesToEveryProvider(t *testing.T) {
 	d := &ProcessDispatcher{runtimeDir: t.TempDir()}
-	env, err := d.denyShimEnv(DispatchRequest{Provider: "codex", DenyProviders: []string{"claude"}})
-	if err != nil || len(env) != 1 || !strings.HasPrefix(env[0], "PATH="+filepath.Join(d.runtimeDir, "deny-bin")) {
-		t.Fatalf("codex stage env = %v, err = %v, want PATH led by deny-bin", env, err)
-	}
-	if env, _ := d.denyShimEnv(DispatchRequest{Provider: "claude", DenyProviders: []string{"codex"}}); env != nil {
-		t.Errorf("claude stage should rely on tool denials, got %v", env)
+	for provider, denied := range map[string]string{"codex": "claude", "claude": "codex"} {
+		env, err := d.denyShimEnv(DispatchRequest{Provider: provider, DenyProviders: []string{denied}})
+		if err != nil || len(env) != 1 || !strings.HasPrefix(env[0], "PATH="+filepath.Join(d.runtimeDir, "deny-bin")) {
+			t.Fatalf("%s stage env = %v, err = %v, want PATH led by deny-bin", provider, env, err)
+		}
 	}
 	if env, _ := d.denyShimEnv(DispatchRequest{Provider: "codex"}); env != nil {
 		t.Errorf("non-sensitive codex stage got %v", env)
+	}
+}
+
+// A claude stage can build the CLI name at run time and dodge Bash(codex:*);
+// the shim catches it at exec, and a custom runtime template inherits the PATH.
+func TestClaudeStageCannotReachCodexThroughShell(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("sh shim")
+	}
+	d := &ProcessDispatcher{runtimeDir: t.TempDir(), runtimeDefault: `n=cod; n=${n}ex; "$n" exec synthetic`}
+	req := DispatchRequest{Provider: "claude", DenyProviders: []string{"codex"}}
+	cmd, err := d.buildCmd(req, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	denyEnv, err := d.denyShimEnv(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmd.Env = denyEnv
+	out, err := cmd.CombinedOutput()
+	if err == nil || !strings.Contains(string(out), "routing.sensitive") {
+		t.Fatalf("codex ran through a variable-built name: err=%v out=%q", err, out)
+	}
+}
+
+func TestSpriteCommandDeniesForeignCLIs(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("sh shim")
+	}
+	script := denyShimScript([]string{"codex", " "})
+	if denyShimScript(nil) != "" {
+		t.Fatal("no providers should give no script")
+	}
+	cmd := exec.Command("sh", "-c", script+` && codex exec synthetic`)
+	out, err := cmd.CombinedOutput()
+	if err == nil || !strings.Contains(string(out), "routing.sensitive") {
+		t.Fatalf("codex ran after the sprite shim script: err=%v out=%q", err, out)
+	}
+}
+
+func TestOrcaRefusesSensitiveDispatch(t *testing.T) {
+	d := &OrcaDispatcher{projectDir: "/p"}
+	_, err := d.Dispatch(context.Background(), DispatchRequest{Name: "s", Prompt: "synthetic", Provider: "claude", Model: "m", WorktreePath: "/w", Runtime: "orca", DenyProviders: []string{"codex"}})
+	if err == nil || !strings.Contains(err.Error(), "routing.sensitive") {
+		t.Fatalf("err = %v, want routing.sensitive refusal", err)
 	}
 }

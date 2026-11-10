@@ -117,6 +117,10 @@ func (d *OrcaDispatcher) Dispatch(ctx context.Context, req DispatchRequest) (Ses
 		return nil, fmt.Errorf("runtime %q not supported by orca dispatcher", reqRuntime)
 	}
 	req.Runtime = "orca"
+	if len(req.DenyProviders) > 0 {
+		// Orca starts the agent: no tool denial, no PATH. Refuse rather than rely on the spec line.
+		return nil, fmt.Errorf("orca runtime cannot enforce routing.sensitive; run this repo's stages on the process runtime")
+	}
 	agent, err := orcaAgentFor(req.Provider)
 	if err != nil {
 		return nil, err

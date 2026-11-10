@@ -231,6 +231,9 @@ func (d *SpritesDispatcher) buildSpriteCommand(
 		quotedArgs[i] = shellx.Quote(arg)
 	}
 	shellCmd := fmt.Sprintf("cat /work/prompt.txt | %s", strings.Join(quotedArgs, " "))
+	if shims := denyShimScript(req.DenyProviders); shims != "" {
+		shellCmd = shims + " && " + shellCmd
+	}
 
 	var cmd *sprites.Cmd
 	var stdout io.ReadCloser
