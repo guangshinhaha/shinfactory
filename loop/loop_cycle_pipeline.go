@@ -242,9 +242,21 @@ func (l *Loop) ensureScheduleIfNeeded(brief mise.Brief, orders *OrdersFile, mise
 			return idle, err
 		}
 	}
-	if miseChanged && !l.hasActiveScheduleCook() && !hasScheduleOrder(*orders) {
+	if l.hasActiveScheduleCook() || hasScheduleOrder(*orders) {
+		if l.lastScheduledAt.IsZero() {
+			// A schedule this loop did not inject (startup, bootstrap) counts
+			// as having seen the current brief.
+			l.lastScheduledFingerprint = schedulingFingerprint(brief)
+			l.lastScheduledAt = l.deps.Now()
+		}
+	} else {
 		fingerprint := schedulingFingerprint(brief)
-		if fingerprint == l.lastScheduledFingerprint {
+		changed := miseChanged && fingerprint != l.lastScheduledFingerprint
+		// Some changes never reach the brief (an issue closed by hand, a label
+		// a person moved), so re-check now and then while capacity is free.
+		stale := !l.lastScheduledAt.IsZero() && l.deps.Now().Sub(l.lastScheduledAt) >= scheduleRefreshInterval &&
+			!l.atMaxConcurrency() && len(brief.Backlog) > 0
+		if !changed && !stale {
 			return false, nil
 		}
 		orders.Orders = append(orders.Orders, scheduleOrder(""))
@@ -252,10 +264,19 @@ func (l *Loop) ensureScheduleIfNeeded(brief mise.Brief, orders *OrdersFile, mise
 			return false, err
 		}
 		l.lastScheduledFingerprint = fingerprint
-		l.logger.Info("mise changed, injecting schedule order")
+		l.lastScheduledAt = l.deps.Now()
+		if changed {
+			l.logger.Info("mise changed, injecting schedule order")
+		} else {
+			l.logger.Info("no schedule for a while with free capacity, injecting schedule order")
+		}
 	}
 	return false, nil
 }
+
+// scheduleRefreshInterval is how long the loop goes without a schedule, while
+// it has free capacity, before it schedules again with no visible change.
+const scheduleRefreshInterval = 10 * time.Minute
 
 // schedulingFingerprint covers what a new schedule could act on: the backlog,
 // the task types and finished stages of non-schedule orders. Recent events and
