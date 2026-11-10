@@ -9,7 +9,7 @@ import (
 	loopruntime "github.com/guangshinhaha/shinfactory/runtime"
 )
 
-func TestSchedulingFingerprintIgnoresScheduleChurn(t *testing.T) {
+func TestSchedulingFingerprintIgnoresEventsAndHistory(t *testing.T) {
 	base := mise.Brief{Backlog: []adapter.BacklogItem{{ID: "1", Title: "scaffold"}}}
 	fp := schedulingFingerprint(base)
 
@@ -22,8 +22,8 @@ func TestSchedulingFingerprintIgnoresScheduleChurn(t *testing.T) {
 
 	stageDone := base
 	stageDone.RecentHistory = []mise.HistoryItem{{SessionID: "1-0", OrderID: "1", TaskKey: "execute", Status: "completed"}}
-	if got := schedulingFingerprint(stageDone); got == fp {
-		t.Error("a finished build stage did not change the fingerprint")
+	if got := schedulingFingerprint(stageDone); got != fp {
+		t.Error("a stage hand-off changed the fingerprint; only the backlog can unblock new work")
 	}
 
 	moreWork := base

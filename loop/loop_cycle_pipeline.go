@@ -278,26 +278,16 @@ func (l *Loop) ensureScheduleIfNeeded(brief mise.Brief, orders *OrdersFile, mise
 // it has free capacity, before it schedules again with no visible change.
 const scheduleRefreshInterval = 10 * time.Minute
 
-// schedulingFingerprint covers what a new schedule could act on: the backlog,
-// the task types and finished stages of non-schedule orders. Recent events and
-// the schedule's own history are left out: every schedule run adds them, so
-// counting them made each schedule run inject the next one.
+// schedulingFingerprint covers what a new schedule could act on: the backlog
+// and the task types. Recent events and stage history are left out: every
+// schedule run and every stage hand-off adds them, and neither can unblock new
+// work. An order that lands closes its issue and one that stops moves its
+// label, and both change the backlog.
 func schedulingFingerprint(brief mise.Brief) string {
-	type finished struct {
-		OrderID, TaskKey, Status string
-	}
-	var history []finished
-	for _, h := range brief.RecentHistory {
-		if h.OrderID == scheduleOrderID || h.TaskKey == scheduleOrderID {
-			continue
-		}
-		history = append(history, finished{h.OrderID, h.TaskKey, h.Status})
-	}
 	data, _ := json.Marshal(struct {
 		Backlog   any
 		TaskTypes any
-		History   []finished
-	}{brief.Backlog, brief.TaskTypes, history})
+	}{brief.Backlog, brief.TaskTypes})
 	sum := sha256.Sum256(data)
 	return hex.EncodeToString(sum[:])
 }
