@@ -50,6 +50,9 @@ func shimBody(name string) string {
 // writeFileAtomic renames a finished temp file into place, so a concurrent
 // session never execs a truncated stub.
 func writeFileAtomic(path string, data []byte) error {
+	if have, err := os.ReadFile(path); err == nil && string(have) == string(data) {
+		return nil // unchanged: skip the rename, which fails on Windows while a session runs the stub
+	}
 	tmp, err := os.CreateTemp(filepath.Dir(path), ".shim-*")
 	if err != nil {
 		return err

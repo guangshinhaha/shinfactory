@@ -122,7 +122,7 @@ func (l *Loop) dispatchRuntime(requested string) string {
 	}
 	if name == "orca" && l.config.Routing.Sensitive && l.deps.Runtimes["process"] != nil {
 		// Orca starts the agent, so the factory cannot pass it tool denials or a PATH shim.
-		l.logger.Warn("routing.sensitive: running on process instead of orca, which cannot enforce routing")
+		l.logger.Debug("routing.sensitive: running on process instead of orca, which cannot enforce routing")
 		return "process"
 	}
 	if name == "orca" && l.deps.Runtimes["orca"] == nil && l.deps.Runtimes["process"] != nil {
