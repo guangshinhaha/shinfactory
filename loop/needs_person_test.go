@@ -178,6 +178,26 @@ func TestStopForPersonAfterTwoFailedRounds(t *testing.T) {
 	}
 }
 
+// An old rejection must not combine with a much later one: only rounds inside
+// failedRoundsWindow count toward the stop.
+func TestFailedRoundsExpireAfterTheWindow(t *testing.T) {
+	env := newStopEnv(t)
+	now := time.Date(2026, 11, 1, 9, 0, 0, 0, time.UTC)
+	env.loop.deps.Now = func() time.Time { return now }
+
+	if got := env.loop.bumpFailedRounds("7"); got != 1 {
+		t.Fatalf("first rejection counted %d, want 1", got)
+	}
+	now = now.Add(failedRoundsWindow - time.Minute)
+	if got := env.loop.bumpFailedRounds("7"); got != 2 {
+		t.Fatalf("rejection inside the window counted %d, want 2", got)
+	}
+	now = now.Add(failedRoundsWindow + time.Minute)
+	if got := env.loop.bumpFailedRounds("7"); got != 1 {
+		t.Fatalf("rejection after the window counted %d, want 1 (the old rounds expired)", got)
+	}
+}
+
 // Stop 3: a merge conflict nobody can resolve in the loop.
 func TestStopForPersonOnAnUnresolvableMergeConflict(t *testing.T) {
 	logPath := stubStopGH(t)
