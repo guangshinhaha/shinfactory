@@ -300,9 +300,9 @@ func (l *Loop) handleStageFailure(ctx context.Context, cook *cookHandle, resultS
 }
 
 func (l *Loop) failStage(_ context.Context, cook *cookHandle, reason string) error {
-	// A failed stage ends this run of the order; a retry under the same ID
-	// must get its one rebase back.
-	l.clearRebased(cook.orderID)
+	// The rebase count stays: a persistent conflict plus unrelated failures
+	// must not earn a second rebase. It clears when a person takes over
+	// (stopForPerson), the review is rejected, or the order is skipped.
 	if err := l.ensureCanonicalOrderFromOrders(cook.orderID); err != nil {
 		return err
 	}

@@ -36,6 +36,9 @@ const (
 // is skipped. A failed stop is logged: the order is already failed and
 // inert, and the next stop reports again.
 func (l *Loop) stopForPerson(ctx context.Context, orderID, summary, detail string) {
+	// A person now owns the order; when they put ready back it starts with
+	// its one rebase again.
+	l.clearRebased(orderID)
 	message := strings.TrimSpace(summary + " " + truncateRunes(strings.TrimSpace(detail), stopMessageLimit))
 	if l.config.Routing.Sensitive {
 		// The comment lands on an issue other people can read; what the agent

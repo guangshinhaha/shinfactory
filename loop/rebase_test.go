@@ -125,19 +125,97 @@ func TestRebaseCountIsWrittenAtomicallyAndSurvivesAReread(t *testing.T) {
 	}
 }
 
-func TestFailedStageClearsTheRebaseCountSoARetryGetsItsRebase(t *testing.T) {
+func TestFailedStageKeepsTheRebaseCountButAPersonStopClearsIt(t *testing.T) {
 	h := newGateHarness(t, "medium", "execute", "quality")
 	h.ln.conflicts = 1
 	h.next(t)
 	h.review(t, 0, "none")
 	h.next(t) // conflict: rebase, review again
-	if h.l.rebaseCount(h.order(t).ID) != 1 {
+	id := h.order(t).ID
+	if h.l.rebaseCount(id) != 1 {
 		t.Fatal("rebase not counted")
 	}
 	h.review(t, 0, "none")
 	h.ln.mergeErr = errors.New("boom")
 	h.next(t) // non-conflict ship error after the rebase fails the stage
-	if n := h.l.rebaseCount(h.order(t).ID); n != 0 {
-		t.Fatalf("rebase count = %d after a failed stage, want 0", n)
+	if n := h.l.rebaseCount(id); n != 1 {
+		t.Fatalf("rebase count = %d after an unrelated failure, want 1 kept", n)
+	}
+	h.l.stopForPerson(t.Context(), id, "needs a look", "")
+	if n := h.l.rebaseCount(id); n != 0 {
+		t.Fatalf("rebase count = %d after a person stop, want 0", n)
+	}
+}
+
+func TestRejectingAParkedOrderClearsItsRebaseCount(t *testing.T) {
+	h := newGateHarness(t, "none", "execute")
+	h.ln.pending = 5
+	h.next(t) // ship waits on checks: the order parks
+	if _, ok := h.l.cooks.pendingReview["42"]; !ok {
+		t.Fatal("order did not park")
+	}
+	if err := h.l.bumpRebased("42"); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.l.controlReject("42"); err != nil {
+		t.Fatal(err)
+	}
+	if n := h.l.rebaseCount("42"); n != 0 {
+		t.Fatalf("rebase count = %d after reject, want 0", n)
+	}
+}
+
+// readOnlyRuntimeDir makes writes beside orders.json fail until the test ends.
+func readOnlyRuntimeDir(t *testing.T, h *gateHarness) {
+	t.Helper()
+	if os.Geteuid() == 0 {
+		t.Skip("root ignores directory permissions")
+	}
+	if err := os.Chmod(h.l.runtimeDir, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(h.l.runtimeDir, 0o755) })
+}
+
+func TestStopConflictedStillStopsThePersonWhenTheFlagWriteFails(t *testing.T) {
+	h := newGateHarness(t, "none", "execute")
+	h.ln.pending = 5
+	h.next(t)
+	pending := h.l.cooks.pendingReview["42"]
+	cook := &cookHandle{cookIdentity: pending.cookIdentity}
+	readOnlyRuntimeDir(t, h)
+
+	err := h.l.stopConflicted(t.Context(), cook, []string{"go.sum"}, "test")
+	if err == nil {
+		t.Fatal("stopConflicted returned nil although the flag write failed")
+	}
+	if len(h.ar.stopCalls) != 1 || h.ar.stopCalls[0] != "42" {
+		t.Fatalf("stop calls = %v, want the person told once about order 42", h.ar.stopCalls)
+	}
+}
+
+func TestFailedReopenOfAParkedOrderRestoresItsPendingReviewAndStages(t *testing.T) {
+	h := newGateHarness(t, "medium", "execute", "quality")
+	h.next(t)
+	h.review(t, 0, "none")
+	h.ln.pending = 5
+	h.next(t) // review passes, ship waits on checks: parked
+	pending, ok := h.l.cooks.pendingReview["42"]
+	if !ok {
+		t.Fatal("order did not park")
+	}
+	cook := &cookHandle{cookIdentity: pending.cookIdentity}
+	before := h.l.canonical.Orders["42"].Stages[0].Status
+	readOnlyRuntimeDir(t, h)
+
+	stopped, err := h.l.onShipConflict(t.Context(), cook, PullRequest{URL: "u"}, true)
+	if !stopped || err == nil {
+		t.Fatalf("stopped=%v err=%v, want a stop with the reopen error", stopped, err)
+	}
+	if _, ok := h.l.canonical.PendingReviews["42"]; !ok {
+		t.Fatal("parked entry lost after the failed reopen")
+	}
+	if got := h.l.canonical.Orders["42"].Stages[0].Status; got != before {
+		t.Fatalf("stage 0 status = %s after the failed reopen, want %s", got, before)
 	}
 }

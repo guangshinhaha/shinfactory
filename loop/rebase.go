@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/guangshinhaha/shinfactory/internal/filex"
+	"github.com/guangshinhaha/shinfactory/internal/ingest"
 )
 
 // A conflict at ship is cleared once by rebasing the order's branch onto the
@@ -143,14 +144,24 @@ func (l *Loop) onShipConflict(ctx context.Context, cook *cookHandle, pr PullRequ
 		return false, err
 	}
 	// reopenStages checkpoints the canonical state, so the parked entry must
-	// be gone first; put it back if the reopen fails so the order is not lost.
+	// be gone first. The reducer drops it; if the reopen fails, park the order
+	// again so it is not lost.
 	prevPending, hadPending := l.canonical.PendingReviews[cook.orderID]
 	if parked {
-		delete(l.canonical.PendingReviews, cook.orderID)
+		err = l.emitEventChecked(ingest.EventStageReviewApproved, map[string]any{
+			"order_id":    cook.orderID,
+			"stage_index": cook.stageIndex,
+			"reason":      "branch rebased onto the base branch; review runs again",
+		})
 	}
-	if err := l.reopenStages(cook.orderID, idx, cook.stageIndex, order.Round); err != nil {
+	if err == nil {
+		err = l.reopenStages(cook.orderID, idx, cook.stageIndex, order.Round)
+	}
+	if err != nil {
 		if parked && hadPending {
-			l.canonical.PendingReviews[cook.orderID] = prevPending
+			if perr := l.parkPendingReview(cook, prevPending.Reason); perr != nil {
+				err = errors.Join(err, perr)
+			}
 		}
 		return true, err
 	}
