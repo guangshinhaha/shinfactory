@@ -192,6 +192,10 @@ type Loop struct {
 	watcherWG          sync.WaitGroup
 	shutdownOnce       sync.Once
 	watcherCount       atomic.Int64
+	// watchedDone maps a watched session ID to its Done channel, from the
+	// watcher's start until its result is queued, so a drain can tell a
+	// finished session whose result is in flight from one still running.
+	watchedDone sync.Map
 	dispatchGeneration atomic.Uint64
 
 	bootstrapAttempts  int
