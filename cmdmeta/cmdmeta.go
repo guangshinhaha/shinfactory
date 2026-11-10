@@ -26,13 +26,13 @@ func Commands() []Command {
 		{Name: "start", Short: "Run the scheduling loop", Flags: []Flag{
 			{Name: "once", Type: "bool", Desc: "Run one scheduling cycle and exit"},
 		}},
-		{Name: "version", Short: "Print noodle version"},
+		{Name: "version", Short: "Print shinfactory version"},
 		{Name: "status", Short: "Show compact runtime status"},
 		{Name: "control", Short: "Send a control to the running loop and print its result"},
 		{Name: "skills", Short: "List resolved skills", Subcommands: []Command{
 			{Name: "list", Short: "List all resolved skills"},
 		}},
-		{Name: "schema", Short: "Print generated schema docs for Noodle runtime contracts", Subcommands: []Command{
+		{Name: "schema", Short: "Print generated schema docs for shinfactory runtime contracts", Subcommands: []Command{
 			{Name: "list", Short: "List available schema targets"},
 		}},
 		{Name: "worktree", Short: "Manage linked git worktrees", Subcommands: []Command{

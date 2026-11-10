@@ -1,4 +1,4 @@
-# Noodle
+# shinfactory
 
 Open-source AI coding framework. Skills as the only extension point, LLM-powered scheduling, kitchen brigade model. Built with Go.
 

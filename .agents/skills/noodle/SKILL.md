@@ -105,7 +105,7 @@ All commands accept `--project-dir` (default: current directory, env: `NOODLE_PR
 | `shinfactory event emit <type> --payload <json>` | Emit with a JSON payload |
 | `shinfactory event emit <type> --session <id>` | Emit to a specific session's event log |
 
-Full CLI reference: https://poteto.github.io/noodle/reference/cli
+Full CLI reference: https://github.com/guangshinhaha/shinfactory/blob/main/docs/reference/cli.md
 
 ## Troubleshooting
 
@@ -117,7 +117,7 @@ Full CLI reference: https://poteto.github.io/noodle/reference/cli
 
 - [references/skill-authoring.md](references/skill-authoring.md) — writing skills: pipeline, orders schema, schedule fields, stage composition, full examples
 - [references/configuration.md](references/configuration.md) — full .noodle.toml config reference
-- https://poteto.github.io/noodle/concepts/adapters — adapter setup, script contracts, provider examples
-- https://poteto.github.io/noodle/concepts/scheduling — how the loop schedules and dispatches work
-- https://poteto.github.io/noodle/concepts/skills — skill discovery, composition, scheduled vs general
-- https://poteto.github.io/noodle/concepts/runtimes — process, sprites, and runtime routing
+- https://github.com/guangshinhaha/shinfactory/blob/main/docs/concepts/adapters.md — adapter setup, script contracts, provider examples
+- https://github.com/guangshinhaha/shinfactory/blob/main/docs/concepts/scheduling.md — how the loop schedules and dispatches work
+- https://github.com/guangshinhaha/shinfactory/blob/main/docs/concepts/skills.md — skill discovery, composition, scheduled vs general
+- https://github.com/guangshinhaha/shinfactory/blob/main/docs/concepts/runtimes.md — process, sprites, and runtime routing

@@ -100,7 +100,7 @@ func reportConfigDiagnostics(
 					result.WorktreePath,
 				)
 				return newStartRepairPromptEnvelope(
-					"repair session started; rerun `noodle start` after repair completes",
+					"repair session started; rerun `shinfactory start` after repair completes",
 					RepairPromptOutcome{
 						Kind:         RepairPromptKindMissingScripts,
 						Provider:     provider,
@@ -206,7 +206,7 @@ func writeRepairPromptBlock(w io.Writer, prompt string) {
 
 func buildRepairPrompt(missing []missingScriptDiagnostic) string {
 	var builder strings.Builder
-	builder.WriteString("Repair Noodle adapter script configuration so `noodle start` no longer reports missing script paths.\n")
+	builder.WriteString("Repair shinfactory adapter script configuration so `shinfactory start` no longer reports missing script paths.\n")
 	builder.WriteString("Fix each missing entry by either creating an executable script at that path or updating .noodle.toml to a valid executable path.\n")
 	builder.WriteString("Keep the fix minimal and avoid broad refactors.\n\n")
 	builder.WriteString("Missing adapter scripts:\n")
@@ -220,7 +220,7 @@ func buildRepairPrompt(missing []missingScriptDiagnostic) string {
 		)
 	}
 	builder.WriteString("\nRequired verification:\n")
-	builder.WriteString("- Re-run `noodle start` and confirm these repairable diagnostics are gone.\n")
+	builder.WriteString("- Re-run `shinfactory start` and confirm these repairable diagnostics are gone.\n")
 	builder.WriteString("- If Go files changed, run `go test ./...`.\n")
 	builder.WriteString("\nReturn a short summary of files changed and the verification results.")
 	return builder.String()

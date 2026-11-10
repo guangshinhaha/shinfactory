@@ -154,7 +154,7 @@ export function Sidebar() {
     <aside className="sidebar">
       <div className="sidebar-header">
         <div className="logo-mark" />
-        <span>NOODLE</span>
+        <span>SHINFACTORY</span>
         <span className="header-status">
           <ConnectionDot /> {currentStatusLabel}
         </span>

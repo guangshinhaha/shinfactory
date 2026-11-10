@@ -9,17 +9,17 @@ function OnboardingPage() {
         <header>
           <div className="flex items-center gap-3 mb-6">
             <div className="logo-mark" />
-            <h1 className="font-display text-2xl font-bold tracking-wider text-accent">NOODLE</h1>
+            <h1 className="font-display text-2xl font-bold tracking-wider text-accent">SHINFACTORY</h1>
           </div>
         </header>
 
-        {/* What is Noodle */}
+        {/* What is shinfactory */}
         <section>
           <h2 className="font-display text-sm font-bold text-accent tracking-wider uppercase mb-3">
-            What is Noodle
+            What is shinfactory
           </h2>
           <p className="text-text-secondary leading-relaxed">
-            Noodle is an open-source AI coding framework built on the kitchen brigade model. It
+            shinfactory is an open-source AI coding framework built on the kitchen brigade model. It
             orchestrates multiple AI agents through skills — the single extension point — using an
             LLM-powered scheduler to coordinate work across your codebase.
           </p>

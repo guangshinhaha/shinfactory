@@ -52,7 +52,7 @@ func TestEnsureProjectStructureFreshDirectory(t *testing.T) {
 
 	// Verify welcome message was printed
 	output := buf.String()
-	if !strings.Contains(output, "Noodle initialized") {
+	if !strings.Contains(output, "shinfactory initialized") {
 		t.Fatalf("expected welcome message on first run, got:\n%s", output)
 	}
 	if !strings.Contains(output, "INSTALL.md") {
@@ -68,7 +68,7 @@ func TestEnsureProjectStructureIdempotent(t *testing.T) {
 	if err := EnsureProjectStructure(dir, &buf); err != nil {
 		t.Fatalf("first run: %v", err)
 	}
-	if !strings.Contains(buf.String(), "Noodle initialized") {
+	if !strings.Contains(buf.String(), "shinfactory initialized") {
 		t.Fatal("expected welcome message on first run")
 	}
 
@@ -102,7 +102,7 @@ func TestEnsureProjectStructureRecreatesDeletedDirectory(t *testing.T) {
 	if err := EnsureProjectStructure(dir, &buf); err != nil {
 		t.Fatalf("second run: %v", err)
 	}
-	if !strings.Contains(buf.String(), "Noodle initialized") {
+	if !strings.Contains(buf.String(), "shinfactory initialized") {
 		t.Fatalf("expected welcome message after directory deletion, got:\n%s", buf.String())
 	}
 

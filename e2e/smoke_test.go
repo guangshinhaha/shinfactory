@@ -69,7 +69,7 @@ func TestSmokeAgentLoop(t *testing.T) {
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("start noodle: %v", err)
 	}
-	t.Logf("noodle started (pid %d)", cmd.Process.Pid)
+	t.Logf("shinfactory started (pid %d)", cmd.Process.Pid)
 
 	// Phased milestone polling.
 	preUISmokeMilestones := []milestone{
@@ -246,7 +246,7 @@ port = 13738
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("start noodle: %v", err)
 	}
-	t.Logf("noodle started (pid %d)", cmd.Process.Pid)
+	t.Logf("shinfactory started (pid %d)", cmd.Process.Pid)
 
 	const baseURL = "http://127.0.0.1:13738"
 	if err := waitForServer(t, baseURL, 15*time.Second); err != nil {
@@ -327,7 +327,7 @@ func TestSmokeStartOnceWithoutSkillsInEmptyRepo(t *testing.T) {
 	statusCmd.Env = append(os.Environ(), "NOODLE_NO_BROWSER=1")
 	statusOut, err := statusCmd.CombinedOutput()
 	if err != nil {
-		t.Fatalf("noodle status in empty repo: %v\noutput:\n%s", err, string(statusOut))
+		t.Fatalf("shinfactory status in empty repo: %v\noutput:\n%s", err, string(statusOut))
 	}
 	t.Logf("status output:\n%s", strings.TrimSpace(string(statusOut)))
 	if !strings.Contains(string(statusOut), "loop=") {
@@ -582,7 +582,7 @@ port = 13739
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("start noodle: %v", err)
 	}
-	t.Logf("noodle started (pid %d)", cmd.Process.Pid)
+	t.Logf("shinfactory started (pid %d)", cmd.Process.Pid)
 
 	// The scheduler should produce orders even with no non-schedule task types.
 	milestones := []milestone{
@@ -648,7 +648,7 @@ func assertOrdersExist(t *testing.T, projectDir string) {
 }
 
 // TestSmokeInstallMd validates the INSTALL.md onboarding flow end-to-end:
-// codex reads INSTALL.md, scaffolds the project, then noodle start --once
+// codex reads INSTALL.md, scaffolds the project, then shinfactory start --once
 // succeeds with a populated mise.json.
 func TestSmokeInstallMd(t *testing.T) {
 	preflight(t)
@@ -707,15 +707,15 @@ Complete the setup end-to-end and then report completion.`, installMd)
 	run(t, dir, "git", "add", "-A")
 	run(t, dir, "git", "commit", "--allow-empty", "-m", "codex install scaffolding")
 
-	// Run noodle start --once — validates the install produced a working setup.
+	// Run shinfactory start --once — validates the install produced a working setup.
 	startCmd := exec.Command(noodleBin, "start", "--once")
 	startCmd.Dir = dir
 	startCmd.Env = append(os.Environ(), "NOODLE_NO_BROWSER=1")
 
 	startOut, startErr := startCmd.CombinedOutput()
-	t.Logf("noodle start --once output:\n%s", string(startOut))
+	t.Logf("shinfactory start --once output:\n%s", string(startOut))
 	if startErr != nil {
-		t.Fatalf("noodle start --once failed: %v\noutput:\n%s", startErr, string(startOut))
+		t.Fatalf("shinfactory start --once failed: %v\noutput:\n%s", startErr, string(startOut))
 	}
 
 	// Assertion: .noodle/mise.json exists and parses as valid JSON.

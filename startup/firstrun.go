@@ -55,13 +55,13 @@ paths = [".agents/skills"]
 	}
 
 	if created {
-		fmt.Fprint(w, `Noodle initialized.
+		fmt.Fprint(w, `shinfactory initialized.
 
 Created .noodle/ directory and .noodle.toml config.
 
 Next steps:
   Point your coding agent at INSTALL.md to set up skills and config.
-  Open the web UI at the configured address, or run "noodle status" for CLI.
+  Open the web UI at the configured address, or run "shinfactory status" for CLI.
 `)
 	}
 

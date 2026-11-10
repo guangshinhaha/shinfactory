@@ -33,15 +33,15 @@ Each tool works without the other two and stays compatible when they are present
 Give this to your agent:
 
 ```md
-Install Noodle and set up this project. Follow the instructions at
-https://raw.githubusercontent.com/poteto/noodle/main/INSTALL.md
+Install shinfactory and set up this project. Follow the instructions at
+https://raw.githubusercontent.com/guangshinhaha/shinfactory/main/INSTALL.md
 ```
 
-Or follow the [getting started guide](https://noodle-run.github.io/noodle/getting-started) to set up manually.
+Or follow the [getting started guide](docs/getting-started.md) to set up manually.
 
 ## Docs
 
-Full documentation lives at [noodle-run.github.io/noodle](https://noodle-run.github.io/noodle/).
+Full documentation lives in [`docs/`](docs/).
 
 Factory concepts for this repo:
 

@@ -24,7 +24,7 @@ Extends the minimal example with custom task types. Adds `test` and `deploy` ski
 
 ```sh
 cd examples/minimal   # or examples/multi-skill
-noodle start
+shinfactory start
 ```
 
 Noodle reads `.noodle.toml`, discovers skills in `.agents/skills/`, and begins the schedule-execute loop.

@@ -1,12 +1,12 @@
 # Skills
 
-Skills are all you need to extend Noodle. Every behavior an agent can perform is a skill: scheduling work, implementing tasks, reviewing code, reflecting on mistakes.
+Skills are all you need to extend shinfactory. Every behavior an agent can perform is a skill: scheduling work, implementing tasks, reviewing code, reflecting on mistakes.
 
 For why this matters, see the [Introduction](/introduction).
 
 ## The `schedule:` field
 
-The `schedule:` field in the frontmatter is what makes a skill run autonomously. Noodle discovers every skill with a `schedule:` field and feeds those descriptions to the scheduler agent as context. The scheduler reads them alongside the current project state and decides what to dispatch.
+The `schedule:` field in the frontmatter is what makes a skill run autonomously. shinfactory discovers every skill with a `schedule:` field and feeds those descriptions to the scheduler agent as context. The scheduler reads them alongside the current project state and decides what to dispatch.
 
 ```yaml
 ---
@@ -36,7 +36,7 @@ description: >
 ---
 ```
 
-A skill **with** `schedule:` runs autonomously in the noodle loop. The scheduling agent reads the `schedule:` value, matches it against current conditions, and creates orders when the trigger fits. Some examples:
+A skill **with** `schedule:` runs autonomously in the shinfactory loop. The scheduling agent reads the `schedule:` value, matches it against current conditions, and creates orders when the trigger fits. Some examples:
 
 ```yaml
 # execute: runs when there's work to do
@@ -57,7 +57,7 @@ The scheduler does not parse these strings mechanically. It reads them as prose 
 
 ## Skill Discovery
 
-Noodle discovers skills by scanning configured search paths. The default is `.agents/skills/`. Configure additional paths in `.noodle.toml`:
+shinfactory discovers skills by scanning configured search paths. The default is `.agents/skills/`. Configure additional paths in `.noodle.toml`:
 
 ```toml
 [skills]
@@ -68,7 +68,7 @@ A directory counts as a skill only if it contains a `SKILL.md` file.
 
 ### Resolution Order
 
-When resolving a skill by name, Noodle walks the `paths` list top to bottom:
+When resolving a skill by name, shinfactory walks the `paths` list top to bottom:
 
 1. Check if `<path>/<name>/` exists and contains a `SKILL.md`
 2. If yes, use this skill. Stop.

@@ -1,6 +1,6 @@
 # Adapters
 
-Adapters bridge external systems into Noodle's backlog. If your team tracks work in GitHub Issues, Linear, Jira, or somewhere else, an adapter syncs those items so Noodle can schedule and execute them.
+Adapters bridge external systems into shinfactory's backlog. If your team tracks work in GitHub Issues, Linear, Jira, or somewhere else, an adapter syncs those items so shinfactory can schedule and execute them.
 
 The default backlog is a markdown file (`brain/todos.md`). You don't need an adapter if that's all you use. Adapters are for when your tickets already live somewhere else and you don't want to duplicate them.
 
@@ -8,7 +8,7 @@ The default backlog is a markdown file (`brain/todos.md`). You don't need an ada
 
 An adapter is a set of commands configured in `.noodle.toml`. Each command handles one operation:
 
-- **sync**: pulls items from the external source into Noodle's backlog format
+- **sync**: pulls items from the external source into shinfactory's backlog format
 - **done**: marks an item complete in the external system
 - **add** _(planned)_: creates a new item in the external system
 - **edit** _(planned)_: updates an existing item
@@ -67,14 +67,14 @@ Only `id` and `title` are required. Everything else — any field, any type — 
 | -------- | ------ | -------- | ---------------------------------- |
 | `id`     | string | yes      | unique identifier                  |
 | `title`  | string | yes      | item title                         |
-| `status` | string | no       | used by Noodle to filter done items |
-| `plan`   | string | no       | used by Noodle to read plan files  |
+| `status` | string | no       | used by shinfactory to filter done items |
+| `plan`   | string | no       | used by shinfactory to read plan files  |
 
-`status` and `plan` are the only optional fields Noodle interprets. All other fields (e.g. `tags`, `section`, `estimate`, `priority`, or anything your system tracks) are passed through as-is. The scheduler sees them in mise.json and can use them for context, but Noodle itself doesn't act on them.
+`status` and `plan` are the only optional fields shinfactory interprets. All other fields (e.g. `tags`, `section`, `estimate`, `priority`, or anything your system tracks) are passed through as-is. The scheduler sees them in mise.json and can use them for context, but shinfactory itself doesn't act on them.
 
 ### `done`
 
-Noodle calls your `done` command when an order completes, passing the item ID as the first argument. Your command should mark that item complete in your external system. No stdin, no output expected.
+shinfactory calls your `done` command when an order completes, passing the item ID as the first argument. Your command should mark that item complete in your external system. No stdin, no output expected.
 
 ```
 my-adapters/backlog-done <id>
@@ -82,15 +82,15 @@ my-adapters/backlog-done <id>
 
 ### `add` _(planned)_
 
-Not yet called by the noodle loop. When implemented, your `add` command will receive JSON on stdin (`title`, plus optional `section`; the ready-made GitHub adapter also takes `body`) and should create the item in your external system, then print the new item's ID to stdout.
+Not yet called by the shinfactory loop. When implemented, your `add` command will receive JSON on stdin (`title`, plus optional `section`; the ready-made GitHub adapter also takes `body`) and should create the item in your external system, then print the new item's ID to stdout.
 
 ### `edit` _(planned)_
 
-Not yet called by the noodle loop. When implemented, your `edit` command will receive the item ID as the first argument and JSON on stdin with the new values.
+Not yet called by the shinfactory loop. When implemented, your `edit` command will receive the item ID as the first argument and JSON on stdin with the new values.
 
 ## Validation
 
-Noodle validates each NDJSON line from the sync command individually. Invalid items are skipped — they don't block the rest of the backlog from processing.
+shinfactory validates each NDJSON line from the sync command individually. Invalid items are skipped — they don't block the rest of the backlog from processing.
 
 **What gets validated:**
 - Each line must be valid JSON

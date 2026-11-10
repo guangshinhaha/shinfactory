@@ -27,14 +27,14 @@ async function pollSnapshotForActiveWorktreeAgent(
   throw new Error("no active non-schedule session with worktree_name found in snapshot within 30s");
 }
 
-test.describe("Noodle UI smoke", () => {
+test.describe("shinfactory UI smoke", () => {
   test("channel layout loads with sidebar, feed, and context panel", async ({ page }) => {
     await page.goto("/");
     const sidebar = page.locator("aside.sidebar");
     await expect(sidebar).toBeVisible();
 
-    // NOODLE header visible in sidebar
-    await expect(sidebar.getByText("NOODLE", { exact: true })).toBeVisible();
+    // SHINFACTORY header visible in sidebar
+    await expect(sidebar.getByText("SHINFACTORY", { exact: true })).toBeVisible();
 
     // Nav links visible
     await expect(sidebar.getByRole("link", { name: "Dashboard" })).toBeVisible();

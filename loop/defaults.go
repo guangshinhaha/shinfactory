@@ -83,7 +83,7 @@ func defaultDependencies(projectDir, runtimeDir, noodleBin string, cfg config.Co
 	wtApp, _ := worktree.NewApp()
 	var wt WorktreeManager
 	if wtApp != nil {
-		wtApp.CmdPrefix = "noodle worktree"
+		wtApp.CmdPrefix = "shinfactory worktree"
 		wtApp.Quiet = true
 		wt = wtApp
 	} else {

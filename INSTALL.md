@@ -1,16 +1,16 @@
-# Install Noodle
+# Install shinfactory
 
-Noodle is a skill-based agent orchestration framework. You write skills (markdown files describing what an agent should do) and Noodle's loop schedules and runs them. Think kitchen brigade: a head chef (the scheduler) reads the backlog, writes orders, and dispatches line cooks (agents) to do the work in isolated worktrees.
+shinfactory is a skill-based agent orchestration framework. You write skills (markdown files describing what an agent should do) and shinfactory's loop schedules and runs them. Think kitchen brigade: a head chef (the scheduler) reads the backlog, writes orders, and dispatches line cooks (agents) to do the work in isolated worktrees.
 
 ## How the loop works
 
 The scheduler reads `.noodle/mise.json` (project state: backlog, active agents, history, registered skills) and writes `.noodle/orders-next.json`. The loop promotes orders and spawns agent sessions. Each agent gets a skill loaded as its instructions. When the agent finishes, its worktree merges back.
 
-The minimum loop is schedule then execute. Noodle handles merging completed work back to main. You can add more stages (quality review, reflection, etc.) by writing skills for them.
+The minimum loop is schedule then execute. shinfactory handles merging completed work back to main. You can add more stages (quality review, reflection, etc.) by writing skills for them.
 
 ## The `schedule` frontmatter field
 
-Noodle adds one thing to skills: a `schedule` field in the YAML frontmatter. Skills without it work normally (agents invoke them directly). Skills with it become autonomous. The scheduler reads the `schedule` value as prose and decides when conditions are met.
+shinfactory adds one thing to skills: a `schedule` field in the YAML frontmatter. Skills without it work normally (agents invoke them directly). Skills with it become autonomous. The scheduler reads the `schedule` value as prose and decides when conditions are met.
 
 ```yaml
 schedule: "After execute completes and all tests pass."
@@ -26,14 +26,20 @@ Work through these steps in order. Each has a skip condition. If the check passe
 
 ### 1. Install the binary
 
-**Skip if:** `noodle --version` succeeds.
+**Skip if:** `shinfactory --version` succeeds.
 
-Detect the platform and install:
+shinfactory has no published release yet, so build it from source. You need **Git**, **Go** (the version in `go.mod`), **Node** and **pnpm**.
 
-- **macOS:** `brew install poteto/tap/noodle`
-- **Linux/Windows:** Download the binary for your platform from `https://github.com/poteto/noodle/releases/latest` and place it on PATH.
+```sh
+git clone https://github.com/guangshinhaha/shinfactory.git
+cd shinfactory
+pnpm install
+pnpm build
+```
 
-Verify: `noodle --version` prints a version string.
+`pnpm build` writes the binary to `bin/shinfactory`. Put it on PATH (for example, copy it to `/usr/local/bin/`).
+
+Verify: `shinfactory --version` prints a version string.
 
 ### 2. Install the noodle skill
 
@@ -46,9 +52,9 @@ The noodle skill teaches agents how to use the CLI and write skills. Copy this o
 Fetch these files from GitHub:
 
 ```
-https://raw.githubusercontent.com/poteto/noodle/main/.agents/skills/noodle/SKILL.md
-https://raw.githubusercontent.com/poteto/noodle/main/.agents/skills/noodle/references/skill-authoring.md
-https://raw.githubusercontent.com/poteto/noodle/main/.agents/skills/noodle/references/configuration.md
+https://raw.githubusercontent.com/guangshinhaha/shinfactory/main/.agents/skills/noodle/SKILL.md
+https://raw.githubusercontent.com/guangshinhaha/shinfactory/main/.agents/skills/noodle/references/skill-authoring.md
+https://raw.githubusercontent.com/guangshinhaha/shinfactory/main/.agents/skills/noodle/references/configuration.md
 ```
 
 Write them to the same paths under the project root (`.agents/skills/noodle/...`). Create directories as needed.
@@ -98,15 +104,15 @@ edit = "adapters/backlog-edit"
 Then fetch the default adapter scripts from GitHub and write them to `adapters/`:
 
 ```
-https://raw.githubusercontent.com/poteto/noodle/main/defaults/adapters/backlog-sync
-https://raw.githubusercontent.com/poteto/noodle/main/defaults/adapters/backlog-add
-https://raw.githubusercontent.com/poteto/noodle/main/defaults/adapters/backlog-done
-https://raw.githubusercontent.com/poteto/noodle/main/defaults/adapters/backlog-edit
+https://raw.githubusercontent.com/guangshinhaha/shinfactory/main/defaults/adapters/backlog-sync
+https://raw.githubusercontent.com/guangshinhaha/shinfactory/main/defaults/adapters/backlog-add
+https://raw.githubusercontent.com/guangshinhaha/shinfactory/main/defaults/adapters/backlog-done
+https://raw.githubusercontent.com/guangshinhaha/shinfactory/main/defaults/adapters/backlog-edit
 ```
 
 Create `adapters/` and write each file there. Make them executable (`chmod +x`).
 
-Minimal config. The user can expand it later. See [the configuration reference](https://poteto.github.io/noodle/reference/configuration) for all options.
+Minimal config. The user can expand it later. See [the configuration reference](https://github.com/guangshinhaha/shinfactory/blob/main/docs/reference/configuration.md) for all options.
 
 ### 4. Add .noodle/ to .gitignore
 
@@ -115,7 +121,7 @@ Minimal config. The user can expand it later. See [the configuration reference](
 Grep `.gitignore` for `.noodle/`. If absent (or `.gitignore` doesn't exist), append:
 
 ```
-# Noodle runtime state
+# shinfactory runtime state
 .noodle/
 ```
 
@@ -125,13 +131,13 @@ Grep `.gitignore` for `.noodle/`. If absent (or `.gitignore` doesn't exist), app
 
 Start by understanding how your human works. Read the conversation history in `~/.claude/` and `~/.codex/` for this project. Look at what commands they run, how they test, how they review code, what they ask agents to do repeatedly. This is the ground truth for what the skills should encode. Existing code, CI config, and test commands fill in the rest.
 
-Then browse `https://github.com/poteto/noodle/tree/main/.agents/skills/` for patterns. Use Noodle's own schedule and execute skills as starting points, but adapt them to this project. Don't copy. The noodle skill's reference docs (from step 2) cover the orders schema and CLI details.
+Then browse `https://github.com/guangshinhaha/shinfactory/tree/main/.agents/skills/` for patterns. Use shinfactory's own schedule and execute skills as starting points, but adapt them to this project. Don't copy. The noodle skill's reference docs (from step 2) cover the orders schema and CLI details.
 
 Skills describe process, not individual tasks. The order tells the agent *what* to do. The skill tells it *how*. Everything in the skill should be reusable across every backlog item. Don't bake current task details into the skill, and don't use the current backlog item in examples. Use generic placeholders instead.
 
-**Schedule skill** (`schedule/SKILL.md`): Reads project state and writes orders. Reads the backlog from `.noodle/mise.json` (synced from `todos.md` or the configured backlog adapter). Writes `orders-next.json`, not `orders.json` directly. Use `noodle schema orders` to get the schema. Routes to providers/models based on `routing.defaults` in `.noodle.toml`. Include a `schedule` frontmatter field, something like "when orders are empty, after backlog changes, or when session history suggests re-evaluation."
+**Schedule skill** (`schedule/SKILL.md`): Reads project state and writes orders. Reads the backlog from `.noodle/mise.json` (synced from `todos.md` or the configured backlog adapter). Writes `orders-next.json`, not `orders.json` directly. Use `shinfactory schema orders` to get the schema. Routes to providers/models based on `routing.defaults` in `.noodle.toml`. Include a `schedule` frontmatter field, something like "when orders are empty, after backlog changes, or when session history suggests re-evaluation."
 
-**Execute skill** (`execute/SKILL.md`): Describes how work gets done, not what work to do. The order's prompt provides task context at runtime. The skill covers: worktree workflow (`noodle worktree create/merge`, never on main), verification commands for this project's stack, commit conventions, and scope discipline. Don't include sections about specific features or domains (like "for auth work, do X"). Include a `schedule` frontmatter field, something like "when backlog items are ready for implementation."
+**Execute skill** (`execute/SKILL.md`): Describes how work gets done, not what work to do. The order's prompt provides task context at runtime. The skill covers: worktree workflow (`shinfactory worktree create/merge`, never on main), verification commands for this project's stack, commit conventions, and scope discipline. Don't include sections about specific features or domains (like "for auth work, do X"). Include a `schedule` frontmatter field, something like "when backlog items are ready for implementation."
 
 ### 6. Seed the backlog
 
@@ -165,7 +171,7 @@ If no, move on.
 Tell the user to start the loop:
 
 ```
-noodle start
+shinfactory start
 ```
 
-Noodle scaffolds `.noodle/` runtime state, the scheduler reads the backlog, and the loop begins.
+shinfactory scaffolds `.noodle/` runtime state, the scheduler reads the backlog, and the loop begins.

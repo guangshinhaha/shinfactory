@@ -117,7 +117,7 @@ Cloud runtime using Cursor background agents.
 
 ## `[adapters.<name>]`
 
-Adapters bridge external systems into the backlog. See https://poteto.github.io/noodle/concepts/adapters for the full guide.
+Adapters bridge external systems into the backlog. See https://github.com/guangshinhaha/shinfactory/blob/main/docs/concepts/adapters.md for the full guide.
 
 | Field | Type | Description |
 |-------|------|-------------|

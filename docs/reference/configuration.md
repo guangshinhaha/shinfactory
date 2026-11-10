@@ -1,6 +1,6 @@
 # Configuration
 
-Noodle is configured through a `.noodle.toml` file at the root of your project. When no config file exists, Noodle uses sensible defaults for all values.
+shinfactory is configured through a `.noodle.toml` file at the root of your project. When no config file exists, shinfactory uses sensible defaults for all values.
 
 ## Minimal config
 
@@ -56,7 +56,7 @@ Maps a role (`scheduler`, `planner`, `builder`, `explorer`, `reviewer`, `adversa
 
 ### `[skills]`
 
-Configures where Noodle discovers skill definitions.
+Configures where shinfactory discovers skill definitions.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
@@ -240,7 +240,7 @@ enabled = true
 
 ### `[adapters.<name>]`
 
-Adapters bridge external systems (issue trackers, project boards) into Noodle's backlog. Each adapter is a named table mapping a skill to a set of shell scripts.
+Adapters bridge external systems (issue trackers, project boards) into shinfactory's backlog. Each adapter is a named table mapping a skill to a set of shell scripts.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|

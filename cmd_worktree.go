@@ -24,7 +24,7 @@ var newWorktreeCommandApp = func() (worktreeCommandApp, error) {
 	if err != nil {
 		return nil, err
 	}
-	app.CmdPrefix = "noodle worktree"
+	app.CmdPrefix = "shinfactory worktree"
 	return app, nil
 }
 

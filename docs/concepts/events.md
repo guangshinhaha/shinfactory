@@ -1,35 +1,35 @@
 # Events
 
-Events are how the noodle loop tracks what happened and how external systems feed information into Noodle. The scheduler reads recent events alongside backlog state and decides how to react.
+Events are how the shinfactory loop tracks what happened and how external systems feed information into shinfactory. The scheduler reads recent events alongside backlog state and decides how to react.
 
-Noodle emits internal events automatically (stage completed, order failed, merge conflict). You can inject your own events from CI pipelines, deploy scripts, monitoring tools, or anything else.
+shinfactory emits internal events automatically (stage completed, order failed, merge conflict). You can inject your own events from CI pipelines, deploy scripts, monitoring tools, or anything else.
 
 ## Emitting events
 
-Use the CLI to send an event into the noodle loop:
+Use the CLI to send an event into the shinfactory loop:
 
 ```bash
-noodle event emit <type> [--payload <json>]
+shinfactory event emit <type> [--payload <json>]
 ```
 
 The type can be any string. The payload is optional JSON with whatever context is relevant.
 
 ```bash
 # CI pipeline failed
-noodle event emit ci.failed --payload '{"build_url": "https://ci.example.com/123", "reason": "tests failed"}'
+shinfactory event emit ci.failed --payload '{"build_url": "https://ci.example.com/123", "reason": "tests failed"}'
 
 # Deploy completed
-noodle event emit deploy.completed --payload '{"env": "prod", "version": "v1.2.3"}'
+shinfactory event emit deploy.completed --payload '{"env": "prod", "version": "v1.2.3"}'
 
 # Flaky test detected
-noodle event emit test.flaky --payload '{"test": "test_login_timeout", "failures": 3}'
+shinfactory event emit test.flaky --payload '{"test": "test_login_timeout", "failures": 3}'
 ```
 
-Events append to `.noodle/loop-events.ndjson`. The next time Noodle builds the mise, recent events appear in the `recent_events` array for the scheduler to read.
+Events append to `.noodle/loop-events.ndjson`. The next time shinfactory builds the mise, recent events appear in the `recent_events` array for the scheduler to read.
 
 ## Internal events
 
-The noodle loop emits these automatically:
+The shinfactory loop emits these automatically:
 
 | Event type | When |
 | --- | --- |
@@ -58,7 +58,7 @@ There is no mechanical trigger matching. The scheduler is an agent. It reads the
 Events can also target a specific agent session:
 
 ```bash
-noodle event emit stage_message --session <session_id> --payload '{"message": "Implementation complete"}'
+shinfactory event emit stage_message --session <session_id> --payload '{"message": "Implementation complete"}'
 ```
 
 Session events write to `.noodle/sessions/<session_id>/events.ndjson` instead of the loop event log. These are used for agent-to-loop communication during a running stage.

@@ -7,7 +7,7 @@ declare const __NOODLE_VERSION__: string;
 const version = __NOODLE_VERSION__;
 const copied = ref(false);
 const promptText =
-  "Install Noodle and set up this project. Follow\nhttps://raw.githubusercontent.com/poteto/noodle/main/INSTALL.md";
+  "Install shinfactory and set up this project. Follow\nhttps://raw.githubusercontent.com/guangshinhaha/shinfactory/main/INSTALL.md";
 
 function copyPrompt() {
   navigator.clipboard.writeText(promptText).then(() => {
@@ -36,7 +36,7 @@ function copyPrompt() {
         <div class="header-right">
           <div class="divider-v"></div>
           <a
-            href="https://github.com/poteto/noodle"
+            href="https://github.com/guangshinhaha/shinfactory"
             class="github-link"
             target="_blank"
             rel="noopener"
@@ -78,7 +78,7 @@ function copyPrompt() {
           </h2>
 
           <p class="hero-sub hero-desc">
-            Orchestrate agents using skills. Noodle handles the rest.
+            Orchestrate agents using skills. shinfactory handles the rest.
           </p>
 
           <div class="hero-cta cta-row">
@@ -99,7 +99,7 @@ function copyPrompt() {
               </svg>
             </a>
             <a
-              href="https://github.com/poteto/noodle"
+              href="https://github.com/guangshinhaha/shinfactory"
               class="btn-secondary"
               target="_blank"
               rel="noopener"
@@ -129,8 +129,8 @@ function copyPrompt() {
             <div class="quickstart-block">
               <pre
                 class="quickstart-pre"
-              ><code>Install Noodle and set up this project. Follow
-<a href="https://raw.githubusercontent.com/poteto/noodle/main/INSTALL.md" target="_blank" rel="noopener" class="quickstart-url">https://raw.githubusercontent.com/poteto/noodle/main/INSTALL.md</a></code></pre>
+              ><code>Install shinfactory and set up this project. Follow
+<a href="https://raw.githubusercontent.com/guangshinhaha/shinfactory/main/INSTALL.md" target="_blank" rel="noopener" class="quickstart-url">https://raw.githubusercontent.com/guangshinhaha/shinfactory/main/INSTALL.md</a></code></pre>
               <button class="quickstart-copy" @click="copyPrompt">
                 {{ copied ? "Copied!" : "Copy" }}
               </button>

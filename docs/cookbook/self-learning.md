@@ -1,6 +1,6 @@
 # Self-Learning
 
-This page describes the [brainmaxxing](https://github.com/poteto/brainmaxxing) skill pack, an optional addon that gives Noodle agents persistent memory across sessions. Brainmaxxing is not part of Noodle's core. The noodle loop works without it.
+This page describes the [brainmaxxing](https://github.com/poteto/brainmaxxing) skill pack, an optional addon that gives shinfactory agents persistent memory across sessions. Brainmaxxing is not part of shinfactory's core. The shinfactory loop works without it.
 
 Brainmaxxing adds three skills that form a self-learning loop on top of the [brain](/concepts/brain) (an Obsidian-compatible directory of markdown files). Together they make the brain get better over time: reflect, meditate, and ruminate.
 

@@ -43,7 +43,7 @@ schedule: "When no active orders exist, after backlog changes, or when session h
 
 Read ` + "`.noodle/mise.json`" + `, write ` + "`.noodle/orders-next.json`" + `.
 The loop atomically promotes orders-next.json into orders.json — never write orders.json directly.
-Use ` + "`noodle schema mise`" + ` and ` + "`noodle schema orders`" + ` as the schema source of truth.
+Use ` + "`shinfactory schema mise`" + ` and ` + "`shinfactory schema orders`" + ` as the schema source of truth.
 
 Operate fully autonomously. Only ask the user when backlog is empty and there is no actionable work; ask whether they want a backlog-adapter setup order scheduled.
 
