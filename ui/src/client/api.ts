@@ -81,6 +81,19 @@ export async function sendControl(cmd: ControlCommand): Promise<ControlAck> {
   return jsonBody<ControlAck>(res);
 }
 
+export async function openInOrca(dispatchID: string): Promise<{ dispatch_id: string }> {
+  const res = await fetch("/api/orca/open", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ dispatch_id: dispatchID }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`openInOrca: ${res.status}${body ? ` — ${body.trim()}` : ""}`);
+  }
+  return jsonBody<{ dispatch_id: string }>(res);
+}
+
 export async function fetchConfig(): Promise<ConfigDefaults> {
   const res = await fetch("/api/config");
   if (!res.ok) {

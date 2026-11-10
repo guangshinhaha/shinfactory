@@ -115,6 +115,10 @@ export interface Stage {
   status: string;
   extra?: Record<string, unknown>;
   session_id?: string;
+  /**
+   * DispatchID is the Orca worker id; set only for stages run on the orca runtime.
+   */
+  dispatch_id?: string;
 }
 /**
  * EventLine is a single parsed event in a session trace.

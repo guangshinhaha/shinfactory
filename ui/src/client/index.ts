@@ -25,6 +25,7 @@ export {
   fetchSessionEvents,
   sendControl,
   fetchConfig,
+  openInOrca,
 } from "./api";
 export {
   connectWS,
@@ -41,6 +42,7 @@ export {
   useSessionEvents,
   useReviewDiff,
   useSendControl,
+  useOpenInOrca,
   useWSStatus,
 } from "./hooks";
 export { useConfig } from "./config";

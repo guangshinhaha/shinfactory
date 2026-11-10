@@ -49,6 +49,7 @@ type Server struct {
 	provider   LoopStateProvider
 	warnings   []string
 	ready      chan struct{}
+	runOrca    orcaRunner
 }
 
 // New creates a Server but does not start it.
@@ -84,6 +85,7 @@ func New(opts Options) *Server {
 		provider:   opts.LoopStateProvider,
 		warnings:   opts.Warnings,
 		ready:      make(chan struct{}),
+		runOrca:    runOrcaCLI,
 	}
 
 	mux := http.NewServeMux()
@@ -91,6 +93,7 @@ func New(opts Options) *Server {
 	mux.HandleFunc("GET /api/snapshot", s.handleSnapshot)
 	mux.HandleFunc("GET /api/sessions/{id}/events", s.handleSessionEvents)
 	mux.HandleFunc("POST /api/control", s.handleControl)
+	mux.HandleFunc("POST /api/orca/open", s.handleOrcaOpen)
 	mux.HandleFunc("GET /api/config", s.handleConfig)
 	mux.HandleFunc("GET /api/reviews/{id}/diff", s.handleReviewDiff)
 	mux.Handle("GET /", uiOrPlaceholder(opts.UI))

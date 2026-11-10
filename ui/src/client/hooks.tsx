@@ -9,7 +9,7 @@ import {
   getWSStatus,
 } from "./ws";
 import type { WSStatus } from "./ws";
-import { fetchSnapshot, fetchSessionEvents, sendControl, fetchReviewDiff } from "./api";
+import { fetchSnapshot, fetchSessionEvents, sendControl, fetchReviewDiff, openInOrca } from "./api";
 import { chooseNewerSnapshot } from "./snapshot-freshness";
 import type {
   Snapshot,
@@ -145,4 +145,9 @@ export function useSendControl() {
       }
     },
   });
+}
+
+/** Brings an orca-runtime stage's worker to the front in Orca. */
+export function useOpenInOrca() {
+  return useMutation<{ dispatch_id: string }, Error, string>({ mutationFn: openInOrca });
 }
