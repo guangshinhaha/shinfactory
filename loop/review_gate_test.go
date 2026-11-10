@@ -582,6 +582,7 @@ func (h *gateHarness) settleEvidence(t *testing.T) {
 
 func TestVerdictCommentFailureStopsTheMerge(t *testing.T) {
 	h := newGateHarness(t, "high", "execute", "quality", "verify")
+	verdictPostBackoff = 0
 	h.ln.verdictErr = errors.New("gh down")
 	h.next(t)
 	h.review(t, 0, "none")
@@ -589,6 +590,22 @@ func TestVerdictCommentFailureStopsTheMerge(t *testing.T) {
 	h.verdict(t, 0, VerdictPass, fixtureHead)
 	h.next(t)
 	h.failedWith(t, "verdict comment failed")
+	if h.ln.verdictTries != verdictPostAttempts {
+		t.Fatalf("tried the comment %d times, want %d before failing", h.ln.verdictTries, verdictPostAttempts)
+	}
+}
+
+func TestVerdictCommentFenceOutlastsBackticksInEvidence(t *testing.T) {
+	h := newGateHarness(t, "high", "execute", "quality", "verify")
+	h.next(t)
+	h.review(t, 0, "none")
+	h.next(t)
+	body := `{"head_sha": "` + fixtureHead + `", "verdict": "PASS", "evidence": "ran ` + "```go" + ` code"}`
+	h.write(t, 0, verifyFileName, body)
+	h.next(t)
+	if len(h.ln.verdicts) != 1 || !strings.Contains(h.ln.verdicts[0], "````json\n"+body+"\n````") {
+		t.Fatalf("comment %q does not wrap the file in a four-backtick fence", h.ln.verdicts)
+	}
 }
 
 func TestVerdictIsPostedOncePerFile(t *testing.T) {

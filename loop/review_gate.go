@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/guangshinhaha/shinfactory/internal/orderx"
 	"github.com/guangshinhaha/shinfactory/internal/state"
@@ -222,6 +223,11 @@ func (l *Loop) readVerdict(order Order, cook *cookHandle) (verifyVerdict, error)
 // crash and rerun does not comment twice.
 const verdictPostedFile = "verdict-posted"
 
+// verdictPostAttempts tries the comment this many times before failing the stage.
+const verdictPostAttempts = 3
+
+var verdictPostBackoff = 2 * time.Second
+
 // postVerdict carries the verifier's file to the PR as a comment, for gantry's
 // verdict-check to read. The loop never writes a verdict: the comment holds
 // the verifier's bytes unchanged.
@@ -230,11 +236,29 @@ func (l *Loop) postVerdict(ctx context.Context, order Order, cook *cookHandle, v
 	if done, err := os.ReadFile(marker); err == nil && string(done) == string(v.raw) {
 		return nil
 	}
-	body := "Verify verdict at head " + v.HeadSHA + ", copied from the verify stage's file:\n\n```json\n" +
-		strings.TrimSpace(string(v.raw)) + "\n```\n"
+	raw := strings.TrimSpace(string(v.raw))
+	fence := "```"
+	for strings.Contains(raw, fence) {
+		fence += "`" // evidence may quote code; the fence must outlast any backtick run in it
+	}
+	body := "Verify verdict at head " + v.HeadSHA + ", copied from the verify stage's file:\n\n" + fence + "json\n" + raw + "\n" + fence + "\n"
 	ctx, cancel := context.WithTimeout(ctx, shipTimeout)
 	defer cancel()
-	if err := l.lander().PostVerdict(ctx, cook.worktreePath, l.prSpec(order, cook).Branch, body); err != nil {
+	// Push first (a no-op when nothing is new): the PR must exist and sit at
+	// the head the verifier judged. Targeting the PR by URL keeps an older
+	// closed PR on the same branch name out of it.
+	pr, err := l.lander().PushAndEnsureDraft(ctx, cook.worktreePath, l.prSpec(order, cook))
+	if err != nil {
+		return fmt.Errorf("push before posting the verify verdict: %w", err)
+	}
+	for attempt := 1; ; attempt++ {
+		err = l.lander().PostVerdict(ctx, cook.worktreePath, pr, body)
+		if err == nil || attempt == verdictPostAttempts {
+			break
+		}
+		time.Sleep(verdictPostBackoff) // a transient gh error must not kill a verified order
+	}
+	if err != nil {
 		return fmt.Errorf("post verify verdict on the PR: %w", err)
 	}
 	if err := os.WriteFile(marker, v.raw, 0o644); err != nil {

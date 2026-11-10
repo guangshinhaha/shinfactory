@@ -33,6 +33,8 @@ type fakeLander struct {
 	// verdicts are the bodies PostVerdict received; verdictErr fails it.
 	verdicts   []string
 	verdictErr error
+	// verdictTries counts PostVerdict calls, failed ones included.
+	verdictTries int
 	// probeFiles is what ConflictingFiles reports.
 	probeFiles []string
 }
@@ -42,7 +44,8 @@ func (f *fakeLander) RebaseOntoBase(context.Context, string, string) error {
 	return f.rebaseErr
 }
 
-func (f *fakeLander) PostVerdict(_ context.Context, _, _, body string) error {
+func (f *fakeLander) PostVerdict(_ context.Context, _ string, _ PullRequest, body string) error {
+	f.verdictTries++
 	if f.verdictErr != nil {
 		return f.verdictErr
 	}
