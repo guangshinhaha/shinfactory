@@ -159,11 +159,12 @@ func (l *Loop) requeueAfterUsageLimit(cook *cookHandle) error {
 	runtimeName := nonEmpty(cook.dispatchedRuntime, l.stageRuntime(cook.stage))
 	reason := nonEmpty(cook.session.Outcome().Reason, "usage limit reached")
 	l.holdRuntime(runtimeName, reason)
-	// The launch never got to work: it must not eat the order's max_attempts.
+	// The account ran out, not the stage: the launch must not eat max_attempts.
 	if order, ok := l.orderByID(cook.orderID); ok {
 		l.refundStageLaunch(cook.orderID, spendTaskKey(cook.stage), order.Round)
 	}
 	if n := l.limitRequeues.bump(cook.orderID, cook.stageIndex); n > l.usageLimitRequeueCap() {
+		l.limitRequeues.reset(cook.orderID, cook.stageIndex)
 		return l.failStage(nil, cook, fmt.Sprintf("stage was requeued after the usage limit %d times: %s", n, reason))
 	}
 	if err := l.resetStageToPending(cook.orderID, cook.stageIndex, reason); err != nil {

@@ -87,13 +87,15 @@ func (l *Loop) recordStageLaunch(orderID, taskKey string, round int) {
 }
 
 // refundStageLaunch takes back one launch counted by recordStageLaunch, for a
-// launch that died on a usage limit before it could do any work.
+// launch that died on a usage limit. The account, not the stage, failed it, so
+// it must not eat max_attempts; the requeue bound still stops a stage that
+// keeps dying that way.
 func (l *Loop) refundStageLaunch(orderID, taskKey string, round int) {
 	orderSpendMu.Lock()
 	defer orderSpendMu.Unlock()
 	ledger := l.readOrderSpend()
 	spend, ok := ledger[orderID]
-	if !ok || round > spend.Round || spend.Attempts[taskKey] <= 0 {
+	if !ok || round != spend.Round || spend.Attempts[taskKey] <= 0 {
 		return
 	}
 	spend.Attempts[taskKey]--

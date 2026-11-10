@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os/exec"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -618,13 +619,16 @@ func (l *Loop) noteMergeabilityWait(orderID, detail string, now time.Time) bool 
 // stopUnknownMergeability ends an order whose PR GitHub never reported on:
 // the stage fails, action_needed names the PR, and the issue goes to a person.
 func (l *Loop) stopUnknownMergeability(ctx context.Context, cook *cookHandle, prURL string) error {
-	delete(l.mergeabilityUnknownSince, cook.orderID)
 	msg := fmt.Sprintf("GitHub has not computed mergeability for %s in %s, needs a person", prURL, unknownMergeabilityTimeout)
 	l.logger.Warn("PR mergeability unknown too long, stopping order", "order", cook.orderID, "pr", prURL)
 	flagErr := l.flagActionNeeded(cook.orderID + ": " + msg)
 	l.stopForPerson(ctx, cook.orderID,
 		"GitHub never reported whether the PR can merge. Check the PR, then put ready back. PR:", prURL)
-	return errors.Join(flagErr, l.failStage(ctx, cook, msg))
+	err := errors.Join(flagErr, l.failStage(ctx, cook, msg))
+	if err == nil {
+		delete(l.mergeabilityUnknownSince, cook.orderID)
+	}
+	return err
 }
 
 // retryAwaitingChecks merges parked PRs whose checks have finished. A PR whose
@@ -644,6 +648,13 @@ func (l *Loop) retryAwaitingChecks(ctx context.Context) error {
 		if strings.HasPrefix(pending.reason, approvedAwaitingChecksPrefix) ||
 			(auto && strings.HasPrefix(pending.reason, awaitingChecksPrefix)) {
 			waiting = append(waiting, pending)
+		}
+	}
+	// Forget orders that left the wait by another path (approved, rejected,
+	// skipped), so a later park starts a fresh clock.
+	for id := range l.mergeabilityUnknownSince {
+		if !slices.ContainsFunc(waiting, func(p *pendingReviewCook) bool { return p.orderID == id }) {
+			delete(l.mergeabilityUnknownSince, id)
 		}
 	}
 	if len(waiting) == 0 {
