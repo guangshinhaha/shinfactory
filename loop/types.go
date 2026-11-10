@@ -163,12 +163,6 @@ type Dependencies struct {
 	OrdersFile     string
 	OrdersNextFile string
 	StatusFile     string
-	// BacklogRetryBackoff is the first wait before retrying a transient backlog
-	// sync failure; it doubles per retry up to a cap. 0 = default.
-	BacklogRetryBackoff time.Duration
-	// BacklogRetrySleep waits between backlog retries; nil sleeps for real.
-	// Tests swap it to run a long outage without waiting.
-	BacklogRetrySleep func(ctx context.Context, d time.Duration) error
 }
 
 type Loop struct {
@@ -230,6 +224,7 @@ type Loop struct {
 
 	reconciledFailures []reconciledFailure
 	lastMiseWarnings   []string
+	backlogRetry       *backlogRetry // pending transient backlog failure; nil when synced
 	lastChecksPoll     time.Time // last time parked PRs were re-checked for merge
 
 	lastLoopFailure *LoopFailureEnvelope

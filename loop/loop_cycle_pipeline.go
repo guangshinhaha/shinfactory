@@ -15,9 +15,12 @@ const mergeBackpressureLimit = 128
 
 func (l *Loop) buildCycleBrief(ctx context.Context) (mise.Brief, []string, bool, bool, error) {
 	l.refreshAdoptedTargets()
-	brief, warnings, miseChanged, err := l.buildBriefWithRetry(ctx)
+	brief, warnings, miseChanged, waiting, err := l.buildBriefWithRetry(ctx)
 	if err != nil {
 		return mise.Brief{}, warnings, false, false, err
+	}
+	if waiting {
+		return mise.Brief{}, warnings, false, false, nil
 	}
 	if l.state != StateRunning && l.state != StateIdle {
 		return brief, warnings, false, miseChanged, nil
@@ -492,46 +495,59 @@ func isTransientBacklogError(err error) bool {
 	return false
 }
 
-// buildBriefWithRetry builds the brief, retrying a transient backlog failure
-// with capped exponential backoff until the configured retry window has been
-// spent waiting (time inside the sync call itself is not counted). A persistent failure returns an error that says so.
-func (l *Loop) buildBriefWithRetry(ctx context.Context) (mise.Brief, []string, bool, error) {
-	wait := l.deps.BacklogRetryBackoff
-	if wait <= 0 {
-		wait = defaultBacklogRetryBackoff
-	}
-	sleep := l.deps.BacklogRetrySleep
-	if sleep == nil {
-		sleep = sleepContext
-	}
-	window := l.config.Backlog.RetryWindow()
-	var waited time.Duration
-	for attempt := 1; ; attempt++ {
-		brief, warnings, changed, err := l.deps.Mise.Build(ctx, l.snapshotActiveSummary(), l.snapshotRecentHistory())
-		if err == nil || ctx.Err() != nil || !isTransientBacklogError(err) {
-			return brief, warnings, changed, err
-		}
-		if waited >= window {
-			return brief, warnings, changed, fmt.Errorf("backlog sync still failing after %d attempts over %s: %w", attempt, waited.Round(time.Second), err)
-		}
-		step := min(wait, maxBacklogRetryBackoff, window-waited)
-		if l.logger != nil {
-			l.logger.Warn("backlog sync failed with a transient error; retrying",
-				"attempt", attempt, "retry_in", step.String(), "cause", err)
-		}
-		if err := sleep(ctx, step); err != nil {
-			return brief, warnings, changed, err
-		}
-		waited += step
-		wait = min(wait*2, maxBacklogRetryBackoff)
-	}
+// backlogRetry tracks a transient backlog sync failure across cycles. The loop
+// never sleeps inside a cycle: it records when the next try is due and returns,
+// so control commands and status stamps keep running during an outage.
+type backlogRetry struct {
+	firstFailure time.Time
+	nextAttempt  time.Time
+	attempts     int
+	backoff      time.Duration
 }
 
-func sleepContext(ctx context.Context, d time.Duration) error {
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-time.After(d):
-		return nil
+// buildBriefWithRetry builds the brief. A transient backlog failure starts (or
+// continues) a retry that spans cycles, with capped exponential backoff, until
+// the configured window has passed since the first failure. While a retry is
+// pending it returns waiting=true with a warning and no brief. A persistent
+// failure returns an error that says so.
+func (l *Loop) buildBriefWithRetry(ctx context.Context) (brief mise.Brief, warnings []string, changed, waiting bool, err error) {
+	now := l.deps.Now()
+	if r := l.backlogRetry; r != nil && now.Before(r.nextAttempt) {
+		return mise.Brief{}, []string{backlogRetryWarning(r, r.nextAttempt.Sub(now))}, false, true, nil
 	}
+	started := now
+	brief, warnings, changed, err = l.deps.Mise.Build(ctx, l.snapshotActiveSummary(), l.snapshotRecentHistory())
+	if ctx.Err() != nil {
+		return brief, warnings, changed, false, err
+	}
+	if err == nil || !isTransientBacklogError(err) {
+		l.backlogRetry = nil
+		return brief, warnings, changed, false, err
+	}
+	now = l.deps.Now()
+	r := l.backlogRetry
+	if r == nil {
+		r = &backlogRetry{firstFailure: started, backoff: defaultBacklogRetryBackoff}
+		l.backlogRetry = r
+	}
+	r.attempts++
+	window := l.config.Backlog.RetryWindow()
+	remaining := window - now.Sub(r.firstFailure)
+	if remaining <= 0 {
+		l.backlogRetry = nil
+		return brief, warnings, changed, false, fmt.Errorf("backlog sync still failing after %d attempts over %s: %w",
+			r.attempts, now.Sub(r.firstFailure).Round(time.Second), err)
+	}
+	step := min(r.backoff, maxBacklogRetryBackoff, remaining)
+	r.nextAttempt = now.Add(step)
+	r.backoff = min(r.backoff*2, maxBacklogRetryBackoff)
+	if l.logger != nil {
+		l.logger.Warn("backlog sync failed with a transient error; retrying",
+			"attempt", r.attempts, "retry_in", step.String(), "cause", err)
+	}
+	return mise.Brief{}, []string{backlogRetryWarning(r, step)}, false, true, nil
+}
+
+func backlogRetryWarning(r *backlogRetry, retryIn time.Duration) string {
+	return fmt.Sprintf("backlog sync failing (attempt %d); retrying in %s", r.attempts, retryIn.Round(time.Second))
 }

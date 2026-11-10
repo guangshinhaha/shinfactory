@@ -301,6 +301,19 @@ func normalizeParsedValues(config *Config, metadata toml.MetaData, diagnostics *
 		config.Spend.MaxCostUSD = defaultMaxOrderCostUSD
 	}
 
+	switch {
+	case config.Backlog.RetryWindowSeconds < 0:
+		appendNormalizedValueDiagnostic(diagnostics, "backlog.retry_window_seconds",
+			fmt.Sprintf("retry_window_seconds=%d is invalid; using %d", config.Backlog.RetryWindowSeconds, int(defaultBacklogRetryWindow.Seconds())),
+		)
+		config.Backlog.RetryWindowSeconds = int(defaultBacklogRetryWindow.Seconds())
+	case config.Backlog.RetryWindowSeconds > maxBacklogRetryWindowSeconds:
+		appendNormalizedValueDiagnostic(diagnostics, "backlog.retry_window_seconds",
+			fmt.Sprintf("retry_window_seconds=%d exceeds the maximum; using %d", config.Backlog.RetryWindowSeconds, maxBacklogRetryWindowSeconds),
+		)
+		config.Backlog.RetryWindowSeconds = maxBacklogRetryWindowSeconds
+	}
+
 	if strings.TrimSpace(config.Runtime.Default) == "" {
 		config.Runtime.Default = defaultRuntimeName
 	} else {
