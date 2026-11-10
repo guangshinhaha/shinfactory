@@ -12,6 +12,9 @@ import (
 	"time"
 )
 
+// pipeDrainGrace is how long after exit the read ends stay open.
+const pipeDrainGrace = 2 * time.Second
+
 // ProcessHandle wraps an os/exec.Cmd with lifecycle primitives for child
 // process management. It replaces what the tmux dispatcher provided: process isolation,
 // liveness checking, and graceful shutdown.
@@ -22,8 +25,9 @@ type ProcessHandle struct {
 	stdout io.ReadCloser
 	stderr io.ReadCloser
 
-	done     chan struct{}
-	doneOnce sync.Once
+	done       chan struct{}
+	drainGrace time.Duration
+	doneOnce   sync.Once
 
 	mu       sync.Mutex
 	exitCode int
@@ -40,6 +44,10 @@ type processMetadata struct {
 // StartProcess spawns a child process with process group isolation and
 // returns a handle for lifecycle management.
 func StartProcess(cmd *exec.Cmd) (*ProcessHandle, error) {
+	return startProcess(cmd, pipeDrainGrace)
+}
+
+func startProcess(cmd *exec.Cmd, drainGrace time.Duration) (*ProcessHandle, error) {
 	configureChildProcess(cmd)
 
 	stdin, err := cmd.StdinPipe()
@@ -50,10 +58,12 @@ func StartProcess(cmd *exec.Cmd) (*ProcessHandle, error) {
 	// child exits, which can discard output the reader has not read yet.
 	stdout, stdoutW, err := os.Pipe()
 	if err != nil {
+		_ = stdin.Close()
 		return nil, fmt.Errorf("create stdout pipe: %w", err)
 	}
 	stderr, stderrW, err := os.Pipe()
 	if err != nil {
+		_ = stdin.Close()
 		_ = stdout.Close()
 		_ = stdoutW.Close()
 		return nil, fmt.Errorf("create stderr pipe: %w", err)
@@ -65,17 +75,19 @@ func StartProcess(cmd *exec.Cmd) (*ProcessHandle, error) {
 	_ = stdoutW.Close()
 	_ = stderrW.Close()
 	if err != nil {
+		_ = stdin.Close()
 		_ = stdout.Close()
 		_ = stderr.Close()
 		return nil, ProcessStartError{Cause: err}
 	}
 
 	h := &ProcessHandle{
-		cmd:    cmd,
-		stdin:  stdin,
-		stdout: stdout,
-		stderr: stderr,
-		done:   make(chan struct{}),
+		cmd:        cmd,
+		stdin:      stdin,
+		stdout:     stdout,
+		stderr:     stderr,
+		done:       make(chan struct{}),
+		drainGrace: drainGrace,
 	}
 
 	go h.wait()
@@ -132,6 +144,13 @@ func (h *ProcessHandle) wait() {
 	}
 	h.mu.Unlock()
 	h.doneOnce.Do(func() { close(h.done) })
+	// Readers get a grace period to drain what the child wrote. After that,
+	// closing the read ends releases the fds and unblocks a reader stuck on a
+	// grandchild that inherited the pipe and outlived the child.
+	time.AfterFunc(h.drainGrace, func() {
+		_ = h.stdout.Close()
+		_ = h.stderr.Close()
+	})
 }
 
 // WriteProcessMetadata writes process.json to the session directory.

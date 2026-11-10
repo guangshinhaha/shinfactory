@@ -1,6 +1,7 @@
 package dispatcher
 
 import (
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -109,5 +110,31 @@ func TestWriteProcessMetadata(t *testing.T) {
 	want := `{"pid":12345,"session_id":"session-1","started_at":"2026-02-27T12:00:00Z"}`
 	if string(data) != want {
 		t.Fatalf("process.json =\n  %s\nwant\n  %s", data, want)
+	}
+}
+
+func TestProcessHandleReadEndsCloseAfterGraceWhenGrandchildHoldsPipe(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("needs a POSIX shell")
+	}
+	// The background sleep inherits stdout and outlives the shell.
+	h, err := startProcess(exec.Command("sh", "-c", "echo hi; sleep 30 &"), 100*time.Millisecond)
+	if err != nil {
+		t.Fatalf("StartProcess: %v", err)
+	}
+	t.Cleanup(func() { _ = h.ForceKill() })
+
+	read := make(chan string, 1)
+	go func() {
+		b, _ := io.ReadAll(h.Stdout())
+		read <- string(b)
+	}()
+	select {
+	case got := <-read:
+		if got != "hi\n" {
+			t.Fatalf("stdout = %q, want %q", got, "hi\n")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("stdout reader still blocked after the child exited")
 	}
 }
