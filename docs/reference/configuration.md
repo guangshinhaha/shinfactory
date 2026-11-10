@@ -94,8 +94,8 @@ Caps what one order may spend. Before each stage launch the loop checks the orde
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `max_attempts` | int | `3` | Times one order may launch the same stage |
-| `max_cost_usd` | float | `20` | Cost ceiling per order, summed from the cost its finished stages reported in their session logs |
+| `max_attempts` | int | `3` | Times one order may launch the same stage; `0` turns the cap off |
+| `max_cost_usd` | float | `20` | Cost ceiling per order, summed from the cost its finished stages reported in their session logs; `0` turns the cap off |
 
 ```toml
 [spend]

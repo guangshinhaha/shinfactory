@@ -17,8 +17,8 @@ func writesStage(paths ...string) Stage {
 }
 
 func TestStageWritesNormalizesPathsAndIgnoresBadValues(t *testing.T) {
-	got := stageWrites(writesStage("./brain/index.md", "brain//index.md", " ", "."))
-	want := []string{"brain/index.md", "brain/index.md"}
+	got := stageWrites(writesStage("./brain/index.md", "brain//index.md", " ", ".", "../x", "..", "a/../../y"))
+	want := []string{"brain/index.md", "brain/index.md", wholeRepoWrite}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("stageWrites = %v, want %v", got, want)
 	}
@@ -140,5 +140,11 @@ func TestParkedOrderHoldsFilesFromOrdersJSONAfterARestart(t *testing.T) {
 	h.l.cooks.pendingReview["a"] = &pendingReviewCook{cookIdentity: cookIdentity{orderID: "a", stageIndex: 0}}
 	if got := h.l.withoutWriteClashes([]dispatchCandidate{{OrderID: "b", Stage: writesStage("brain/index.md")}}); len(got) != 0 {
 		t.Fatalf("restarted parked order's file not held: kept %v", got)
+	}
+}
+
+func TestWholeRepoWriteOverlapsEveryPath(t *testing.T) {
+	if !writePathsOverlap(wholeRepoWrite, "brain/index.md") || !writePathsOverlap("a/b.go", wholeRepoWrite) {
+		t.Fatal("a bare . must overlap every path")
 	}
 }

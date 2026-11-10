@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/guangshinhaha/shinfactory/internal/orderx"
 )
@@ -224,6 +225,7 @@ func TestCheckTestFirst(t *testing.T) {
 		{"tests, docs, fix", []commitFiles{c("a", "web/app.spec.ts"), c("b", "README.md"), c("c", "x.go")}, true},
 		{"notes commit first is neutral", []commitFiles{c("a", "brain/note.md"), c("b", "x_test.go"), c("c", "x.go")}, true},
 		{"docs-only branch has no fix", []commitFiles{c("a", "x_test.go"), c("b", "README.md")}, false},
+		{"tests plus docs first, then fix", []commitFiles{c("a", "x_test.go", "README.md"), c("b", "x.go")}, true},
 		{"testdata counts as test", []commitFiles{c("a", "pkg/testdata/in.json"), c("b", "x.go")}, true},
 	}
 	for _, tc := range cases {
@@ -446,4 +448,14 @@ func TestSlowCheckDoesNotDelayAnotherOrdersCompletion(t *testing.T) {
 	}
 	close(release)
 	h.settleEvidence(t)
+}
+
+func TestTailNeverSplitsARune(t *testing.T) {
+	s := strings.Repeat("é", 10) // two bytes each
+	for n := 1; n <= len(s); n++ {
+		got := tail(s, n)
+		if !utf8.ValidString(got) {
+			t.Fatalf("tail(%d) = %q, not valid UTF-8", n, got)
+		}
+	}
 }

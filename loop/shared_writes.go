@@ -14,6 +14,10 @@ import (
 // and conflict at ship.
 const stageWritesKey = "writes"
 
+// wholeRepoWrite is the normalized form of a bare "." in extra.writes: the
+// stage may write anywhere, so it overlaps every other path.
+const wholeRepoWrite = "."
+
 // stageWrites returns the normalized shared paths a stage declares. A value
 // that is not a list of strings is ignored.
 func stageWrites(s Stage) []string {
@@ -27,9 +31,19 @@ func stageWrites(s Stage) []string {
 	}
 	out := make([]string, 0, len(paths))
 	for _, p := range paths {
-		p = path.Clean(strings.ReplaceAll(strings.TrimSpace(p), "\\", "/"))
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		p = path.Clean(strings.ReplaceAll(p, "\\", "/"))
 		p = strings.TrimPrefix(strings.TrimPrefix(p, "./"), "/")
-		if p != "" && p != "." {
+		switch {
+		case p == "" || p == ".":
+			// A bare "." names the whole repository.
+			out = append(out, wholeRepoWrite)
+		case p == ".." || strings.HasPrefix(p, "../"):
+			// A path outside the repository can't clash with another order's file.
+		default:
 			out = append(out, p)
 		}
 	}
@@ -86,6 +100,9 @@ func (l *Loop) sharedWriteHolders() []writeHold {
 // stage on a case-sensitive file system costs a wait, while missing a clash on
 // a case-insensitive one costs a conflict at ship.
 func writePathsOverlap(a, b string) bool {
+	if a == wholeRepoWrite || b == wholeRepoWrite {
+		return true
+	}
 	a, b = strings.ToLower(a), strings.ToLower(b)
 	return a == b || strings.HasPrefix(a, b+"/") || strings.HasPrefix(b, a+"/")
 }

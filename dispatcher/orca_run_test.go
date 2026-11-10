@@ -81,3 +81,29 @@ func TestRecoverOrphansScansEveryRecordedRun(t *testing.T) {
 		t.Fatalf("stopped = %v, want d1 and d2 from both readable runs", got)
 	}
 }
+
+// A session record with no run id is still recovered, against the factory's
+// own run, instead of being skipped and leaving its worker running.
+func TestRecoverOrphansUsesTheFactoryRunForARecordWithoutRunID(t *testing.T) {
+	dir := t.TempDir()
+	sd := filepath.Join(dir, "sessions", "s-d1")
+	if err := os.MkdirAll(sd, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(sd, "orca.json"), []byte(`{"dispatch_id":"d1"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stops []string
+	d := NewOrcaDispatcher(OrcaDispatcherConfig{ProjectDir: dir, RuntimeDir: dir, RunID: "run_x"})
+	d.run = func(_ context.Context, _ string, args ...string) ([]byte, error) {
+		if strings.Contains(strings.Join(args, " "), "worker-stop") {
+			stops = append(stops, args[len(args)-2])
+			return []byte(`{"ok":true,"result":{}}`), nil
+		}
+		return []byte(`{"result":{"workers":[{"dispatchId":"d1","state":"ready","outcome":"in_progress"}]}}`), nil
+	}
+	got, err := d.RecoverOrphans(context.Background())
+	if err != nil || strings.Join(got, ",") != "d1" {
+		t.Fatalf("stopped = %v, err = %v, want d1", got, err)
+	}
+}

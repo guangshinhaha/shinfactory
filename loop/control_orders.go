@@ -213,6 +213,8 @@ func (l *Loop) controlRequeue(orderID string) error {
 		}
 		break
 	}
+	// A requeue is a fresh start: a stale ledger would stop it at the old cap.
+	l.clearOrderSpend(orderID)
 	_ = l.events.Emit(LoopEventOrderRequeued, OrderRequeuedPayload{
 		OrderID: orderID,
 	})

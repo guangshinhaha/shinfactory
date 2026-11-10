@@ -288,13 +288,13 @@ func normalizeParsedValues(config *Config, metadata toml.MetaData, diagnostics *
 		config.Concurrency.MaxConcurrency = defaultMaxConcurrency
 	}
 
-	if config.Spend.MaxAttempts <= 0 {
+	if config.Spend.MaxAttempts < 0 {
 		appendNormalizedValueDiagnostic(diagnostics, "spend.max_attempts",
 			fmt.Sprintf("max_attempts=%d is invalid; using %d", config.Spend.MaxAttempts, defaultMaxStageAttempts),
 		)
 		config.Spend.MaxAttempts = defaultMaxStageAttempts
 	}
-	if config.Spend.MaxCostUSD <= 0 {
+	if config.Spend.MaxCostUSD < 0 {
 		appendNormalizedValueDiagnostic(diagnostics, "spend.max_cost_usd",
 			fmt.Sprintf("max_cost_usd=%v is invalid; using %v", config.Spend.MaxCostUSD, defaultMaxOrderCostUSD),
 		)
