@@ -295,6 +295,9 @@ type mergeResult struct {
 	// Unbuildable lists IDs of proposed orders dropped because they name no
 	// ready backlog item.
 	Unbuildable []string
+	// AmendRejected lists IDs of active orders whose amendment was dropped
+	// because a stage was in flight.
+	AmendRejected []string
 }
 
 // Reads and validates orders-next.json, merges into the provided orders, and
@@ -348,6 +351,7 @@ func consumeOrdersNext(nextPath string, existing OrdersFile, backlog []adapter.B
 	// except:
 	// 1) a failed existing order can be replaced by a new active proposal
 	// 2) an active existing order can be amended by a new active proposal
+	var amendRejected []string
 	for _, order := range incoming.Orders {
 		idx, exists := existingIndex[order.ID]
 		if exists {
@@ -361,6 +365,15 @@ func consumeOrdersNext(nextPath string, existing OrdersFile, backlog []adapter.B
 					order.WorkType = existing.Orders[idx].WorkType
 				}
 				existing.Orders[idx] = order
+				continue
+			}
+			if stageInFlight(existing.Orders[idx]) {
+				// Rewriting an order under its running stage cancels the stage
+				// and re-runs earlier work. The scheduler re-proposes once the
+				// stage has finished, if the amendment still applies.
+				if shouldAmendActiveOrder(existing.Orders[idx], order) {
+					amendRejected = append(amendRejected, order.ID)
+				}
 				continue
 			}
 			merged, replaced := mergeAmendedActiveOrder(existing.Orders[idx], order)
@@ -378,6 +391,7 @@ func consumeOrdersNext(nextPath string, existing OrdersFile, backlog []adapter.B
 		Promoted:       true,
 		EmptyPromotion: emptyPromotion,
 		Unbuildable:    unbuildable,
+		AmendRejected:  amendRejected,
 	}, nil
 }
 
@@ -409,6 +423,16 @@ func splitBuildableOrders(orders []Order, backlog []adapter.BacklogItem) (keep [
 
 func shouldReplaceFailedOrder(existing Order, incoming Order) bool {
 	return existing.Status == OrderStatusFailed && incoming.Status == OrderStatusActive
+}
+
+// stageInFlight reports whether a stage of the order is running or merging.
+func stageInFlight(order Order) bool {
+	for _, stage := range order.Stages {
+		if stage.Status == StageStatusActive || stage.Status == StageStatusMerging {
+			return true
+		}
+	}
+	return false
 }
 
 func shouldAmendActiveOrder(existing Order, incoming Order) bool {
@@ -491,4 +515,3 @@ func (l *Loop) stageRouting(stage Stage) (provider, model string) {
 func NormalizeAndValidateOrders(of OrdersFile, reg taskreg.Registry, cfg config.Config) (OrdersFile, bool, error) {
 	return orderx.NormalizeAndValidateOrders(of, reg, cfg)
 }
-

@@ -19,7 +19,6 @@ source_hash: 33a7b6a54db85d578abcd217f5390517746a23a6cc5f26b51066ec39df8b65fa
       "active_summary_total": 2,
       "first_spawn": {
         "name": "order-existing-0-execute",
-        "skill": "execute",
         "provider": "claude",
         "model": "claude-opus-4-6"
       }
@@ -33,7 +32,6 @@ source_hash: 33a7b6a54db85d578abcd217f5390517746a23a6cc5f26b51066ec39df8b65fa
       "active_summary_total": 2,
       "first_spawn": {
         "name": "order-existing-0-execute",
-        "skill": "execute",
         "provider": "claude",
         "model": "claude-opus-4-6"
       }

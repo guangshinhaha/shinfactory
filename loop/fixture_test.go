@@ -41,6 +41,10 @@ type loopFixtureSetup struct {
 type loopFixtureActiveSession struct {
 	ID     string `json:"id"`
 	Target string `json:"target"`
+	// Stage is the stage definition the session runs, as in orders.json.
+	// Omit it for a session whose stage the loop doesn't know.
+	Stage      *Stage `json:"stage"`
+	StageIndex int    `json:"stage_index"`
 }
 
 type loopFixtureAdoptedTarget struct {
@@ -297,6 +301,10 @@ func applyFixtureActiveSessions(l *Loop, sessions []loopFixtureActiveSession) {
 				status: "running",
 				done:   make(chan struct{}),
 			},
+		}
+		if session.Stage != nil {
+			cook.stage = *session.Stage
+			cook.stageIndex = session.StageIndex
 		}
 		l.cooks.activeCooksByOrder[targetID] = cook
 	}

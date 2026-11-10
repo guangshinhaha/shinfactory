@@ -1,0 +1,6 @@
+{
+  "active_sessions": [
+    {"id": "cook-inflight", "target": "order-existing", "stage_index": 1,
+     "stage": {"task_key":"quality","provider":"claude","model":"claude-opus-4-6"}}
+  ]
+}
