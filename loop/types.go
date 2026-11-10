@@ -163,12 +163,6 @@ type Dependencies struct {
 	OrdersFile     string
 	OrdersNextFile string
 	StatusFile     string
-	// BacklogRetryBackoff is the first wait before retrying a transient backlog
-	// sync failure; it doubles per retry up to a cap. 0 = default.
-	BacklogRetryBackoff time.Duration
-	// BacklogRetrySleep waits between backlog retries; nil sleeps for real.
-	// Tests swap it to run a long outage without waiting.
-	BacklogRetrySleep func(ctx context.Context, d time.Duration) error
 }
 
 type Loop struct {
@@ -192,13 +186,13 @@ type Loop struct {
 	registryStale     atomic.Bool
 	registryFailCount int
 
-	watcherWG          sync.WaitGroup
-	shutdownOnce       sync.Once
-	watcherCount       atomic.Int64
+	watcherWG    sync.WaitGroup
+	shutdownOnce sync.Once
+	watcherCount atomic.Int64
 	// watchedDone maps a watched session ID to its Done channel, from the
 	// watcher's start until its result is queued, so a drain can tell a
 	// finished session whose result is in flight from one still running.
-	watchedDone sync.Map
+	watchedDone        sync.Map
 	dispatchGeneration atomic.Uint64
 
 	bootstrapAttempts  int
@@ -230,7 +224,8 @@ type Loop struct {
 
 	reconciledFailures []reconciledFailure
 	lastMiseWarnings   []string
-	lastChecksPoll     time.Time // last time parked PRs were re-checked for merge
+	backlogRetry       *backlogRetry // pending transient backlog failure; nil when synced
+	lastChecksPoll     time.Time     // last time parked PRs were re-checked for merge
 
 	lastLoopFailure *LoopFailureEnvelope
 

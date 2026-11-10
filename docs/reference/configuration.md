@@ -115,7 +115,7 @@ Tunes how the loop treats a backlog sync that fails with a transient error: DNS 
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `retry_window_seconds` | int | `300` | Total time to keep retrying a transient backlog failure |
+| `retry_window_seconds` | int | `300` | Total time, from the first failure, to keep retrying a transient backlog failure. Negative or over `86400` values are reset with a warning |
 
 ```toml
 [backlog]
