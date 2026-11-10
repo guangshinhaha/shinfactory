@@ -807,3 +807,37 @@ func TestOrcaRuntimeCompletedStageResetsTheUsageLimitCount(t *testing.T) {
 		t.Fatalf("count after a normal finish = %d, want 1", n)
 	}
 }
+
+// Orca cannot observe when a zcode worker is ready, so a zcode stage runs on the
+// process runtime even when orca is the default; claude stages stay on orca.
+func TestZcodeStageRunsOnProcessWhenOrcaIsDefault(t *testing.T) {
+	cfg := localLandingConfig()
+	cfg.Runtime.Default = "orca"
+	processRT, orcaRT := newMockRuntime(), newMockRuntime()
+	l := New(t.TempDir(), "noodle", cfg, Dependencies{
+		Runtimes: map[string]loopruntime.Runtime{"process": processRT, "orca": orcaRT},
+		Worktree: &fakeWorktree{},
+		Adapter:  &fakeAdapterRunner{},
+		Mise:     &fakeMise{},
+		Monitor:  fakeMonitor{},
+		Registry: testLoopRegistry(),
+	})
+
+	for _, provider := range []string{"zcode", "claude"} {
+		req := loopruntime.DispatchRequest{Name: provider + "-cook", Prompt: "do it", Provider: provider, Runtime: "orca"}
+		if _, _, err := l.dispatchSession(context.Background(), req); err != nil {
+			t.Fatalf("dispatch %s: %v", provider, err)
+		}
+	}
+
+	processRT.mu.Lock()
+	defer processRT.mu.Unlock()
+	orcaRT.mu.Lock()
+	defer orcaRT.mu.Unlock()
+	if len(processRT.calls) != 1 || processRT.calls[0].Provider != "zcode" || processRT.calls[0].Runtime != "process" {
+		t.Errorf("process calls = %+v, want the zcode stage", processRT.calls)
+	}
+	if len(orcaRT.calls) != 1 || orcaRT.calls[0].Provider != "claude" {
+		t.Errorf("orca calls = %+v, want the claude stage", orcaRT.calls)
+	}
+}

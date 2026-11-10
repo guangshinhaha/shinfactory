@@ -180,6 +180,11 @@ func (l *Loop) spawnCook(ctx context.Context, cand dispatchCandidate, order Orde
 
 func (l *Loop) dispatchSession(ctx context.Context, req loopruntime.DispatchRequest) (loopruntime.SessionHandle, RuntimeFallbackOutcome, error) {
 	runtimeName := l.dispatchRuntime(req.Runtime)
+	// Orca cannot observe when a zcode worker is ready, so worker-start times
+	// out; zcode runs headless (`zcode -p`) on the process runtime instead.
+	if runtimeName == "orca" && stringx.Normalize(req.Provider) == "zcode" && l.deps.Runtimes["process"] != nil {
+		runtimeName = "process"
+	}
 
 	runtime := l.deps.Runtimes[runtimeName]
 	if runtime == nil {

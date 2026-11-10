@@ -95,6 +95,10 @@ func (d *ProcessDispatcher) Dispatch(ctx context.Context, req DispatchRequest) (
 		return nil, err
 	}
 
+	var stdoutFilter func(io.Reader) io.Reader
+	if stringx.Normalize(req.Provider) == "zcode" && strings.TrimSpace(d.runtimeDefault) == "" {
+		stdoutFilter = zcodeStream
+	}
 	session := newProcessSession(processSessionConfig{
 		id:            sessionID,
 		process:       process,
@@ -105,6 +109,7 @@ func (d *ProcessDispatcher) Dispatch(ctx context.Context, req DispatchRequest) (
 		warnings:      skillBundle.Warnings,
 		controller:    controller,
 		sink:          d.sink,
+		stdoutFilter:  stdoutFilter,
 	})
 	session.start(ctx)
 	return session, nil
@@ -193,7 +198,7 @@ func (d *ProcessDispatcher) startSessionProcess(
 	ctx context.Context, req DispatchRequest,
 	systemPrompt, composedPrompt, sessionID, sessionDir, stderrPath string,
 ) (*claudeController, *ProcessHandle, error) {
-	cmd, err := d.buildCmd(req, systemPrompt)
+	cmd, err := d.buildCmd(req, systemPrompt, composedPrompt)
 	if err != nil {
 		return nil, nil, fmt.Errorf("build command: %w", err)
 	}
@@ -236,6 +241,11 @@ func (d *ProcessDispatcher) startSessionProcess(
 func (d *ProcessDispatcher) configureStdin(
 	ctx context.Context, process *ProcessHandle, provider, composedPrompt string,
 ) (*claudeController, error) {
+	if stringx.Normalize(provider) == "zcode" {
+		// zcode takes its prompt as an argument; nothing to send.
+		_ = process.Stdin().Close()
+		return nil, nil
+	}
 	if stringx.Normalize(provider) == "codex" {
 		go func() {
 			_, _ = io.WriteString(process.Stdin(), composedPrompt)
@@ -252,7 +262,7 @@ func (d *ProcessDispatcher) configureStdin(
 
 // buildCmd constructs an exec.Cmd for the provider. The stamp processor runs
 // in-process via processSession.processStream, so no shell pipeline is needed.
-func (d *ProcessDispatcher) buildCmd(req DispatchRequest, systemPrompt string) (*exec.Cmd, error) {
+func (d *ProcessDispatcher) buildCmd(req DispatchRequest, systemPrompt, composedPrompt string) (*exec.Cmd, error) {
 	runtimeCmd := strings.TrimSpace(d.runtimeDefault)
 	if runtimeCmd != "" {
 		return d.buildCustomRuntimeCmd(req, runtimeCmd)
@@ -267,6 +277,9 @@ func (d *ProcessDispatcher) buildCmd(req DispatchRequest, systemPrompt string) (
 		args := codexBaseArgs(req)
 		args = append(args, extraArgs...)
 		return exec.Command(binary, args...), nil
+
+	case "zcode":
+		return exec.Command(binary, zcodeBaseArgs(req, composedPrompt)...), nil
 
 	default: // claude
 		args := claudeBaseArgs(req, systemPrompt)
@@ -293,6 +306,8 @@ func (d *ProcessDispatcher) buildCustomRuntimeCmd(req DispatchRequest, runtimeCm
 
 func (d *ProcessDispatcher) resolveAgentBinary(provider string) string {
 	switch stringx.Normalize(provider) {
+	case "zcode":
+		return "zcode"
 	case "codex":
 		if path := strings.TrimSpace(d.providerConfigs.Codex.Path); path != "" {
 			candidate := filepath.Join(filex.ExpandHome(path), "codex")

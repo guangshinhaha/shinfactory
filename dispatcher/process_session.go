@@ -2,6 +2,7 @@ package dispatcher
 
 import (
 	"context"
+	"io"
 
 	"github.com/guangshinhaha/shinfactory/event"
 	"github.com/guangshinhaha/shinfactory/parse"
@@ -12,9 +13,10 @@ import (
 // as a shell pipeline stage.
 type processSession struct {
 	sessionBase
-	process    *ProcessHandle
-	controller *claudeController // nil for non-steerable sessions
-	warnings   []string
+	process      *ProcessHandle
+	controller   *claudeController // nil for non-steerable sessions
+	warnings     []string
+	stdoutFilter func(io.Reader) io.Reader
 }
 
 type processSessionConfig struct {
@@ -27,6 +29,7 @@ type processSessionConfig struct {
 	warnings      []string
 	controller    *claudeController // nil for non-steerable sessions
 	sink          SessionEventSink
+	stdoutFilter  func(io.Reader) io.Reader // reshapes a provider's stdout into stream lines; nil = as is
 }
 
 func newProcessSession(cfg processSessionConfig) *processSession {
@@ -39,9 +42,10 @@ func newProcessSession(cfg processSessionConfig) *processSession {
 			prompt:        cfg.prompt,
 			sink:          cfg.sink,
 		}),
-		process:    cfg.process,
-		controller: cfg.controller,
-		warnings:   append([]string(nil), cfg.warnings...),
+		process:      cfg.process,
+		controller:   cfg.controller,
+		warnings:     append([]string(nil), cfg.warnings...),
+		stdoutFilter: cfg.stdoutFilter,
 	}
 }
 
@@ -55,7 +59,11 @@ func (s *processSession) start(ctx context.Context) {
 		interceptor := &canonicalLineInterceptor{onLine: func(line []byte) {
 			s.consumeCanonicalLine(line, s.processHook)
 		}}
-		s.processStream(ctx, s.process.Stdout(), interceptor)
+		stdout := io.Reader(s.process.Stdout())
+		if s.stdoutFilter != nil {
+			stdout = s.stdoutFilter(stdout)
+		}
+		s.processStream(ctx, stdout, interceptor)
 	}()
 
 	go func() {

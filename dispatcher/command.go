@@ -76,6 +76,12 @@ func codexBaseArgs(req DispatchRequest) []string {
 	return args
 }
 
+// zcodeBaseArgs returns zcode's headless flags. zcode takes no system-prompt
+// flag (composePrompts inlines it) and runs the model its own config names.
+func zcodeBaseArgs(req DispatchRequest, prompt string) []string {
+	return []string{"-p", prompt, "--cwd", req.WorktreePath, "--mode", "yolo", "--json"}
+}
+
 func generateSessionID(name string) (string, error) {
 	randBytes := make([]byte, 3)
 	if _, err := rand.Read(randBytes); err != nil {
@@ -145,10 +151,13 @@ func composePrompts(provider, requestPrompt, preamble, skillSystemPrompt string)
 		systemPrompt = fullSystemPrompt
 		return systemPrompt, finalPrompt
 	}
+	if strings.EqualFold(provider, "zcode") && strings.TrimSpace(fullSystemPrompt) != "" {
+		finalPrompt = fullSystemPrompt + "\n\n---\n\n" + requestPrompt
+		return systemPrompt, finalPrompt
+	}
 	// Codex loads skills natively via Skill(name) — only inline the preamble.
 	if strings.EqualFold(provider, "codex") && strings.TrimSpace(preamble) != "" {
 		finalPrompt = requestPrompt + "\n\n---\n\n" + preamble
 	}
 	return systemPrompt, finalPrompt
 }
-
