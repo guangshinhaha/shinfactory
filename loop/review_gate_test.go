@@ -3,6 +3,7 @@ package loop
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -384,6 +385,54 @@ func TestHighOrderThroughStubGHMergesOnlyAfterVerifyAtHead(t *testing.T) {
 	}
 }
 
+// postedComments returns the PR comment bodies the stub gh recorded.
+func postedComments(logPath string) []string {
+	data, _ := os.ReadFile(filepath.Join(filepath.Dir(logPath), "comments.log"))
+	var out []string
+	for _, c := range strings.Split(string(data), "\n---\n") {
+		if strings.TrimSpace(c) != "" {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+// verdict-check on gantry reads a PR comment, so the verifier's file has to
+// reach the PR, byte for byte, at the head it judged, before the merge.
+func TestVerifyVerdictIsPostedOnPRBeforeMerge(t *testing.T) {
+	for _, verdict := range []string{VerdictPass, VerdictPassNotes, VerdictFail} {
+		t.Run(verdict, func(t *testing.T) {
+			logPath := stubGH(t)
+			h, work := realGateHarness(t)
+			head := gitIn(t, work, "rev-parse", "HEAD")
+			h.next(t)
+			h.review(t, 0, "none")
+			h.next(t)
+			// The verifier's own file, written the way a verifier would.
+			body := `{"head_sha": "` + head + `", "verdict": "` + verdict + `", "evidence": "ran the fixture, saw it"}` + "\n"
+			h.write(t, 0, verifyFileName, body)
+			h.next(t)
+
+			comments := postedComments(logPath)
+			if len(comments) != 1 {
+				calls, _ := os.ReadFile(logPath)
+				t.Fatalf("PR got %d comments, want the verifier's verdict once\ncalls:\n%s", len(comments), calls)
+			}
+			if !strings.Contains(comments[0], strings.TrimSpace(body)) {
+				t.Fatalf("comment does not carry the verifier's file verbatim:\n%s\nwant it to contain\n%s", comments[0], body)
+			}
+			calls, _ := os.ReadFile(logPath)
+			if verdict != VerdictFail {
+				if c, m := strings.Index(string(calls), "pr comment"), strings.Index(string(calls), "pr merge"); c < 0 || m < 0 || c > m {
+					t.Fatalf("verdict comment must come before the merge\n%s", calls)
+				}
+			} else if strings.Contains(string(calls), "pr merge") {
+				t.Fatalf("FAIL verdict merged\n%s", calls)
+			}
+		})
+	}
+}
+
 func TestTierAndRoundSurviveOnDiskAndRestart(t *testing.T) {
 	h := newGateHarness(t, "high", "execute", "quality", "verify")
 	h.next(t)
@@ -528,5 +577,68 @@ func (h *gateHarness) settleEvidence(t *testing.T) {
 		if err := h.l.Cycle(context.Background()); err != nil {
 			t.Fatalf("evidence cycle: %v", err)
 		}
+	}
+}
+
+func TestVerdictCommentFailureStopsTheMerge(t *testing.T) {
+	h := newGateHarness(t, "high", "execute", "quality", "verify")
+	verdictPostBackoff = 0
+	h.ln.verdictErr = errors.New("gh down")
+	h.next(t)
+	h.review(t, 0, "none")
+	h.next(t)
+	h.verdict(t, 0, VerdictPass, fixtureHead)
+	h.next(t)
+	h.failedWith(t, "verdict comment failed")
+	if h.ln.verdictTries != verdictPostAttempts {
+		t.Fatalf("tried the comment %d times, want %d before failing", h.ln.verdictTries, verdictPostAttempts)
+	}
+}
+
+func TestVerdictCommentFenceOutlastsBackticksInEvidence(t *testing.T) {
+	h := newGateHarness(t, "high", "execute", "quality", "verify")
+	h.next(t)
+	h.review(t, 0, "none")
+	h.next(t)
+	body := `{"head_sha": "` + fixtureHead + `", "verdict": "PASS", "evidence": "ran ` + "```go" + ` code"}`
+	h.write(t, 0, verifyFileName, body)
+	h.next(t)
+	if len(h.ln.verdicts) != 1 || !strings.Contains(h.ln.verdicts[0], "````json\n"+body+"\n````") {
+		t.Fatalf("comment %q does not wrap the file in a four-backtick fence", h.ln.verdicts)
+	}
+}
+
+func TestVerdictIsPostedOncePerFile(t *testing.T) {
+	h := newGateHarness(t, "high", "execute", "quality", "verify")
+	h.next(t)
+	h.review(t, 0, "none")
+	h.next(t)
+	h.verdict(t, 0, VerdictPass, fixtureHead)
+	h.next(t)
+	if len(h.ln.verdicts) != 1 || !strings.Contains(h.ln.verdicts[0], `"verdict":"PASS"`) {
+		t.Fatalf("posted %q, want the verifier's PASS once", h.ln.verdicts)
+	}
+	cook := &cookHandle{worktreePath: "wt"}
+	cook.worktreeName = h.l.cookWorktreeName("42", 0, "")
+	order := Order{ID: "42"}
+	v, err := h.l.readVerdict(order, cook)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := h.l.postVerdict(context.Background(), order, cook, v); err != nil {
+		t.Fatal(err)
+	}
+	if len(h.ln.verdicts) != 1 {
+		t.Fatalf("same verdict file posted %d times, want 1", len(h.ln.verdicts))
+	}
+}
+
+func TestMediumTierPostsNoVerdict(t *testing.T) {
+	h := newGateHarness(t, "medium", "execute", "quality")
+	h.next(t)
+	h.review(t, 0, "none")
+	h.next(t)
+	if len(h.ln.verdicts) != 0 {
+		t.Fatalf("medium tier posted %q, want nothing", h.ln.verdicts)
 	}
 }

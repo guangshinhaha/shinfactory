@@ -160,7 +160,7 @@ func (l *Loop) completeAfterEvidence(ctx context.Context, cook *cookHandle) erro
 	if l.config.Landing.PR() {
 		// Before the stage message: a blocking message parks the stage, and
 		// approving it later must not skip the review or verify check.
-		if handled, err := l.reviewGate(cook); handled || err != nil {
+		if handled, err := l.reviewGate(ctx, cook); handled || err != nil {
 			return err
 		}
 	}

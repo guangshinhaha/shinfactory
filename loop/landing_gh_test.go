@@ -59,6 +59,9 @@ case "$1 $2" in
 "pr create") touch "` + state + `/pr"; echo https://github.test/o/r/pull/7 ;;
 "pr ready") touch "` + state + `/ready" ;;
 "pr merge") touch "` + state + `/merged" ;;
+"pr comment")
+  # gh pr comment <branch> --body <text>: keep each body, separated by a marker line.
+  printf '%s\n---\n' "$5" >> "` + state + `/comments.log" ;;
 *) echo "unexpected gh call: $*" >&2; exit 1 ;;
 esac
 `

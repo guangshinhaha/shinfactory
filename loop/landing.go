@@ -50,6 +50,8 @@ type Lander interface {
 	// with a lease. On a conflict it aborts the rebase, leaves the branch as it
 	// was, and returns a *RebaseConflictError naming the files.
 	RebaseOntoBase(ctx context.Context, dir, base string) error
+	// PostVerdict comments body on pr. The caller makes it repeat-safe.
+	PostVerdict(ctx context.Context, dir string, pr PullRequest, body string) error
 	// ConflictingFiles lists the files a rebase onto the remote base branch
 	// would conflict in, without changing the branch.
 	ConflictingFiles(ctx context.Context, dir, base string) ([]string, error)
@@ -361,6 +363,11 @@ func (g ghLander) RebaseOntoBase(ctx context.Context, dir, base string) error {
 		return fmt.Errorf("rebase onto origin/%s failed: %s", base, out)
 	}
 	_, err = g.run(ctx, dir, "git", "push", "--force-with-lease", "origin", branch)
+	return err
+}
+
+func (g ghLander) PostVerdict(ctx context.Context, dir string, pr PullRequest, body string) error {
+	_, err := g.run(ctx, dir, "gh", "pr", "comment", pr.URL, "--body", body)
 	return err
 }
 
