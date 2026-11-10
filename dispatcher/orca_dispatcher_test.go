@@ -71,6 +71,46 @@ func TestOrcaDispatchLaunchesWorkerWithChosenProviderAndModel(t *testing.T) {
 	}
 }
 
+func TestOrcaDispatchLaunchesZcodeWorker(t *testing.T) {
+	fake := fakeorca.New(t)
+	d, dir := orcaTestDispatcher(t, fake)
+
+	req := orcaTestRequest(dir)
+	req.Provider = "zcode"
+	req.Model = "GLM-5.3"
+	s, err := d.Dispatch(context.Background(), req)
+	if err != nil {
+		t.Fatalf("dispatch: %v", err)
+	}
+	start := fake.Starts()
+	if len(start) != 1 {
+		t.Fatalf("worker-start calls = %v, want 1", start)
+	}
+	for _, frag := range []string{"--agent zcode", "--model GLM-5.3"} {
+		if !strings.Contains(start[0], frag) {
+			t.Errorf("worker-start = %q, missing %q", start[0], frag)
+		}
+	}
+	fake.Settle(t, fake.LastDispatch(t), "succeeded")
+	if out := waitDone(t, s); out.Status != StatusCompleted {
+		t.Fatalf("outcome = %+v, want completed", out)
+	}
+}
+
+func TestOrcaDispatchRejectsUnknownProvider(t *testing.T) {
+	fake := fakeorca.New(t)
+	d, dir := orcaTestDispatcher(t, fake)
+
+	req := orcaTestRequest(dir)
+	req.Provider = "cursor"
+	if _, err := d.Dispatch(context.Background(), req); err == nil {
+		t.Fatal("expected an error for a provider orca has no agent for")
+	}
+	if n := len(fake.Starts()); n != 0 {
+		t.Fatalf("worker-start calls = %d, want 0 (rejected before launch)", n)
+	}
+}
+
 func TestOrcaDispatchReportsUsageLimitAtLaunch(t *testing.T) {
 	fake := fakeorca.New(t)
 	fake.SetLimit(t, true)

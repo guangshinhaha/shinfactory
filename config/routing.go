@@ -157,7 +157,7 @@ func (c Config) ValidateStageRouting(provider, model string) error {
 }
 
 // knownProviders are the agent CLIs a stage could shell out to.
-var knownProviders = []string{"claude", "codex"}
+var knownProviders = []string{"claude", "codex", "zcode"}
 
 // ForeignProviders lists the provider CLIs a stage on provider must not run.
 // It is empty unless routing.sensitive is set. The dispatcher turns it into

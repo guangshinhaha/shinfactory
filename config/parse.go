@@ -240,7 +240,7 @@ func normalizeParsedValues(config *Config, metadata toml.MetaData, diagnostics *
 			)
 		}
 		config.Routing.Defaults.Provider = defaultRoutingProvider
-	case "claude", "codex":
+	case "claude", "codex", "zcode":
 		config.Routing.Defaults.Provider = provider
 	default:
 		appendNormalizedValueDiagnostic(diagnostics, "routing.defaults.provider",

@@ -206,10 +206,10 @@ func (d *OrcaDispatcher) Dispatch(ctx context.Context, req DispatchRequest) (Ses
 // orcaAgentFor maps a factory provider onto an Orca agent id.
 func orcaAgentFor(provider string) (string, error) {
 	switch p := stringx.Normalize(provider); p {
-	case "claude", "codex":
+	case "claude", "codex", "zcode":
 		return p, nil
 	default:
-		return "", fmt.Errorf("provider %q has no orca agent (valid: claude, codex)", provider)
+		return "", fmt.Errorf("provider %q has no orca agent (valid: claude, codex, zcode)", provider)
 	}
 }
 

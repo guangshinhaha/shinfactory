@@ -161,6 +161,13 @@ func TestNonClaudeDefaultsGetNoClaudeRoles(t *testing.T) {
 	}
 }
 
+func TestZcodeRoleIsAccepted(t *testing.T) {
+	cfg := parseRouting(t, "[routing.roles]\nbuilder = { provider = \"zcode\", model = \"GLM-5.3\" }\n")
+	if got := Validate(cfg); hasCode(got, DiagnosticCodeProviderUnknown) {
+		t.Errorf("zcode role flagged as unknown provider: %+v", got.Diagnostics)
+	}
+}
+
 func TestRoleWithProviderButNoModelIsFatal(t *testing.T) {
 	cfg := parseRouting(t, "[routing.roles]\nbuilder = { provider = \"codex\" }\n")
 	if got := Validate(cfg); !hasCode(got, DiagnosticCodeRoutingDefaultsMissing) {
@@ -209,14 +216,35 @@ func TestValidateStageProviderOnSensitiveRepo(t *testing.T) {
 
 func TestForeignProvidersOnlyOnSensitiveRepo(t *testing.T) {
 	cfg := parseRouting(t, "[routing]\nsensitive = true\n")
-	if got := cfg.ForeignProviders("claude"); len(got) != 1 || got[0] != "codex" {
-		t.Errorf("sensitive claude repo: foreign = %v, want [codex]", got)
+	if got := cfg.ForeignProviders("claude"); len(got) != 2 || got[0] != "codex" || got[1] != "zcode" {
+		t.Errorf("sensitive claude repo: foreign = %v, want [codex zcode]", got)
 	}
-	if got := cfg.ForeignProviders("codex"); len(got) != 1 || got[0] != "claude" {
-		t.Errorf("sensitive codex stage: foreign = %v, want [claude]", got)
+	if got := cfg.ForeignProviders("codex"); len(got) != 2 || got[0] != "claude" || got[1] != "zcode" {
+		t.Errorf("sensitive codex stage: foreign = %v, want [claude zcode]", got)
+	}
+	if got := cfg.ForeignProviders("zcode"); len(got) != 2 || got[0] != "claude" || got[1] != "codex" {
+		t.Errorf("sensitive zcode stage: foreign = %v, want [claude codex]", got)
 	}
 	cfg.Routing.Sensitive = false
 	if got := cfg.ForeignProviders("claude"); got != nil {
 		t.Errorf("non-sensitive repo: foreign = %v, want none", got)
+	}
+}
+
+func TestZcodeOnlyWhenConfigNamesIt(t *testing.T) {
+	plain := parseRouting(t, "")
+	provider, model := plain.ResolveStageRouting("execute", "zcode", "GLM-5.3")
+	if provider != "claude" || model != "claude-sonnet-5-5" {
+		t.Errorf("unnamed zcode leaked: %s/%s", provider, model)
+	}
+
+	named := parseRouting(t, "[routing.roles]\nbuilder = { provider = \"zcode\", model = \"GLM-5.3\" }\n")
+	provider, model = named.ResolveStageRouting("execute", "", "")
+	if provider != "zcode" || model != "GLM-5.3" {
+		t.Errorf("named zcode builder = %s/%s", provider, model)
+	}
+	provider, _ = named.ResolveStageRouting("plan", "", "")
+	if provider != "claude" {
+		t.Errorf("planner should stay claude, got %s", provider)
 	}
 }
