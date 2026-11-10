@@ -46,16 +46,27 @@ func StartProcess(cmd *exec.Cmd) (*ProcessHandle, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create stdin pipe: %w", err)
 	}
-	stdout, err := cmd.StdoutPipe()
+	// Plain os pipes, not cmd.StdoutPipe: Wait closes those as soon as the
+	// child exits, which can discard output the reader has not read yet.
+	stdout, stdoutW, err := os.Pipe()
 	if err != nil {
 		return nil, fmt.Errorf("create stdout pipe: %w", err)
 	}
-	stderr, err := cmd.StderrPipe()
+	stderr, stderrW, err := os.Pipe()
 	if err != nil {
+		_ = stdout.Close()
+		_ = stdoutW.Close()
 		return nil, fmt.Errorf("create stderr pipe: %w", err)
 	}
+	cmd.Stdout, cmd.Stderr = stdoutW, stderrW
 
-	if err := cmd.Start(); err != nil {
+	err = cmd.Start()
+	// The child holds its own copies of the write ends.
+	_ = stdoutW.Close()
+	_ = stderrW.Close()
+	if err != nil {
+		_ = stdout.Close()
+		_ = stderr.Close()
 		return nil, ProcessStartError{Cause: err}
 	}
 

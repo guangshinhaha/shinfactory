@@ -32,11 +32,20 @@ func waitDone(t *testing.T, s Session) SessionOutcome {
 	t.Helper()
 	select {
 	case <-s.Done():
-		return s.Outcome()
 	case <-time.After(5 * time.Second):
 		t.Fatal("session did not finish")
 		return SessionOutcome{}
 	}
+	// A poll still mid-call would write into the fake's state dir while
+	// t.TempDir cleanup removes it.
+	if orca, ok := s.(*orcaSession); ok {
+		select {
+		case <-orca.pollDone:
+		case <-time.After(5 * time.Second):
+			t.Fatal("orca poll did not stop")
+		}
+	}
+	return s.Outcome()
 }
 
 func TestOrcaDispatchLaunchesWorkerWithChosenProviderAndModel(t *testing.T) {

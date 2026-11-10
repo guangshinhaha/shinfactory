@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/guangshinhaha/shinfactory/event"
@@ -46,6 +47,12 @@ type orcaSession struct {
 	bin          string
 	run          orcaRunner
 	pollInterval time.Duration
+	// terminating is set before Terminate stops the worker, so the poll loop
+	// does not report the stop it caused as a failed worker.
+	terminating atomic.Bool
+	// pollDone closes when the poll loop has returned and no orca call of
+	// its is still running.
+	pollDone chan struct{}
 }
 
 func newOrcaSession(cfg orcaSessionConfig) *orcaSession {
@@ -63,6 +70,7 @@ func newOrcaSession(cfg orcaSessionConfig) *orcaSession {
 		bin:          cfg.bin,
 		run:          cfg.run,
 		pollInterval: cfg.pollInterval,
+		pollDone:     make(chan struct{}),
 	}
 }
 
@@ -75,6 +83,7 @@ func (s *orcaSession) start(ctx context.Context) {
 }
 
 func (s *orcaSession) poll(ctx context.Context) {
+	defer close(s.pollDone)
 	ticker := time.NewTicker(s.pollInterval)
 	defer ticker.Stop()
 	failures := 0
@@ -103,6 +112,10 @@ func (s *orcaSession) poll(ctx context.Context) {
 		failures = 0
 		if !w.settled() {
 			continue
+		}
+		if s.terminating.Load() {
+			// Terminate is stopping this worker and records the outcome.
+			return
 		}
 		s.finish(s.outcomeFor(ctx, w))
 		return
@@ -280,6 +293,7 @@ func (s *orcaSession) appendCanonical(kind parse.EventType, message string) {
 }
 
 func (s *orcaSession) Terminate() error {
+	s.terminating.Store(true)
 	err := stopOrcaWorker(s.run, s.bin, s.dispatchID)
 	s.finish(SessionOutcome{Status: StatusKilled, Reason: "orca worker stopped"})
 	return err
