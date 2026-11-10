@@ -15,7 +15,7 @@ const mergeBackpressureLimit = 128
 
 func (l *Loop) buildCycleBrief(ctx context.Context) (mise.Brief, []string, bool, bool, error) {
 	l.refreshAdoptedTargets()
-	brief, warnings, miseChanged, err := l.deps.Mise.Build(ctx, l.snapshotActiveSummary(), l.snapshotRecentHistory())
+	brief, warnings, miseChanged, err := l.buildBriefWithRetry(ctx)
 	if err != nil {
 		return mise.Brief{}, warnings, false, false, err
 	}
@@ -454,4 +454,59 @@ func (l *Loop) spawnPlannedCandidates(ctx context.Context, candidates []dispatch
 		}
 	}
 	return nil
+}
+
+// backlogSyncAttempts bounds how often a cycle tries the backlog sync when it
+// keeps failing with a transient error.
+const backlogSyncAttempts = 4
+
+const defaultBacklogRetryBackoff = time.Second
+
+// transientMarkers are lowercase fragments of network and 5xx failures from the
+// backlog adapter (gh, curl, DNS). Anything else, such as bad credentials or a
+// missing repo, fails at once.
+var transientMarkers = []string{
+	"no such host", "temporary failure in name resolution", "could not resolve host",
+	"connection refused", "connection reset", "i/o timeout", "operation timed out",
+	"tls handshake", "network is unreachable", "no route to host", "unexpected eof",
+	"error connecting to", "http 500", "http 502", "http 503", "http 504",
+	"500 internal server error", "bad gateway", "service unavailable", "gateway timeout",
+}
+
+func isTransientBacklogError(err error) bool {
+	text := strings.ToLower(err.Error())
+	for _, marker := range transientMarkers {
+		if strings.Contains(text, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+// buildBriefWithRetry builds the brief, retrying a transient backlog failure
+// with doubling backoff. A persistent failure returns an error that says so.
+func (l *Loop) buildBriefWithRetry(ctx context.Context) (mise.Brief, []string, bool, error) {
+	wait := l.deps.BacklogRetryBackoff
+	if wait <= 0 {
+		wait = defaultBacklogRetryBackoff
+	}
+	for attempt := 1; ; attempt++ {
+		brief, warnings, changed, err := l.deps.Mise.Build(ctx, l.snapshotActiveSummary(), l.snapshotRecentHistory())
+		if err == nil || ctx.Err() != nil || !isTransientBacklogError(err) {
+			return brief, warnings, changed, err
+		}
+		if attempt >= backlogSyncAttempts {
+			return brief, warnings, changed, fmt.Errorf("backlog sync still failing after %d attempts: %w", attempt, err)
+		}
+		if l.logger != nil {
+			l.logger.Warn("backlog sync failed with a transient error; retrying",
+				"attempt", attempt, "retry_in", wait.String(), "cause", err)
+		}
+		select {
+		case <-ctx.Done():
+			return brief, warnings, changed, ctx.Err()
+		case <-time.After(wait):
+		}
+		wait *= 2
+	}
 }

@@ -163,6 +163,9 @@ type Dependencies struct {
 	OrdersFile     string
 	OrdersNextFile string
 	StatusFile     string
+	// BacklogRetryBackoff is the first wait before retrying a transient backlog
+	// sync failure; it doubles per retry. 0 = default.
+	BacklogRetryBackoff time.Duration
 }
 
 type Loop struct {

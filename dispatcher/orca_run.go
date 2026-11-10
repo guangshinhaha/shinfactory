@@ -38,6 +38,25 @@ func (d *OrcaDispatcher) ensureRun(ctx context.Context) (string, error) {
 			return id, nil
 		}
 	}
+	return d.createRun(callCtx)
+}
+
+// replaceRun abandons a run Orca fenced (the host slept and another owner took
+// the run) and creates a new one. It does nothing if another caller already
+// replaced fenced.
+func (d *OrcaDispatcher) replaceRun(ctx context.Context, fenced string) (string, error) {
+	d.runMu.Lock()
+	defer d.runMu.Unlock()
+	if d.runID != "" && d.runID != fenced {
+		return d.runID, nil
+	}
+	callCtx, cancel := context.WithTimeout(ctx, orcaStartTimeout)
+	defer cancel()
+	return d.createRun(callCtx)
+}
+
+// createRun makes a new Orca run and records it. Callers hold runMu.
+func (d *OrcaDispatcher) createRun(callCtx context.Context) (string, error) {
 	// run-create binds the calling terminal to the new run. Every call the
 	// factory makes names its run, so the binding only matters to a loop
 	// started from a coordinator's terminal; set runtime.orca.run_id there.

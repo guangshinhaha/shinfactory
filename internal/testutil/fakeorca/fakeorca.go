@@ -46,6 +46,14 @@ worker-start)
       exit 1
     fi
   fi
+  if [ -f "$D/fenced" ]; then
+    left=$(cat "$D/fenced")
+    if [ "$left" -gt 0 ]; then
+      echo $(( left - 1 )) > "$D/fenced"
+      echo '{"ok":false,"error":{"code":"consumer_fenced","message":"Consumer was fenced by a newer run owner"}}' >&2
+      exit 1
+    fi
+  fi
   if [ -f "$D/limit" ]; then
     cat "$D/limit" >&2
     exit 1
@@ -187,6 +195,25 @@ func (f *Fake) RefuseUnknownWorktree(t *testing.T, n int) {
 	if err := os.WriteFile(filepath.Join(f.Dir, "unknown"), []byte(strconv.Itoa(n)), 0o644); err != nil {
 		t.Fatalf("refuse unknown worktree: %v", err)
 	}
+}
+
+// FenceConsumer makes the next n worker-starts fail with consumer_fenced, as
+// real Orca does for a run whose consumer lost ownership (a host sleep).
+func (f *Fake) FenceConsumer(t *testing.T, n int) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(f.Dir, "fenced"), []byte(strconv.Itoa(n)), 0o644); err != nil {
+		t.Fatalf("fence consumer: %v", err)
+	}
+}
+
+// RunOf is the run a worker was started in.
+func (f *Fake) RunOf(t *testing.T, dispatchID string) string {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(f.Dir, "run-"+dispatchID))
+	if err != nil {
+		t.Fatalf("read run of %s: %v", dispatchID, err)
+	}
+	return strings.TrimSpace(string(data))
 }
 
 // Settle ends a worker with the given outcome ("succeeded", "failed").

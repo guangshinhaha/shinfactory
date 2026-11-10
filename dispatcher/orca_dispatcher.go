@@ -161,6 +161,14 @@ func (d *OrcaDispatcher) Dispatch(ctx context.Context, req DispatchRequest) (Ses
 		return nil, err
 	}
 	dispatchID, err := d.startWorker(ctx, runID, sessionID, specPath, agent, req)
+	if err != nil && isConsumerFenced(err) {
+		// The host slept and Orca fenced this run's consumer. Move to a new
+		// run once; a second fence is a real failure.
+		if runID, err = d.replaceRun(ctx, runID); err != nil {
+			return nil, err
+		}
+		dispatchID, err = d.startWorker(ctx, runID, sessionID, specPath, agent, req)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -272,6 +280,11 @@ func (d *OrcaDispatcher) startWorker(ctx context.Context, runID, sessionID, spec
 // isSelectorNotFound reports Orca refusing a worktree selector it does not know yet.
 func isSelectorNotFound(err error, out []byte) bool {
 	return strings.Contains(err.Error(), "selector_not_found") || strings.Contains(string(out), "selector_not_found")
+}
+
+// isConsumerFenced reports Orca refusing a run whose consumer lost ownership.
+func isConsumerFenced(err error) bool {
+	return strings.Contains(err.Error(), "consumer_fenced")
 }
 
 // stopWorker fences a worker best-effort; used when a launch must be undone.

@@ -208,3 +208,46 @@ func TestOrcaDispatchGivesUpOnPersistentUnknownWorktree(t *testing.T) {
 		t.Fatalf("dispatch error = %v, want one naming selector_not_found", err)
 	}
 }
+
+func TestOrcaDispatchRecoversRunAfterConsumerFenced(t *testing.T) {
+	fake := fakeorca.New(t)
+	d, dir := orcaTestDispatcher(t, fake)
+
+	first, err := d.Dispatch(context.Background(), orcaTestRequest(dir))
+	if err != nil {
+		t.Fatalf("first dispatch: %v", err)
+	}
+	fake.Settle(t, fake.LastDispatch(t), "succeeded")
+	waitDone(t, first)
+
+	// The host sleeps; Orca fences the old run's consumer.
+	fake.FenceConsumer(t, 1)
+	s, err := d.Dispatch(context.Background(), orcaTestRequest(dir))
+	if err != nil {
+		t.Fatalf("dispatch after consumer_fenced = %v, want a recovered run", err)
+	}
+	fake.Settle(t, fake.LastDispatch(t), "succeeded")
+	waitDone(t, s)
+
+	runs := fake.Runs()
+	if len(runs) != 2 {
+		t.Fatalf("runs = %v, want a new run created after the fence", runs)
+	}
+	if got := fake.RunOf(t, fake.LastDispatch(t)); got != runs[1] {
+		t.Fatalf("worker run = %s, want the new run %s", got, runs[1])
+	}
+	if rec := d.recordedRun(); rec != runs[1] {
+		t.Fatalf("recorded run = %s, want %s so a restart finds it", rec, runs[1])
+	}
+}
+
+func TestOrcaDispatchGivesUpWhenConsumerStaysFenced(t *testing.T) {
+	fake := fakeorca.New(t)
+	d, dir := orcaTestDispatcher(t, fake)
+	fake.FenceConsumer(t, 100)
+
+	_, err := d.Dispatch(context.Background(), orcaTestRequest(dir))
+	if err == nil || !strings.Contains(err.Error(), "consumer_fenced") {
+		t.Fatalf("dispatch error = %v, want consumer_fenced surfaced after one recovery", err)
+	}
+}
