@@ -461,11 +461,12 @@ func (l *Loop) spawnPlannedCandidates(ctx context.Context, candidates []dispatch
 	return nil
 }
 
-// backlogSyncAttempts bounds how often a cycle tries the backlog sync when it
-// keeps failing with a transient error.
-const backlogSyncAttempts = 4
-
-const defaultBacklogRetryBackoff = time.Second
+const (
+	defaultBacklogRetryBackoff = time.Second
+	// maxBacklogRetryBackoff caps the doubling so a long window keeps probing
+	// the network instead of waiting minutes between tries.
+	maxBacklogRetryBackoff = 30 * time.Second
+)
 
 // transientMarkers are lowercase fragments of network and 5xx failures from the
 // backlog adapter (gh, curl, DNS). Anything else, such as bad credentials or a
@@ -476,6 +477,7 @@ var transientMarkers = []string{
 	"tls handshake", "network is unreachable", "no route to host", "unexpected eof",
 	"error connecting to", "http 500", "http 502", "http 503", "http 504",
 	"500 internal server error", "bad gateway", "service unavailable", "gateway timeout",
+	"enotfound", "client.timeout exceeded", "timeout awaiting response headers",
 }
 
 func isTransientBacklogError(err error) bool {
@@ -489,29 +491,45 @@ func isTransientBacklogError(err error) bool {
 }
 
 // buildBriefWithRetry builds the brief, retrying a transient backlog failure
-// with doubling backoff. A persistent failure returns an error that says so.
+// with capped exponential backoff until the configured retry window has been
+// spent waiting (time inside the sync call itself is not counted). A persistent failure returns an error that says so.
 func (l *Loop) buildBriefWithRetry(ctx context.Context) (mise.Brief, []string, bool, error) {
 	wait := l.deps.BacklogRetryBackoff
 	if wait <= 0 {
 		wait = defaultBacklogRetryBackoff
 	}
+	sleep := l.deps.BacklogRetrySleep
+	if sleep == nil {
+		sleep = sleepContext
+	}
+	window := l.config.Backlog.RetryWindow()
+	var waited time.Duration
 	for attempt := 1; ; attempt++ {
 		brief, warnings, changed, err := l.deps.Mise.Build(ctx, l.snapshotActiveSummary(), l.snapshotRecentHistory())
 		if err == nil || ctx.Err() != nil || !isTransientBacklogError(err) {
 			return brief, warnings, changed, err
 		}
-		if attempt >= backlogSyncAttempts {
-			return brief, warnings, changed, fmt.Errorf("backlog sync still failing after %d attempts: %w", attempt, err)
+		if waited >= window {
+			return brief, warnings, changed, fmt.Errorf("backlog sync still failing after %d attempts over %s: %w", attempt, waited.Round(time.Second), err)
 		}
+		step := min(wait, maxBacklogRetryBackoff, window-waited)
 		if l.logger != nil {
 			l.logger.Warn("backlog sync failed with a transient error; retrying",
-				"attempt", attempt, "retry_in", wait.String(), "cause", err)
+				"attempt", attempt, "retry_in", step.String(), "cause", err)
 		}
-		select {
-		case <-ctx.Done():
-			return brief, warnings, changed, ctx.Err()
-		case <-time.After(wait):
+		if err := sleep(ctx, step); err != nil {
+			return brief, warnings, changed, err
 		}
-		wait *= 2
+		waited += step
+		wait = min(wait*2, maxBacklogRetryBackoff)
+	}
+}
+
+func sleepContext(ctx context.Context, d time.Duration) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-time.After(d):
+		return nil
 	}
 }
