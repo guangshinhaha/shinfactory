@@ -114,8 +114,10 @@ func (s *orcaSession) poll(ctx context.Context) {
 			continue
 		}
 		if s.terminating.Load() {
-			// Terminate is stopping this worker and records the outcome.
-			return
+			// Terminate is stopping this worker and records the outcome. If
+			// its worker-stop fails it clears the flag, and the next tick
+			// reports how the worker really ended.
+			continue
 		}
 		s.finish(s.outcomeFor(ctx, w))
 		return
@@ -292,11 +294,18 @@ func (s *orcaSession) appendCanonical(kind parse.EventType, message string) {
 	}
 }
 
+// Terminate stops the worker and reports Killed only once Orca confirmed the
+// stop. A failed worker-stop leaves the session running, so a caller never
+// starts a second worker beside one that may still be live; the caller retries
+// or parks the order with the error.
 func (s *orcaSession) Terminate() error {
 	s.terminating.Store(true)
-	err := stopOrcaWorker(s.run, s.bin, s.dispatchID)
+	if err := stopOrcaWorker(s.run, s.bin, s.dispatchID); err != nil {
+		s.terminating.Store(false)
+		return fmt.Errorf("stop orca worker %s: %w", s.dispatchID, err)
+	}
 	s.finish(SessionOutcome{Status: StatusKilled, Reason: "orca worker stopped"})
-	return err
+	return nil
 }
 
 func (s *orcaSession) ForceKill() error { return s.Terminate() }

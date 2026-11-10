@@ -81,6 +81,8 @@ export function AgentFeed({ sessionId }: { sessionId: string }) {
   const activeSession = snapshot.active.find((s) => s.id === sessionId && s.status === "running");
   const isSessionThinking =
     snapshot.loop_state === "running" && Boolean(activeSession?.current_action?.trim());
+  // Orca workers cannot be interrupted live, so Stop ends the worker.
+  const stopLabel = session?.runtime === "orca" ? "Stop (ends worker)" : "Stop";
   const pendingReview = snapshot.pending_reviews?.find((r) => r.session_id === sessionId);
 
   const items = useMemo(() => groupConsecutiveTools(events), [events]);
@@ -196,7 +198,7 @@ export function AgentFeed({ sessionId }: { sessionId: string }) {
                 onClick={handleStop}
                 disabled={isControlPending}
               >
-                {isControlPending ? "Stopping…" : "Stop"}
+                {isControlPending ? "Stopping…" : stopLabel}
               </button>
             )}
             {orderForSession && (
