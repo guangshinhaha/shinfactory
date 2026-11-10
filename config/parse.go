@@ -270,10 +270,12 @@ func normalizeParsedValues(config *Config, metadata toml.MetaData, diagnostics *
 	case LandingModeLocal, LandingModePR:
 		config.Landing.Mode = mode
 	default:
+		// A typo must not turn on pushes and merges to a remote: fall back to
+		// the mode that touches nothing outside the project.
 		appendNormalizedValueDiagnostic(diagnostics, "landing.mode",
-			fmt.Sprintf("landing.mode %q unsupported; using %q", config.Landing.Mode, LandingModePR),
+			fmt.Sprintf("landing.mode %q unsupported; using %q", config.Landing.Mode, LandingModeLocal),
 		)
-		config.Landing.Mode = LandingModePR
+		config.Landing.Mode = LandingModeLocal
 	}
 	config.Landing.Base = strings.TrimSpace(config.Landing.Base)
 
