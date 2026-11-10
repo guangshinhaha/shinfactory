@@ -1640,6 +1640,33 @@ foreignObject.node.node-clickable .tree-node-card:active {
   border-left-color: var(--color-accent);
   color: var(--color-text-primary);
 }
+.stage-model {
+  color: var(--color-text-tertiary);
+}
+.stage-orca {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.stage-dispatch {
+  color: var(--color-text-tertiary);
+}
+.stage-orca-open {
+  font: inherit;
+  color: var(--color-accent);
+  background: none;
+  border: 1px solid var(--color-border-subtle);
+  padding: 2px 8px;
+  cursor: pointer;
+}
+.stage-orca-open:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.stage-orca-error {
+  color: var(--color-red);
+}
 .stage-dot {
   width: 6px;
   height: 6px;

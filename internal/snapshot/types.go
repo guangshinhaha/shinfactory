@@ -103,6 +103,8 @@ type Stage struct {
 	Status    string                     `json:"status"`
 	Extra     map[string]json.RawMessage `json:"extra,omitempty"`
 	SessionID string                     `json:"session_id,omitempty"`
+	// DispatchID is the Orca worker id; set only for stages run on the orca runtime.
+	DispatchID string `json:"dispatch_id,omitempty"`
 }
 
 // EventLine is a single parsed event in a session trace.

@@ -2,13 +2,16 @@ package snapshot
 
 import (
 	"encoding/json"
+	"fmt"
 	"path/filepath"
 	"sort"
 	"time"
 
 	"github.com/guangshinhaha/shinfactory/event"
+	"github.com/guangshinhaha/shinfactory/internal/linestatus"
 	"github.com/guangshinhaha/shinfactory/internal/orderx"
 	"github.com/guangshinhaha/shinfactory/internal/projection"
+	"github.com/guangshinhaha/shinfactory/internal/state"
 	"github.com/guangshinhaha/shinfactory/internal/stringx"
 	"github.com/guangshinhaha/shinfactory/loop"
 )
@@ -105,11 +108,11 @@ func LoadSnapshot(runtimeDir string, now time.Time, state loop.LoopState) (Snaps
 				Model:     stage.Model,
 				Runtime:   stage.Runtime,
 				Group:     stage.Group,
-				Status:    stage.Status,
+				Status:    uiStageStatus(stage.Status),
 				Extra:     cloneRawMap(stage.Extra),
 				SessionID: "",
 			}
-			if (stage.Status == string(orderx.StageStatusActive) || stage.Status == string(orderx.StageStatusMerging)) && activeSessionID != "" {
+			if (s.Status == string(orderx.StageStatusActive) || s.Status == string(orderx.StageStatusMerging)) && activeSessionID != "" {
 				s.SessionID = activeSessionID
 			} else if sid := completedSessionByStage[orderStageKey{order.ID, s.TaskKey}]; sid != "" {
 				s.SessionID = sid
@@ -126,6 +129,16 @@ func LoadSnapshot(runtimeDir string, now time.Time, state loop.LoopState) (Snaps
 		})
 	}
 
+	// The line overlay refines the projection; an unreadable state file must
+	// not blank the dashboard, so it degrades to the projection and warns.
+	var warnings []string
+	activeOrderIDs := projected.ActiveOrderIDs
+	if line, err := linestatus.Read(runtimeDir); err != nil {
+		warnings = append(warnings, fmt.Sprintf("dashboard shows the loop's last published state: read line state: %v", err))
+	} else {
+		orders, activeOrderIDs = overlayLine(orders, activeOrderIDs, line)
+	}
+
 	feedEvents := readSteerEvents(filepath.Join(runtimeDir, "control.ndjson"))
 	loopEvents := readLoopEvents(runtimeDir)
 	feedEvents = append(feedEvents, loopEvents...)
@@ -140,7 +153,7 @@ func LoadSnapshot(runtimeDir string, now time.Time, state loop.LoopState) (Snaps
 		Active:             active,
 		Recent:             recent,
 		Orders:             orders,
-		ActiveOrderIDs:     nonNilStrings(projected.ActiveOrderIDs),
+		ActiveOrderIDs:     nonNilStrings(activeOrderIDs),
 		ActionNeeded:       nonNilStrings(projected.ActionNeeded),
 		EventsBySession:    map[string][]EventLine{},
 		FeedEvents:         nonNilFeedEvents(feedEvents),
@@ -149,6 +162,7 @@ func LoadSnapshot(runtimeDir string, now time.Time, state loop.LoopState) (Snaps
 		PendingReviewCount: projected.PendingReviewCount,
 		Mode:               projected.Mode,
 		MaxConcurrency:     state.MaxConcurrency,
+		Warnings:           warnings,
 	}, nil
 }
 
@@ -259,4 +273,71 @@ func nonNilReviews(s []loop.PendingReviewItem) []loop.PendingReviewItem {
 		return []loop.PendingReviewItem{}
 	}
 	return append([]loop.PendingReviewItem(nil), s...)
+}
+
+// uiStageStatus maps a stage's lifecycle status onto the statuses the dashboard
+// draws: a dispatched, running or parked stage is active, a skipped one is
+// cancelled.
+func uiStageStatus(status string) string {
+	switch state.StageLifecycleStatus(status) {
+	case state.StageDispatching, state.StageRunning, state.StageReview:
+		return string(orderx.StageStatusActive)
+	case state.StageSkipped:
+		return string(orderx.StageStatusCancelled)
+	default:
+		return status
+	}
+}
+
+// overlayLine makes the dashboard agree with `shinfactory status --json`. The
+// loop's published projection can lag the factory's state files and carries no
+// resolved routing, so the line wins: it adds orders the projection lacks and
+// fills each stage's session, dispatch id, provider and model from the files.
+func overlayLine(orders []Order, activeIDs []string, line linestatus.Report) ([]Order, []string) {
+	byID := make(map[string]int, len(orders))
+	for i, o := range orders {
+		byID[o.ID] = i
+	}
+	active := append([]string(nil), activeIDs...)
+	known := make(map[string]bool, len(active))
+	for _, id := range active {
+		known[id] = true
+	}
+	lineOrders := make([]linestatus.Order, 0, len(line.Running)+len(line.Queued)+len(line.Parked))
+	lineOrders = append(lineOrders, line.Running...)
+	lineOrders = append(lineOrders, line.Queued...)
+	lineOrders = append(lineOrders, line.Parked...)
+	for _, lo := range lineOrders {
+		i, ok := byID[lo.ID]
+		if !ok {
+			orders = append(orders, Order{ID: lo.ID, Title: lo.Title, Status: string(state.OrderActive), Stages: []Stage{}})
+			i = len(orders) - 1
+			byID[lo.ID] = i
+		}
+		if !known[lo.ID] {
+			known[lo.ID] = true
+			active = append(active, lo.ID)
+		}
+		stages := orders[i].Stages
+		for j, ls := range lo.Stages {
+			if j >= len(stages) {
+				stages = append(stages, Stage{TaskKey: ls.TaskKey, Status: uiStageStatus(ls.Status)})
+			}
+			if stages[j].TaskKey != ls.TaskKey {
+				continue
+			}
+			if ls.SessionID != "" {
+				stages[j].SessionID = ls.SessionID
+			}
+			if ls.Provider != "" {
+				stages[j].Provider = ls.Provider
+			}
+			if ls.Model != "" {
+				stages[j].Model = ls.Model
+			}
+			stages[j].DispatchID = ls.DispatchID
+		}
+		orders[i].Stages = stages
+	}
+	return orders, active
 }

@@ -15,7 +15,7 @@ How the factory runs day to day: what drives the work, who decides, and where yo
 There are three places, each with a different job.
 
 - **The dashboard shows the line.** It shows each repo's orders, their stages, each stage's model, status and cost, and the controls (pause, drain, stop, steer). It reads the factory's own state, the same state `shinfactory status --json` shows.
-- **Orca shows each agent.** On the `orca` runtime, each stage card on the dashboard links to its Orca worker. That link is being built in [#113](https://github.com/guangshinhaha/shinfactory/issues/113).
+- **Orca shows each agent.** On the `orca` runtime, each stage in the order pipeline shows its Orca dispatch id and an "open in Orca" action that brings that worker to the front. The dashboard never copies the worker's transcript.
 - **The coordinator chat is the combined view** across repos. A combined dashboard is iceboxed as [#120](https://github.com/guangshinhaha/shinfactory/issues/120).
 
 ### One dashboard per repo
