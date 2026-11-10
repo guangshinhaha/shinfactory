@@ -1,3 +1,8 @@
+mode = "auto"
+
+[concurrency]
+max_concurrency = 2
+
 # Fallback for task keys with no role.
 [routing.defaults]
 provider = "claude"
@@ -44,16 +49,9 @@ mode = "pr"
 close_issues = true
 
 [runtime]
-# "process" | "sprites"
-default = "process"
+default = "orca"
 
-[runtime.sprites]
-# token_env = "SPRITES_TOKEN"
-# base_url = ""
-sprite_name = "noodle-dev"
-# git_token_env = "GITHUB_TOKEN"
+[runtime.orca]
 
-# [runtime.cursor]
-# api_key_env = "CURSOR_API_KEY"
-# base_url = ""
-# repository = ""
+[server]
+port = 3002
