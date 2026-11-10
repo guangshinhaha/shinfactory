@@ -1,0 +1,12 @@
+{
+  "orders": [
+    {
+      "id": "order-existing",
+      "title": "Mid quality",
+      "stages": [
+        {"do":"execute","with":"claude","model":"claude-opus-4-6","prompt":"another round"},
+        {"do":"quality","with":"claude","model":"claude-opus-4-6"}
+      ]
+    }
+  ]
+}

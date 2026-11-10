@@ -1,0 +1,13 @@
+{
+  "orders": [
+    {
+      "id": "order-existing",
+      "title": "Mid quality",
+      "stages": [
+        {"task_key":"execute","provider":"claude","model":"claude-opus-4-6","status":"completed"},
+        {"task_key":"quality","provider":"claude","model":"claude-opus-4-6","status":"active"}
+      ],
+      "status": "active"
+    }
+  ]
+}

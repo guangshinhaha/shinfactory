@@ -359,7 +359,7 @@ func TestConsumeOrdersNextDuplicateActiveIDAmendsPendingTail(t *testing.T) {
 				Title:  "existing order",
 				Status: orderx.OrderStatusActive,
 				Stages: []orderx.Stage{
-					{TaskKey: "execute", Skill: "execute", Prompt: "ship this", Provider: "codex", Model: "gpt-5.4", Status: orderx.StageStatusActive},
+					{TaskKey: "execute", Skill: "execute", Prompt: "ship this", Provider: "codex", Model: "gpt-5.4", Status: orderx.StageStatusPending},
 					{TaskKey: "quality", Provider: "claude", Model: "claude-opus-4-6", Status: orderx.StageStatusPending},
 					{TaskKey: "reflect", Provider: "claude", Model: "claude-opus-4-6", Status: orderx.StageStatusPending},
 				},
@@ -395,8 +395,8 @@ func TestConsumeOrdersNextDuplicateActiveIDAmendsPendingTail(t *testing.T) {
 	if len(stages) != 2 {
 		t.Fatalf("expected 2 stages after amendment, got %d", len(stages))
 	}
-	if stages[0].TaskKey != "execute" || stages[0].Status != orderx.StageStatusActive {
-		t.Fatalf("stage[0] = %+v, want active execute", stages[0])
+	if stages[0].TaskKey != "execute" || stages[0].Status != orderx.StageStatusPending {
+		t.Fatalf("stage[0] = %+v, want pending execute", stages[0])
 	}
 	if stages[1].TaskKey != "adversarial-review" || stages[1].Status != orderx.StageStatusPending {
 		t.Fatalf("stage[1] = %+v, want pending adversarial-review", stages[1])
@@ -415,7 +415,7 @@ func TestConsumeOrdersNextDuplicateActiveIDAmendsCurrentStage(t *testing.T) {
 				Title:  "existing order",
 				Status: orderx.OrderStatusActive,
 				Stages: []orderx.Stage{
-					{TaskKey: "execute", Prompt: "old prompt", Provider: "codex", Model: "gpt-5.4", Status: orderx.StageStatusActive},
+					{TaskKey: "execute", Prompt: "old prompt", Provider: "codex", Model: "gpt-5.4", Status: orderx.StageStatusPending},
 					{TaskKey: "quality", Provider: "claude", Model: "claude-opus-4-6", Status: orderx.StageStatusPending},
 				},
 			},

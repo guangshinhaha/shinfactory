@@ -73,6 +73,11 @@ func (l *Loop) handlePromotionResult(result mergeResult, err error) error {
 		l.droppedOrderIDs = appendUnique(l.droppedOrderIDs, result.Unbuildable)
 		l.logger.Warn("dropped orders that name no ready issue", "orders", strings.Join(result.Unbuildable, ", "))
 	}
+	if len(result.AmendRejected) > 0 {
+		l.logger.Warn("rejected amendment to orders with a stage in flight",
+			"orders", strings.Join(result.AmendRejected, ", "),
+			"reason", "stage in flight; amend after it finishes")
+	}
 	if result.EmptyPromotion {
 		l.scheduleNothingUntil = l.deps.Now().Add(5 * time.Minute)
 		l.logger.Info("schedule produced no orders, entering cooldown")
