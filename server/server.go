@@ -172,7 +172,7 @@ func (s *Server) handleSnapshot(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	snap.Warnings = mergeWarnings(s.warnings, loopState.Warnings)
+	snap.Warnings = mergeWarnings(s.warnings, append(append([]string(nil), loopState.Warnings...), snap.Warnings...))
 	writeJSON(w, http.StatusOK, snap)
 }
 

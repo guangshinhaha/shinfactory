@@ -254,7 +254,7 @@ func (h *wsHub) loadAndBroadcast(runtimeDir string, now func() time.Time, provid
 	if err != nil {
 		return
 	}
-	snap.Warnings = mergeWarnings(warnings, loopState.Warnings)
+	snap.Warnings = mergeWarnings(warnings, append(append([]string(nil), loopState.Warnings...), snap.Warnings...))
 
 	// Zero volatile fields for diff-gating so clock-only drift doesn't force a broadcast.
 	hashSnap := snapshotForHash(snap)
@@ -332,7 +332,7 @@ func (h *wsHub) loadInitialSnapshot(runtimeDir string, now func() time.Time, pro
 	if err != nil {
 		return nil, err
 	}
-	snap.Warnings = mergeWarnings(warnings, loopState.Warnings)
+	snap.Warnings = mergeWarnings(warnings, append(append([]string(nil), loopState.Warnings...), snap.Warnings...))
 	data, err := json.Marshal(snap)
 	if err != nil {
 		return nil, err

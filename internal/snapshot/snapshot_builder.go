@@ -129,11 +129,15 @@ func LoadSnapshot(runtimeDir string, now time.Time, state loop.LoopState) (Snaps
 		})
 	}
 
-	line, err := linestatus.Read(runtimeDir)
-	if err != nil {
-		return Snapshot{}, fmt.Errorf("read line state: %w", err)
+	// The line overlay refines the projection; an unreadable state file must
+	// not blank the dashboard, so it degrades to the projection and warns.
+	var warnings []string
+	activeOrderIDs := projected.ActiveOrderIDs
+	if line, err := linestatus.Read(runtimeDir); err != nil {
+		warnings = append(warnings, fmt.Sprintf("dashboard shows the loop's last published state: read line state: %v", err))
+	} else {
+		orders, activeOrderIDs = overlayLine(orders, activeOrderIDs, line)
 	}
-	orders, activeOrderIDs := overlayLine(orders, projected.ActiveOrderIDs, line)
 
 	feedEvents := readSteerEvents(filepath.Join(runtimeDir, "control.ndjson"))
 	loopEvents := readLoopEvents(runtimeDir)
@@ -158,6 +162,7 @@ func LoadSnapshot(runtimeDir string, now time.Time, state loop.LoopState) (Snaps
 		PendingReviewCount: projected.PendingReviewCount,
 		Mode:               projected.Mode,
 		MaxConcurrency:     state.MaxConcurrency,
+		Warnings:           warnings,
 	}, nil
 }
 

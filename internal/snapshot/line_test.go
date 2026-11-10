@@ -57,3 +57,18 @@ func TestLoadSnapshotReadsOrcaOrderFromFactoryState(t *testing.T) {
 		t.Fatalf("active order ids = %v", snap.ActiveOrderIDs)
 	}
 }
+
+// A state file the line cannot parse must not blank the dashboard.
+func TestLoadSnapshotDegradesWhenLineStateIsUnreadable(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "status.json"), []byte("{not json"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	snap, err := LoadSnapshot(dir, time.Now(), loop.LoopState{})
+	if err != nil {
+		t.Fatalf("snapshot failed: %v", err)
+	}
+	if len(snap.Warnings) != 1 {
+		t.Fatalf("warnings = %v, want one", snap.Warnings)
+	}
+}

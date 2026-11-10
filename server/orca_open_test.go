@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -40,6 +41,7 @@ func orcaOpenServer(t *testing.T, run orcaRunner) *Server {
 func postOpen(s *Server, body string) *httptest.ResponseRecorder {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/api/orca/open", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
 	s.handleOrcaOpen(rec, req)
 	return rec
 }
@@ -85,5 +87,29 @@ func TestOrcaOpenReportsWorkerWithoutTerminal(t *testing.T) {
 	})
 	if rec := postOpen(s, `{"dispatch_id":"ctx_8f03"}`); rec.Code != http.StatusConflict {
 		t.Fatalf("status = %d, want 409", rec.Code)
+	}
+}
+
+func TestOrcaOpenRequiresJSONContentType(t *testing.T) {
+	s := orcaOpenServer(t, func(context.Context, string, ...string) ([]byte, error) {
+		t.Fatal("orca ran for a request that was not JSON")
+		return nil, nil
+	})
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/orca/open", strings.NewReader(`{"dispatch_id":"ctx_8f03"}`))
+	req.Header.Set("Content-Type", "text/plain")
+	s.handleOrcaOpen(rec, req)
+	if rec.Code != http.StatusUnsupportedMediaType {
+		t.Fatalf("status = %d, want 415", rec.Code)
+	}
+}
+
+func TestOrcaOpenHidesCLIErrorDetail(t *testing.T) {
+	s := orcaOpenServer(t, func(context.Context, string, ...string) ([]byte, error) {
+		return nil, fmt.Errorf("orca: /Users/shin/secret/path exploded")
+	})
+	rec := postOpen(s, `{"dispatch_id":"ctx_8f03"}`)
+	if rec.Code != http.StatusBadGateway || strings.Contains(rec.Body.String(), "/Users/shin") {
+		t.Fatalf("status = %d body = %q", rec.Code, rec.Body)
 	}
 }
