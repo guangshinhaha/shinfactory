@@ -1,6 +1,7 @@
 package loop
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -171,6 +172,8 @@ type verifyVerdict struct {
 	HeadSHA  string `json:"head_sha"`
 	Verdict  string `json:"verdict"`
 	Evidence string `json:"evidence"`
+
+	raw []byte // the file as the verifier wrote it
 }
 
 func parseVerdict(data []byte) (verifyVerdict, error) {
@@ -204,6 +207,7 @@ func (l *Loop) readVerdict(order Order, cook *cookHandle) (verifyVerdict, error)
 	if err != nil {
 		return v, err
 	}
+	v.raw = data
 	head, err := headSHA(cook.worktreePath)
 	if err != nil {
 		return v, err
@@ -214,10 +218,35 @@ func (l *Loop) readVerdict(order Order, cook *cookHandle) (verifyVerdict, error)
 	return v, nil
 }
 
+// verdictPostedFile records the verdict file already posted for a round, so a
+// crash and rerun does not comment twice.
+const verdictPostedFile = "verdict-posted"
+
+// postVerdict carries the verifier's file to the PR as a comment, for gantry's
+// verdict-check to read. The loop never writes a verdict: the comment holds
+// the verifier's bytes unchanged.
+func (l *Loop) postVerdict(ctx context.Context, order Order, cook *cookHandle, v verifyVerdict) error {
+	marker := filepath.Join(l.gateDir(order.ID, order.Round), verdictPostedFile)
+	if done, err := os.ReadFile(marker); err == nil && string(done) == string(v.raw) {
+		return nil
+	}
+	body := "Verify verdict at head " + v.HeadSHA + ", copied from the verify stage's file:\n\n```json\n" +
+		strings.TrimSpace(string(v.raw)) + "\n```\n"
+	ctx, cancel := context.WithTimeout(ctx, shipTimeout)
+	defer cancel()
+	if err := l.lander().PostVerdict(ctx, cook.worktreePath, l.prSpec(order, cook).Branch, body); err != nil {
+		return fmt.Errorf("post verify verdict on the PR: %w", err)
+	}
+	if err := os.WriteFile(marker, v.raw, 0o644); err != nil {
+		return fmt.Errorf("record posted verdict: %w", err)
+	}
+	return nil
+}
+
 // reviewGate runs when a stage completes in landing mode "pr", before the
 // stage pushes or ships. It returns true when it has handled the completion
 // itself (failed the stage or sent the order back to execute).
-func (l *Loop) reviewGate(cook *cookHandle) (bool, error) {
+func (l *Loop) reviewGate(ctx context.Context, cook *cookHandle) (bool, error) {
 	order, ok := l.orderByID(cook.orderID)
 	if !ok || isScheduleOrder(order) {
 		return false, nil
@@ -260,6 +289,10 @@ func (l *Loop) reviewGate(cook *cookHandle) (bool, error) {
 		}
 		v, err := l.readVerdict(order, cook)
 		if err != nil {
+			return true, l.failStage(nil, cook, err.Error())
+		}
+		// Before any merge, and for a FAIL too, so the PR shows why it is blocked.
+		if err := l.postVerdict(ctx, order, cook, v); err != nil {
 			return true, l.failStage(nil, cook, err.Error())
 		}
 		if v.Verdict == VerdictFail {

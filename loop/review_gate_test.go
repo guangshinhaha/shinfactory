@@ -3,6 +3,7 @@ package loop
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -576,5 +577,51 @@ func (h *gateHarness) settleEvidence(t *testing.T) {
 		if err := h.l.Cycle(context.Background()); err != nil {
 			t.Fatalf("evidence cycle: %v", err)
 		}
+	}
+}
+
+func TestVerdictCommentFailureStopsTheMerge(t *testing.T) {
+	h := newGateHarness(t, "high", "execute", "quality", "verify")
+	h.ln.verdictErr = errors.New("gh down")
+	h.next(t)
+	h.review(t, 0, "none")
+	h.next(t)
+	h.verdict(t, 0, VerdictPass, fixtureHead)
+	h.next(t)
+	h.failedWith(t, "verdict comment failed")
+}
+
+func TestVerdictIsPostedOncePerFile(t *testing.T) {
+	h := newGateHarness(t, "high", "execute", "quality", "verify")
+	h.next(t)
+	h.review(t, 0, "none")
+	h.next(t)
+	h.verdict(t, 0, VerdictPass, fixtureHead)
+	h.next(t)
+	if len(h.ln.verdicts) != 1 || !strings.Contains(h.ln.verdicts[0], `"verdict":"PASS"`) {
+		t.Fatalf("posted %q, want the verifier's PASS once", h.ln.verdicts)
+	}
+	cook := &cookHandle{worktreePath: "wt"}
+	cook.worktreeName = h.l.cookWorktreeName("42", 0, "")
+	order := Order{ID: "42"}
+	v, err := h.l.readVerdict(order, cook)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := h.l.postVerdict(context.Background(), order, cook, v); err != nil {
+		t.Fatal(err)
+	}
+	if len(h.ln.verdicts) != 1 {
+		t.Fatalf("same verdict file posted %d times, want 1", len(h.ln.verdicts))
+	}
+}
+
+func TestMediumTierPostsNoVerdict(t *testing.T) {
+	h := newGateHarness(t, "medium", "execute", "quality")
+	h.next(t)
+	h.review(t, 0, "none")
+	h.next(t)
+	if len(h.ln.verdicts) != 0 {
+		t.Fatalf("medium tier posted %q, want nothing", h.ln.verdicts)
 	}
 }
