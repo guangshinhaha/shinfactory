@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -500,5 +502,123 @@ func TestSteerRespawnOnTheLastAllowedAttemptIsNotStoppedByTheSpendCap(t *testing
 	}
 	if got := l.orderSpendOf("order-2").Attempts["execute"]; got != l.config.Spend.MaxAttempts {
 		t.Fatalf("execute attempts = %d, want %d: a steer is not a new attempt", got, l.config.Spend.MaxAttempts)
+	}
+}
+
+func orcaCook(orderID string, stage Stage, sess loopruntime.SessionHandle) *cookHandle {
+	return &cookHandle{
+		cookIdentity:      cookIdentity{orderID: orderID, stage: stage},
+		session:           sess,
+		worktreeName:      "wt-" + orderID,
+		worktreePath:      "/does/not/matter",
+		orderStatus:       OrderStatusActive,
+		dispatchedRuntime: "orca",
+	}
+}
+
+func assertNoSteerEffects(t *testing.T, l *Loop, rt *mockRuntime, sess *mockSession, sessionID string) {
+	t.Helper()
+	if sess.status == "killed" {
+		t.Fatal("session was killed by a refused steer")
+	}
+	if len(rt.calls) != 0 {
+		t.Fatalf("dispatch calls = %d, want 0", len(rt.calls))
+	}
+	if _, err := os.Stat(filepath.Join(l.runtimeDir, "orders.json")); !os.IsNotExist(err) {
+		t.Fatalf("orders.json touched by a refused steer (stat err = %v)", err)
+	}
+	events, err := event.NewEventReader(l.runtimeDir).ReadSession(sessionID, event.EventFilter{})
+	if err != nil {
+		t.Fatalf("read session events: %v", err)
+	}
+	if len(events) != 0 {
+		t.Fatalf("refused steer wrote %d session events, want 0 (current_action must not become the steer text)", len(events))
+	}
+}
+
+func TestSteerRefusedOnOrcaAgentTarget(t *testing.T) {
+	rt := newMockRuntime()
+	l := newSteerTestLoop(t, rt)
+	sess := &mockSession{id: "sess-orca", status: "running", done: make(chan struct{})}
+	l.cooks.activeCooksByOrder["order-orca"] = orcaCook("order-orca", Stage{TaskKey: "execute"}, sess)
+
+	err := l.steer("wt-order-orca", "new direction")
+	if err == nil || !strings.Contains(err.Error(), "Open in Orca") {
+		t.Fatalf("steer err = %v, want a refusal that points to Open in Orca", err)
+	}
+	if got := l.cooks.activeCooksByOrder["order-orca"]; got == nil || got.session.ID() != "sess-orca" {
+		t.Fatal("refused steer replaced or removed the active cook")
+	}
+	assertNoSteerEffects(t, l, rt, sess, "sess-orca")
+}
+
+func TestSteerRefusedOnOrcaScheduleTarget(t *testing.T) {
+	rt := newMockRuntime()
+	l := newSteerTestLoop(t, rt)
+	sess := &mockSession{id: "sess-orca-schedule", status: "running", done: make(chan struct{})}
+	l.cooks.activeCooksByOrder[ScheduleTaskKey()] = orcaCook(ScheduleTaskKey(), Stage{TaskKey: ScheduleTaskKey()}, sess)
+
+	err := l.steer(ScheduleTaskKey(), "prioritize auth hardening")
+	if err == nil || !strings.Contains(err.Error(), "Open in Orca") {
+		t.Fatalf("steer err = %v, want a refusal that points to Open in Orca", err)
+	}
+	assertNoSteerEffects(t, l, rt, sess, "sess-orca-schedule")
+}
+
+// A steer resumes the same attempt, so it must never run the retry reset that
+// discards uncommitted work.
+func TestSteerRespawnKeepsUncommittedWorkOnRetriedStage(t *testing.T) {
+	rt := newMockRuntime()
+	l := newSteerTestLoop(t, rt)
+	stage := Stage{TaskKey: "execute", Prompt: "original", Provider: "claude", Model: "claude-sonnet-4-6"}
+	name := l.cookWorktreeName("order-retry", 0, stage.TaskKey)
+	wt := l.worktreePath(name)
+	if err := os.MkdirAll(wt, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	git := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", append([]string{"-C", wt}, args...)...)
+		cmd.Env = append(os.Environ(), "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	git("init", "-q")
+	tracked := filepath.Join(wt, "tracked.txt")
+	if err := os.WriteFile(tracked, []byte("committed\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	git("add", ".")
+	git("commit", "-q", "-m", "base")
+	if err := os.WriteFile(tracked, []byte("edited, uncommitted\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	untracked := filepath.Join(wt, "new.txt")
+	if err := os.WriteFile(untracked, []byte("untracked work\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	sess := &mockSession{id: "sess-retry", status: "running", done: make(chan struct{})}
+	l.cooks.activeCooksByOrder["order-retry"] = &cookHandle{
+		cookIdentity: cookIdentity{orderID: "order-retry", stage: stage},
+		session:      sess,
+		worktreeName: name,
+		worktreePath: wt,
+		orderStatus:  OrderStatusActive,
+		attempt:      1,
+	}
+
+	if err := l.steer(name, "new direction"); err != nil {
+		t.Fatalf("steer: %v", err)
+	}
+	if got := l.cooks.activeCooksByOrder["order-retry"]; got == nil || got.session.ID() == "sess-retry" {
+		t.Fatal("steer did not respawn the cook")
+	}
+	if b, _ := os.ReadFile(tracked); string(b) != "edited, uncommitted\n" {
+		t.Fatalf("tracked edit lost across steer respawn: %q", b)
+	}
+	if _, err := os.Stat(untracked); err != nil {
+		t.Fatalf("untracked file lost across steer respawn: %v", err)
 	}
 }
