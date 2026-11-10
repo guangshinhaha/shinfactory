@@ -1,6 +1,7 @@
 package dispatcher
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -119,5 +120,13 @@ func TestSpriteCommandDeniesForeignCLIs(t *testing.T) {
 	out, err := cmd.CombinedOutput()
 	if err == nil || !strings.Contains(string(out), "routing.sensitive") {
 		t.Fatalf("codex ran after the sprite shim script: err=%v out=%q", err, out)
+	}
+}
+
+func TestOrcaRefusesSensitiveDispatch(t *testing.T) {
+	d := &OrcaDispatcher{projectDir: "/p"}
+	_, err := d.Dispatch(context.Background(), DispatchRequest{Name: "s", Prompt: "synthetic", Provider: "claude", Model: "m", WorktreePath: "/w", Runtime: "orca", DenyProviders: []string{"codex"}})
+	if err == nil || !strings.Contains(err.Error(), "routing.sensitive") {
+		t.Fatalf("err = %v, want routing.sensitive refusal", err)
 	}
 }

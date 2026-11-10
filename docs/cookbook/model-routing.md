@@ -46,7 +46,7 @@ Every stage stays on `routing.defaults.provider`. A role that names another prov
 
 The loop also keeps a running stage from handing work to the other provider. Every launch on a sensitive repo sets `NOODLE_SENSITIVE=1` and `NOODLE_DENY_PROVIDERS`. A claude stage starts with a Bash deny rule for the `codex` CLI. Every stage, claude or codex, also gets a stub for the other provider's CLI ahead of `PATH` that exits non-zero, so `sh -c` and names built from variables are caught too. The sprites runtime writes the same stubs on the sprite. So the `codex` and `adversarial-review` skills cannot delegate mid-stage. `shinfactory start` refuses to run its repair session on another provider.
 
-Orca starts its own agent, so the factory cannot give it a deny rule or a `PATH`. A sensitive repo runs on the `process` runtime instead of `orca` (the worker spec still names the forbidden CLI if orca is the only runtime wired). A custom `runtimeDefault` template runs as a child process and inherits the `PATH` stubs.
+Orca starts its own agent, so the factory cannot give it a deny rule or a `PATH`. A sensitive repo runs on the `process` runtime instead of `orca` (with a warning in the log); if only `orca` is wired, the launch is refused. A custom `runtimeDefault` template runs as a child process and inherits the `PATH` stubs.
 
 Limits: the match is by CLI name, so a script that calls the provider's binary by absolute path gets through.
 

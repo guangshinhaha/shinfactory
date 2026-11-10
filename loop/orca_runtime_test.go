@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -429,7 +430,7 @@ func TestSensitiveRepoNeverResolvesToOrca(t *testing.T) {
 	cfg.Runtime.Default = "orca"
 	cfg.Routing.Sensitive = true
 	rts := map[string]loopruntime.Runtime{"process": newMockRuntime(), "orca": newMockRuntime()}
-	l := &Loop{config: cfg, deps: Dependencies{Runtimes: rts}}
+	l := &Loop{config: cfg, logger: slog.New(slog.DiscardHandler), deps: Dependencies{Runtimes: rts}}
 	if got := l.stageRuntime(Stage{}); got != "process" {
 		t.Errorf("stageRuntime = %q, want process", got)
 	}
@@ -437,7 +438,7 @@ func TestSensitiveRepoNeverResolvesToOrca(t *testing.T) {
 		t.Errorf("dispatchRuntime(orca) = %q, want process", got)
 	}
 	cfg.Routing.Sensitive = false
-	l = &Loop{config: cfg, deps: Dependencies{Runtimes: rts}}
+	l = &Loop{config: cfg, logger: slog.New(slog.DiscardHandler), deps: Dependencies{Runtimes: rts}}
 	if got := l.dispatchRuntime("orca"); got != "orca" {
 		t.Errorf("non-sensitive dispatchRuntime(orca) = %q, want orca", got)
 	}
