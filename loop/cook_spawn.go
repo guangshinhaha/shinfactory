@@ -79,7 +79,8 @@ func (l *Loop) spawnCook(ctx context.Context, cand dispatchCandidate, order Orde
 	resumePrompt := opts.resume
 	worktreePath := l.worktreePath(name)
 	if !created {
-		if opts.attempt > 0 {
+		// A steer resumes the same attempt; only a retry after failure starts clean.
+		if opts.attempt > 0 && !opts.steered {
 			resetWorktreeState(worktreePath)
 		}
 		if hint := worktreeResumeContext(worktreePath, name); hint != "" {

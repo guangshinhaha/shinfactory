@@ -6,6 +6,7 @@ import { buildSession, buildSnapshot } from "../test-utils";
 import type { Snapshot } from "~/client";
 
 const mockSend = vi.fn();
+const mockOpen = vi.fn();
 let mockSnapshot: Snapshot = buildSnapshot();
 
 vi.mock("~/client", async () => {
@@ -14,6 +15,7 @@ vi.mock("~/client", async () => {
     ...(actual as Record<string, unknown>),
     useSuspenseSnapshot: () => ({ data: mockSnapshot }),
     useSendControl: () => ({ mutate: mockSend, isPending: false }),
+    useOpenInOrca: () => ({ mutate: mockOpen, isPending: false, isError: false, error: null }),
     useSessionEvents: () => ({ data: [] }),
   };
 });
@@ -27,6 +29,7 @@ vi.mock("@tanstack/react-router", () => ({
 beforeEach(() => {
   mockSnapshot = buildSnapshot();
   mockSend.mockClear();
+  mockOpen.mockClear();
 });
 
 describe("SchedulerFeed", () => {
@@ -85,6 +88,35 @@ describe("SchedulerFeed", () => {
     expect(
       screen.getByText("Bootstrapping schedule skill. This usually takes a few seconds."),
     ).toBeInTheDocument();
+  });
+
+  it("replaces the input with an Open in Orca button when the scheduler runs on orca", async () => {
+    const session = buildSession({ id: "sess-sched", task_key: "schedule", runtime: "orca" });
+    mockSnapshot = buildSnapshot({
+      sessions: [session],
+      orders: [
+        {
+          id: "schedule",
+          status: "active",
+          stages: [
+            {
+              provider: "claude",
+              model: "opus",
+              status: "active",
+              task_key: "schedule",
+              session_id: "sess-sched",
+              dispatch_id: "ctx_sched",
+            },
+          ],
+        },
+      ],
+    });
+
+    render(<SchedulerFeed />);
+    expect(screen.queryByPlaceholderText("Enter instructions or critique...")).toBeNull();
+    await userEvent.setup().click(screen.getByText("Open in Orca"));
+    expect(mockOpen).toHaveBeenCalledWith("ctx_sched");
+    expect(mockSend).not.toHaveBeenCalled();
   });
 
   it("sends steer command on submit", async () => {

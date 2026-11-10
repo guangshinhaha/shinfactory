@@ -6,6 +6,7 @@ import { Tooltip } from "./Tooltip";
 import { StreamingDelta } from "./StreamingDelta";
 import { groupConsecutiveTools } from "./group-tools";
 import { VirtualizedFeed } from "./VirtualizedFeed";
+import { OrcaSteerNotice, dispatchIDForSession, isSteerable } from "./OrcaSteerNotice";
 
 function statusColor(status: string): string {
   if (status === "running") {
@@ -152,6 +153,9 @@ export function AgentFeed({ sessionId }: { sessionId: string }) {
 
       {pendingReview && <ReviewBanner review={pendingReview} />}
 
+      {!isSteerable(session) ? (
+        <OrcaSteerNotice dispatchID={dispatchIDForSession(snapshot, sessionId)} />
+      ) : (
       <div className="input-area">
         <div className="input-label">
           {isSessionThinking ? (
@@ -222,6 +226,7 @@ export function AgentFeed({ sessionId }: { sessionId: string }) {
           </div>
         </div>
       </div>
+      )}
     </>
   );
 }

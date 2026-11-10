@@ -5,6 +5,7 @@ import type { Session } from "~/client";
 import { StreamingDelta } from "./StreamingDelta";
 import { groupConsecutiveTools } from "./group-tools";
 import { VirtualizedFeed } from "./VirtualizedFeed";
+import { OrcaSteerNotice, dispatchIDForSession, isSteerable } from "./OrcaSteerNotice";
 
 function findSchedulerSession(sessions: Session[]): Session | undefined {
   return sessions.find((s) => s.task_key?.toLowerCase().trim() === "schedule");
@@ -169,6 +170,9 @@ export function SchedulerFeed() {
         }
       />
 
+      {schedulerSession && !isSteerable(schedulerSession) ? (
+        <OrcaSteerNotice dispatchID={dispatchIDForSession(snapshot, schedulerSession.id)} />
+      ) : (
       <div className="input-area">
         <div className="input-label">{renderInputLabel()}</div>
         <div className="input-row">
@@ -208,6 +212,7 @@ export function SchedulerFeed() {
           </div>
         </div>
       </div>
+      )}
     </>
   );
 }
