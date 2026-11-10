@@ -2,6 +2,9 @@ package loop
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -240,13 +243,42 @@ func (l *Loop) ensureScheduleIfNeeded(brief mise.Brief, orders *OrdersFile, mise
 		}
 	}
 	if miseChanged && !l.hasActiveScheduleCook() && !hasScheduleOrder(*orders) {
+		fingerprint := schedulingFingerprint(brief)
+		if fingerprint == l.lastScheduledFingerprint {
+			return false, nil
+		}
 		orders.Orders = append(orders.Orders, scheduleOrder(""))
 		if err := l.writeOrdersState(*orders); err != nil {
 			return false, err
 		}
+		l.lastScheduledFingerprint = fingerprint
 		l.logger.Info("mise changed, injecting schedule order")
 	}
 	return false, nil
+}
+
+// schedulingFingerprint covers what a new schedule could act on: the backlog,
+// the task types and finished stages of non-schedule orders. Recent events and
+// the schedule's own history are left out: every schedule run adds them, so
+// counting them made each schedule run inject the next one.
+func schedulingFingerprint(brief mise.Brief) string {
+	type finished struct {
+		OrderID, TaskKey, Status string
+	}
+	var history []finished
+	for _, h := range brief.RecentHistory {
+		if h.OrderID == scheduleOrderID || h.TaskKey == scheduleOrderID {
+			continue
+		}
+		history = append(history, finished{h.OrderID, h.TaskKey, h.Status})
+	}
+	data, _ := json.Marshal(struct {
+		Backlog   any
+		TaskTypes any
+		History   []finished
+	}{brief.Backlog, brief.TaskTypes, history})
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:])
 }
 
 // bootstrapScheduleIfEmpty handles the case where no non-schedule orders
