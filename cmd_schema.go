@@ -52,7 +52,7 @@ func runSchema(target string) error {
 	}
 	out, err := schemadoc.RenderMarkdown(target)
 	if err != nil {
-		return fmt.Errorf("%w. Run `noodle schema list` to see supported targets", err)
+		return fmt.Errorf("%w. Run `shinfactory schema list` to see supported targets", err)
 	}
 	fmt.Fprint(os.Stdout, out)
 	return nil

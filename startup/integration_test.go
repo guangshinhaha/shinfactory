@@ -15,7 +15,7 @@ import (
 )
 
 // TestCLIIntegrationStartScaffolds builds the noodle binary and verifies
-// that `noodle start --once` in a fresh directory scaffolds the project structure.
+// that `shinfactory start --once` in a fresh directory scaffolds the project structure.
 func TestCLIIntegrationStartScaffolds(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
@@ -69,7 +69,7 @@ func TestCLIIntegrationStartScaffolds(t *testing.T) {
 	// the failure is from missing skills, not from config or scaffolding.
 	if err != nil {
 		if !strings.Contains(string(output), "skill") {
-			t.Fatalf("noodle start --once failed for unexpected reason:\n%s", output)
+			t.Fatalf("shinfactory start --once failed for unexpected reason:\n%s", output)
 		}
 	}
 

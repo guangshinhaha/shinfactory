@@ -14,7 +14,7 @@ import (
 // App holds the resolved git root and provides worktree operations.
 type App struct {
 	Root              string
-	CmdPrefix         string        // command prefix for user-facing messages (e.g., "noodle worktree")
+	CmdPrefix         string        // command prefix for user-facing messages (e.g., "shinfactory worktree")
 	MergeLockTimeout  time.Duration // 0 uses defaultMergeLockTimeout
 	IntegrationBranch string        // override for the integration branch; auto-discovered when empty
 	Quiet             bool          // suppress stdout/stderr chatter for programmatic callers
