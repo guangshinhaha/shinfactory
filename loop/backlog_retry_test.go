@@ -77,13 +77,12 @@ func TestBuildCycleBriefDoesNotRetryHardBacklogError(t *testing.T) {
 }
 
 // A host sleep keeps the network down far longer than the old ~7s window
-// (1s+2s+4s). The fake network fails for ten virtual minutes, then recovers.
+// (1s+2s+4s). The fake network fails for four virtual minutes, then recovers.
 func TestBuildCycleBriefSurvivesLongNetworkOutage(t *testing.T) {
-	m := &fakeMise{}
-	l, slept := backlogRetryLoop(t, m)
+	var calls int
+	l, slept := backlogRetryLoop(t, &fakeMise{})
 	outage := 4 * time.Minute
-	m.results = nil
-	l.deps.Mise = outageMise{down: func() bool { return *slept < outage }, calls: &m.calls}
+	l.deps.Mise = outageMise{down: func() bool { return *slept < outage }, calls: &calls}
 	l.config.Backlog.RetryWindowSeconds = 600
 
 	_, _, running, _, err := l.buildCycleBrief(context.Background())
