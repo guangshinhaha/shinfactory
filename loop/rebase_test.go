@@ -1,6 +1,8 @@
 package loop
 
 import (
+	"errors"
+	"os"
 	"strings"
 	"testing"
 )
@@ -101,5 +103,41 @@ func TestConflictWithoutReviewStageShipsTheRebasedHead(t *testing.T) {
 	h.next(t)
 	if h.ln.rebases != 1 || len(h.ln.merged) != 1 {
 		t.Fatalf("rebases=%d merged=%d, want 1 rebase then 1 merge", h.ln.rebases, len(h.ln.merged))
+	}
+}
+
+func TestRebaseCountIsWrittenAtomicallyAndSurvivesAReread(t *testing.T) {
+	h := newGateHarness(t, "none", "execute")
+	if err := h.l.bumpRebased("a"); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.l.bumpRebased("b"); err != nil {
+		t.Fatal(err)
+	}
+	entries, _ := os.ReadDir(h.l.runtimeDir)
+	for _, e := range entries {
+		if strings.Contains(e.Name(), ".tmp") {
+			t.Fatalf("temp file %s left behind", e.Name())
+		}
+	}
+	if h.l.rebaseCount("a") != 1 || h.l.rebaseCount("b") != 1 {
+		t.Fatal("counts lost between writes")
+	}
+}
+
+func TestFailedStageClearsTheRebaseCountSoARetryGetsItsRebase(t *testing.T) {
+	h := newGateHarness(t, "medium", "execute", "quality")
+	h.ln.conflicts = 1
+	h.next(t)
+	h.review(t, 0, "none")
+	h.next(t) // conflict: rebase, review again
+	if h.l.rebaseCount(h.order(t).ID) != 1 {
+		t.Fatal("rebase not counted")
+	}
+	h.review(t, 0, "none")
+	h.ln.mergeErr = errors.New("boom")
+	h.next(t) // non-conflict ship error after the rebase fails the stage
+	if n := h.l.rebaseCount(h.order(t).ID); n != 0 {
+		t.Fatalf("rebase count = %d after a failed stage, want 0", n)
 	}
 }

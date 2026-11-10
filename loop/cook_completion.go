@@ -290,6 +290,9 @@ func (l *Loop) handleStageFailure(ctx context.Context, cook *cookHandle, resultS
 }
 
 func (l *Loop) failStage(_ context.Context, cook *cookHandle, reason string) error {
+	// A failed stage ends this run of the order; a retry under the same ID
+	// must get its one rebase back.
+	l.clearRebased(cook.orderID)
 	if err := l.ensureCanonicalOrderFromOrders(cook.orderID); err != nil {
 		return err
 	}

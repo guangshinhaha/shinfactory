@@ -267,3 +267,18 @@ func TestGHLanderTreatsAFailedReadAfterMergeAsPending(t *testing.T) {
 		t.Fatalf("err = %v, want ErrChecksPending after a merge whose status read failed", err)
 	}
 }
+
+// Right after a push GitHub can report mergeable UNKNOWN. Merging then would
+// surface gh's generic conflict error instead of ErrPRConflict, so wait.
+func TestGHLanderWaitsWhileMergeabilityIsUnknown(t *testing.T) {
+	work := newOrderRepo(t, "42-0-task")
+	head := gitIn(t, work, "rev-parse", "HEAD")
+	logPath := gitHubStub(t, head, `{"headRefName":"42-0-task","headRefOid":"HEAD","state":"OPEN","isDraft":false,"isCrossRepository":false,"mergeStateStatus":"CLEAN","mergeable":"UNKNOWN","statusCheckRollup":[{"status":"COMPLETED"}]}`, `[]`)
+	err := (ghLander{}).MarkReadyAndMerge(context.Background(), work, PullRequest{URL: "https://github.test/o/r/pull/7", Branch: "42-0-task"})
+	if !errors.Is(err, ErrChecksPending) {
+		t.Fatalf("err = %v, want ErrChecksPending", err)
+	}
+	if strings.Contains(ghCalls(logPath), "pr merge") {
+		t.Fatal("tried to merge while mergeability was unknown")
+	}
+}

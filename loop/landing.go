@@ -215,7 +215,7 @@ type prState struct {
 
 // checksPending reports what the PR still waits on, or "" when nothing.
 func (p prState) checksPending() string {
-	if p.MergeStateStatus == "UNKNOWN" {
+	if p.MergeStateStatus == "UNKNOWN" || p.Mergeable == "UNKNOWN" {
 		return "GitHub has not computed mergeability yet"
 	}
 	// Right after a push GitHub reports no checks yet and the PR as BLOCKED
