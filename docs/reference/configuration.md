@@ -109,6 +109,21 @@ The cost check runs between stages, so one stage can finish past the ceiling bef
 
 ---
 
+### `[backlog]`
+
+Tunes how the loop treats a backlog sync that fails with a transient error: DNS failure, a client timeout, a connection reset or a 5xx. The loop retries with exponential backoff (1s, doubling, capped at 30s) until the window is spent, then stops with "backlog sync still failing". Other errors, such as bad credentials, stop at once.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `retry_window_seconds` | int | `300` | Total time to keep retrying a transient backlog failure |
+
+```toml
+[backlog]
+retry_window_seconds = 300
+```
+
+---
+
 ### `[agents]`
 
 Configures paths and arguments for agent CLI binaries. Each sub-table names a provider.

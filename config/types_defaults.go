@@ -25,6 +25,26 @@ type Config struct {
 	Server      ServerConfig             `toml:"server"`
 	Landing     LandingConfig            `toml:"landing"`
 	Spend       SpendConfig              `toml:"spend"`
+	Backlog     BacklogConfig            `toml:"backlog"`
+}
+
+const defaultBacklogRetryWindow = 5 * time.Minute
+
+// BacklogConfig tunes how the loop treats a backlog sync that fails with a
+// transient network or 5xx error.
+type BacklogConfig struct {
+	// RetryWindowSeconds is the total time the loop keeps retrying a transient
+	// backlog failure, with capped exponential backoff, before it stops.
+	// 0 = five minutes.
+	RetryWindowSeconds int `toml:"retry_window_seconds"`
+}
+
+// RetryWindow is the total time to keep retrying a transient backlog failure.
+func (c BacklogConfig) RetryWindow() time.Duration {
+	if c.RetryWindowSeconds <= 0 {
+		return defaultBacklogRetryWindow
+	}
+	return time.Duration(c.RetryWindowSeconds) * time.Second
 }
 
 const (
