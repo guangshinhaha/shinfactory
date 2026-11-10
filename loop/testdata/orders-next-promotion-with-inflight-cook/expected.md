@@ -2,7 +2,7 @@
 schema_version: 1
 expected_failure: false
 bug: false
-source_hash: 33a7b6a54db85d578abcd217f5390517746a23a6cc5f26b51066ec39df8b65fa
+source_hash: 7f6e7a1040e18dccb644487540e5ecbb1faa3a062d76fb1c6adbdc02385c75a1
 ---
 
 ## Runtime Dump
@@ -19,6 +19,7 @@ source_hash: 33a7b6a54db85d578abcd217f5390517746a23a6cc5f26b51066ec39df8b65fa
       "active_summary_total": 2,
       "first_spawn": {
         "name": "order-existing-0-execute",
+        "skill": "execute",
         "provider": "claude",
         "model": "claude-opus-4-6"
       }
@@ -32,6 +33,7 @@ source_hash: 33a7b6a54db85d578abcd217f5390517746a23a6cc5f26b51066ec39df8b65fa
       "active_summary_total": 2,
       "first_spawn": {
         "name": "order-existing-0-execute",
+        "skill": "execute",
         "provider": "claude",
         "model": "claude-opus-4-6"
       }

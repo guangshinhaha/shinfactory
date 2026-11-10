@@ -50,3 +50,22 @@ func TestConsumeOrdersNextRejectsAmendmentWhileStageInFlight(t *testing.T) {
 		})
 	}
 }
+
+func TestConsumeOrdersNextUnchangedProposalIsNotReportedAsRejected(t *testing.T) {
+	dir := t.TempDir()
+	ordersPath := filepath.Join(dir, "orders.json")
+	nextPath := filepath.Join(dir, "orders-next.json")
+	existing := orderx.OrdersFile{Orders: []orderx.Order{{
+		ID: "19", Status: orderx.OrderStatusActive,
+		Stages: []orderx.Stage{{TaskKey: "quality", Skill: "quality", Provider: "claude", Model: "claude-opus-4-6", Status: orderx.StageStatusActive}},
+	}}}
+	if err := orderx.WriteOrdersAtomic(ordersPath, existing); err != nil {
+		t.Fatal(err)
+	}
+	writeCompactOrders(t, nextPath, orderx.CompactOrdersFile{Orders: []orderx.CompactOrder{
+		{ID: "19", Stages: []orderx.CompactStage{{Do: "quality", With: "claude", Model: "claude-opus-4-6"}}},
+	}})
+	if result := consumeOrdersNextAndPersist(t, nextPath, ordersPath); len(result.AmendRejected) != 0 {
+		t.Fatalf("AmendRejected = %v, want none for an unchanged proposal", result.AmendRejected)
+	}
+}

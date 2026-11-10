@@ -369,9 +369,9 @@ func consumeOrdersNext(nextPath string, existing OrdersFile, backlog []adapter.B
 			}
 			if stageInFlight(existing.Orders[idx]) {
 				// Rewriting an order under its running stage cancels the stage
-				// and re-runs earlier work. The scheduler re-proposes once the
-				// stage has finished, if the amendment still applies.
-				if shouldAmendActiveOrder(existing.Orders[idx], order) {
+				// and re-runs earlier work. The proposal is dropped and the
+				// loop logs it; an unchanged proposal is not worth a warning.
+				if _, changed := mergeAmendedActiveOrder(existing.Orders[idx], order); changed {
 					amendRejected = append(amendRejected, order.ID)
 				}
 				continue
