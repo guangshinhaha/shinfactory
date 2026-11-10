@@ -22,9 +22,6 @@ func (l *Loop) buildCycleBrief(ctx context.Context) (mise.Brief, []string, bool,
 	if l.state != StateRunning && l.state != StateIdle {
 		return brief, warnings, false, miseChanged, nil
 	}
-	if l.state == StateIdle {
-		l.setState(StateRunning)
-	}
 	return brief, warnings, true, miseChanged, nil
 }
 
@@ -305,6 +302,11 @@ func (l *Loop) prepareOrdersForCycle(brief mise.Brief, warnings []string, miseCh
 		return OrdersFile{}, false, nil
 	}
 
+	// Leave idle only once the cycle has work; flipping at cycle start made an
+	// idle loop log idle<->running every cycle.
+	if l.state == StateIdle {
+		l.setState(StateRunning)
+	}
 	l.setOrdersState(orders)
 	return orders, true, nil
 }
