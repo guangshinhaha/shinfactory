@@ -86,10 +86,13 @@ func TestOrcaDispatchLaunchesZcodeWorker(t *testing.T) {
 	if len(start) != 1 {
 		t.Fatalf("worker-start calls = %v, want 1", start)
 	}
-	for _, frag := range []string{"--agent zcode", "--model GLM-5.3"} {
-		if !strings.Contains(start[0], frag) {
-			t.Errorf("worker-start = %q, missing %q", start[0], frag)
-		}
+	if !strings.Contains(start[0], "--agent zcode") {
+		t.Errorf("worker-start = %q, missing --agent zcode", start[0])
+	}
+	// Orca refuses --model for zcode: "Agent zcode does not support
+	// launch-time model selection."
+	if strings.Contains(start[0], "--model") {
+		t.Errorf("worker-start = %q, should omit --model for zcode", start[0])
 	}
 	fake.Settle(t, fake.LastDispatch(t), "succeeded")
 	if out := waitDone(t, s); out.Status != StatusCompleted {

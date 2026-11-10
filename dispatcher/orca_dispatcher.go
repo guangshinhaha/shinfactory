@@ -213,6 +213,18 @@ func orcaAgentFor(provider string) (string, error) {
 	}
 }
 
+// orcaAgentAcceptsModel reports whether Orca lets worker-start pick this
+// agent's model with --model. zcode (and any future agent that launches with
+// a model from its own config) rejects the flag outright.
+func orcaAgentAcceptsModel(agent string) bool {
+	switch agent {
+	case "claude", "codex":
+		return true
+	default:
+		return false
+	}
+}
+
 // buildSpec composes the worker's task. An Orca worker has no factory
 // environment, so the spec carries the session identity the skills read from
 // $NOODLE_SESSION_ID and $NOODLE_PROJECT_DIR.
@@ -245,9 +257,14 @@ func (d *OrcaDispatcher) startWorker(ctx context.Context, runID, sessionID, spec
 		"--spec-file", specPath,
 		"--worktree", "path:" + req.WorktreePath,
 		"--agent", agent,
-		"--model", strings.TrimSpace(req.Model),
 		"--comment", "shinfactory session " + sessionID,
 		"--json",
+	}
+	// Orca refuses --model for an agent that runs its own fixed model (zcode
+	// launches with whatever model its own config names); only pass it to an
+	// agent Orca lets us pick a model for.
+	if orcaAgentAcceptsModel(agent) {
+		args = append(args, "--model", strings.TrimSpace(req.Model))
 	}
 	if title := strings.TrimSpace(req.Title); title != "" {
 		args = append(args, "--task-title", title)
