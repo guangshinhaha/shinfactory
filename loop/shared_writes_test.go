@@ -131,3 +131,14 @@ func TestSharedWritesClashOnCaseAndDirectoryOverlap(t *testing.T) {
 		}
 	}
 }
+
+func TestParkedOrderHoldsFilesFromOrdersJSONAfterARestart(t *testing.T) {
+	h := newGateHarness(t, "none", "execute")
+	writeTestOrders(t, h.l.runtimeDir, OrdersFile{Orders: []Order{{ID: "a", Status: OrderStatusActive, Stages: []Stage{writesStage("brain/index.md")}}}})
+	h.l.ordersLoaded = false
+	// The reloaded cook has no Extra on its stage.
+	h.l.cooks.pendingReview["a"] = &pendingReviewCook{cookIdentity: cookIdentity{orderID: "a", stageIndex: 0}}
+	if got := h.l.withoutWriteClashes([]dispatchCandidate{{OrderID: "b", Stage: writesStage("brain/index.md")}}); len(got) != 0 {
+		t.Fatalf("restarted parked order's file not held: kept %v", got)
+	}
+}

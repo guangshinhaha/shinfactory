@@ -52,9 +52,17 @@ func (l *Loop) sharedWriteHolders() []writeHold {
 	for orderID, cook := range l.cooks.activeCooksByOrder {
 		add(orderID, cook.stage)
 	}
+	// A parked cook is rebuilt from canonical state after a restart without
+	// its stage's Extra, so read the stage from orders.json, falling back to
+	// the cook's own copy.
 	for orderID, cook := range l.cooks.pendingReview {
-		add(orderID, cook.stage)
+		stage := cook.stage
+		if order, ok := l.orderByID(orderID); ok && cook.stageIndex < len(order.Stages) {
+			stage = order.Stages[cook.stageIndex]
+		}
+		add(orderID, stage)
 	}
+	// An adopted session runs the order's first active stage.
 	for orderID := range l.cooks.adoptedTargets {
 		if _, running := l.cooks.activeCooksByOrder[orderID]; running {
 			continue
@@ -66,6 +74,7 @@ func (l *Loop) sharedWriteHolders() []writeHold {
 		for _, st := range order.Stages {
 			if st.Status == StageStatusActive {
 				add(orderID, st)
+				break
 			}
 		}
 	}

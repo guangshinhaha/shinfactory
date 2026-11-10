@@ -129,7 +129,6 @@ func (l *Loop) onShipConflict(ctx context.Context, cook *cookHandle, pr PullRequ
 		if errors.As(err, &ce) {
 			return true, l.stopConflicted(ctx, cook, ce.Files, "the rebase onto the base branch conflicts")
 		}
-		l.clearRebased(cook.orderID)
 		return true, l.failStage(ctx, cook, "rebase onto the base branch: "+err.Error())
 	}
 	l.logger.Info("order rebased onto the base branch", "order", cook.orderID, "pr", pr.URL)
@@ -191,12 +190,11 @@ func (l *Loop) stopConflicted(ctx context.Context, cook *cookHandle, files []str
 		WorktreeName: cook.worktreeName,
 		Files:        files,
 	})
-	// A failed flag write must not skip the stop or the count clear: the order
+	// A failed flag write must not skip the stop (failStage clears the count): the order
 	// would stay claimed with nobody told. Report both errors.
 	flagErr := l.flagActionNeeded(cook.orderID + ": " + msg)
 	l.stopForPerson(ctx, cook.orderID,
 		"A merge conflict the factory cannot resolve. Resolve it by hand or reshape the issue, then put ready back. Conflict:",
 		msg)
-	l.clearRebased(cook.orderID)
 	return errors.Join(flagErr, l.failStage(ctx, cook, msg))
 }
