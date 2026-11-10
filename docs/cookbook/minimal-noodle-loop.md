@@ -1,6 +1,6 @@
-# Minimal Noodle Loop
+# Minimal shinfactory Loop
 
-The smallest working Noodle project. Two skills, a backlog, and a config file. This is the "hello world." If you can run this, everything else builds on top of it.
+The smallest working shinfactory project. Two skills, a backlog, and a config file. This is the "hello world." If you can run this, everything else builds on top of it.
 
 ## Project structure
 
@@ -15,7 +15,7 @@ Four files. That's it.
 
 ## Configuration
 
-`.noodle.toml` sets the default model and tells Noodle where skills live:
+`.noodle.toml` sets the default model and tells shinfactory where skills live:
 
 ```toml
 mode = "auto"
@@ -28,8 +28,8 @@ model = "claude-sonnet-4-6"
 paths = [".agents/skills"]
 ```
 
-`mode = "auto"` means Noodle runs the full noodle loop unattended. The scheduler reads the backlog, creates orders, spawns agents, merges results, and repeats until there's nothing left to do.
-This cookbook sets `mode = "auto"` on purpose for an unattended demo. If you omit `mode`, Noodle defaults to `supervised`.
+`mode = "auto"` means shinfactory runs the full shinfactory loop unattended. The scheduler reads the backlog, creates orders, spawns agents, merges results, and repeats until there's nothing left to do.
+This cookbook sets `mode = "auto"` on purpose for an unattended demo. If you omit `mode`, shinfactory defaults to `supervised`.
 
 ## The schedule skill
 
@@ -107,26 +107,26 @@ The execute skill is the workhorse. It gets a task, makes changes, verifies them
 
 ## Backlog
 
-1. [ ] Add a hello-world CLI command that prints "Hello from Noodle"
+1. [ ] Add a hello-world CLI command that prints "Hello from shinfactory"
 2. [ ] Write a README explaining what this project does
 ```
 
-Numbered checkboxes. The scheduler reads these, creates one order per unchecked item, and the noodle loop works through them. As items complete, they get checked off.
+Numbered checkboxes. The scheduler reads these, creates one order per unchecked item, and the shinfactory loop works through them. As items complete, they get checked off.
 
 ## Running it
 
 ```sh
-noodle start
+shinfactory start
 ```
 
 Here's what happens:
 
-1. Noodle reads `.noodle.toml` and discovers the two skills.
+1. shinfactory reads `.noodle.toml` and discovers the two skills.
 2. The scheduler runs first. It reads `brain/todos.md`, finds two unchecked items, and writes orders to `.noodle/orders-next.json`.
-3. Noodle picks up the first order and spawns an agent as a child process with its own worktree.
+3. shinfactory picks up the first order and spawns an agent as a child process with its own worktree.
 4. The agent runs the execute skill: reads the task, implements it, runs any checks, and commits.
 5. The completed worktree merges back to the main branch.
-6. The noodle loop re-schedules. The scheduler sees one item is done, creates orders for remaining work.
+6. The shinfactory loop re-schedules. The scheduler sees one item is done, creates orders for remaining work.
 7. This continues until all backlog items are checked off.
 
-Open `localhost:3000` to watch it in the web UI, or run `noodle status` from the terminal.
+Open `localhost:3000` to watch it in the web UI, or run `shinfactory status` from the terminal.

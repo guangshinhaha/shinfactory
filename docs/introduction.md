@@ -1,6 +1,6 @@
 # Introduction
 
-This page walks through the ideas behind Noodle. If you want to jump straight to installing, head to [Getting Started](/getting-started).
+This page walks through the ideas behind shinfactory. If you want to jump straight to installing, head to [Getting Started](/getting-started).
 
 ---
 
@@ -41,18 +41,18 @@ It would be even better if the scheduler itself was an agent. Then we wouldn't n
 
 ## Skills that run themselves
 
-Noodle is the framework that makes it possible for skills to run themselves. Give it a project with schedulable skills:
+shinfactory is the framework that makes it possible for skills to run themselves. Give it a project with schedulable skills:
 
 ```sh
-noodle start
+shinfactory start
 ```
 
-Noodle figures out which of your skills can be scheduled, runs the scheduler agent, spawns agents in isolated git worktrees, merges their work back, and loops.
+shinfactory figures out which of your skills can be scheduled, runs the scheduler agent, spawns agents in isolated git worktrees, merges their work back, and loops.
 
-You write the skills. Noodle makes them run themselves.
+You write the skills. shinfactory makes them run themselves.
 
 ## What to read next
 
-- [Getting Started](/getting-started) — install Noodle and run your first loop
+- [Getting Started](/getting-started) — install shinfactory and run your first loop
 - [Skills](/concepts/skills) — the full picture on writing and composing skills
-- [FAQ](/reference/faq) — common questions about Noodle
+- [FAQ](/reference/faq) — common questions about shinfactory

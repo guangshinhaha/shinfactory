@@ -143,7 +143,7 @@ export function AgentFeed({ sessionId }: { sessionId: string }) {
     <>
       <AgentHeader session={session} onStopAll={handleStopAll} isPending={isControlPending} />
 
-      <div className="feed-watermark">NOODLE</div>
+      <div className="feed-watermark">SHINFACTORY</div>
 
       <VirtualizedFeed
         items={items}

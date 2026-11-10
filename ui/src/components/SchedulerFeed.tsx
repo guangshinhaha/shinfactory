@@ -66,7 +66,7 @@ export function SchedulerFeed() {
       emptyMessage = (
         <>
           {"The scheduler starts when you run "}
-          <code style={{ fontFamily: "var(--font-mono)" }}>noodle start</code>
+          <code style={{ fontFamily: "var(--font-mono)" }}>shinfactory start</code>
           {" and have skills installed."}
           <br />
           <Link to="/onboarding" style={{ color: "var(--color-accent)" }}>
@@ -157,7 +157,7 @@ export function SchedulerFeed() {
         </div>
       </header>
 
-      <div className="feed-watermark">NOODLE</div>
+      <div className="feed-watermark">SHINFACTORY</div>
 
       <VirtualizedFeed
         items={items}

@@ -16,7 +16,7 @@ export default defineConfig({
   base: "/noodle/",
   title: "shinfactory",
   description:
-    "Noodle is an open-source AI coding framework that orchestrates agents using skills — reusable, self-scheduling units of work. Built with Go, it uses LLM-powered scheduling and a kitchen brigade model to automate code review, testing, planning, and more.",
+    "shinfactory is an open-source AI coding framework that orchestrates agents using skills — reusable, self-scheduling units of work. Built with Go, it uses LLM-powered scheduling and a kitchen brigade model to automate code review, testing, planning, and more.",
 
   markdown: {
     theme: "min-dark",
@@ -69,8 +69,8 @@ export default defineConfig({
 
   themeConfig: {
     nav: [
-      { text: NOODLE_VERSION, link: `https://github.com/poteto/noodle/releases/tag/${NOODLE_VERSION}` },
-      { text: "GitHub", link: "https://github.com/poteto/noodle" },
+      { text: NOODLE_VERSION, link: `https://github.com/guangshinhaha/shinfactory/releases` },
+      { text: "GitHub", link: "https://github.com/guangshinhaha/shinfactory" },
     ],
 
     sidebar: [
@@ -83,7 +83,7 @@ export default defineConfig({
         link: "/getting-started",
       },
       {
-        text: "Thinking in Noodle",
+        text: "Thinking in shinfactory",
         link: "/thinking-in-noodle",
       },
       {
@@ -113,7 +113,7 @@ export default defineConfig({
         text: "Cookbook",
         items: [
           {
-            text: "Minimal Noodle Loop",
+            text: "Minimal shinfactory Loop",
             link: "/cookbook/minimal-noodle-loop",
           },
           {
@@ -133,7 +133,7 @@ export default defineConfig({
           },
           {
             text: "File an Issue",
-            link: "https://github.com/poteto/noodle/issues",
+            link: "https://github.com/guangshinhaha/shinfactory/issues",
           },
         ],
       },

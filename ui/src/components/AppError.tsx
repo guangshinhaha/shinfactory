@@ -16,7 +16,7 @@ export function AppError({ error, reset }: ErrorComponentProps) {
     <div className="flex flex-col h-screen bg-bg-depth">
       <div className="flex items-center justify-between px-10 pt-7 pb-6 border-b border-border-subtle bg-bg-depth shrink-0">
         <h1 className="font-display font-bold text-lg tracking-wider uppercase text-text-primary">
-          NOODLE
+          SHINFACTORY
         </h1>
       </div>
 
@@ -24,7 +24,7 @@ export function AppError({ error, reset }: ErrorComponentProps) {
         <div className="bg-bg-surface border border-border-subtle border-l-4 border-l-red p-10 max-w-[480px] w-full animate-fade-in">
           <h2 className="font-display font-bold text-xl text-text-primary mb-1">Something broke</h2>
           <p className="text-neutral-500 text-sm mb-6">
-            The dashboard couldn&apos;t load. This usually means the noodle server is down or
+            The dashboard couldn&apos;t load. This usually means the shinfactory server is down or
             restarting.
           </p>
 

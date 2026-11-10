@@ -1,6 +1,6 @@
 # Cookbook
 
-Patterns for common Noodle setups. Each recipe is a project structure you can copy and adapt.
+Patterns for common shinfactory setups. Each recipe is a project structure you can copy and adapt.
 
 | Pattern                                      | What it shows                                                        |
 | -------------------------------------------- | -------------------------------------------------------------------- |

@@ -1,10 +1,10 @@
 # Key Terms
 
-Quick reference for terms used throughout the Noodle docs.
+Quick reference for terms used throughout the shinfactory docs.
 
 ## Adapter
 
-A bridge between an external system (GitHub Issues, Linear, Jira) and Noodle's backlog. Adapters are commands configured in `.noodle.toml` that sync, add, complete, and edit items. Can be any executable: shell scripts, Python, Node, Go binaries. See [Adapters](/concepts/adapters).
+A bridge between an external system (GitHub Issues, Linear, Jira) and shinfactory's backlog. Adapters are commands configured in `.noodle.toml` that sync, add, complete, and edit items. Can be any executable: shell scripts, Python, Node, Go binaries. See [Adapters](/concepts/adapters).
 
 ## Brain
 
@@ -32,7 +32,7 @@ The system that decides which agent provider and model handle each task. The sch
 
 ## Schedule field
 
-The `schedule:` field in a skill's YAML frontmatter. A natural-language description of when the skill should fire. The scheduler reads it and decides when conditions are met. Skills with a `schedule:` field run autonomously in the noodle loop. Skills without one are [general skills](#general-skill).
+The `schedule:` field in a skill's YAML frontmatter. A natural-language description of when the skill should fire. The scheduler reads it and decides when conditions are met. Skills with a `schedule:` field run autonomously in the shinfactory loop. Skills without one are [general skills](#general-skill).
 
 ## Scheduler
 
@@ -40,7 +40,7 @@ The agent that reads the [mise](#mise), evaluates the backlog, and writes [order
 
 ## Skill
 
-A markdown file (`SKILL.md`) that teaches an agent how to do something. The body is a prompt. The frontmatter is metadata. Skills are all you need to extend Noodle. See [Skills](/concepts/skills).
+A markdown file (`SKILL.md`) that teaches an agent how to do something. The body is a prompt. The frontmatter is metadata. Skills are all you need to extend shinfactory. See [Skills](/concepts/skills).
 
 ## Stages
 

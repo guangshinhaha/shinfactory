@@ -64,7 +64,7 @@ func NewRootCmd() *cobra.Command {
 		},
 	}
 	root.PersistentFlags().StringVar(&projectDirFlag, "project-dir", "", "project directory (default: current directory, env: NOODLE_PROJECT_DIR)")
-	root.Flags().BoolVar(&showVersion, "version", false, "Print noodle version")
+	root.Flags().BoolVar(&showVersion, "version", false, "Print shinfactory version")
 
 	root.AddCommand(
 		newStartCmd(&app),

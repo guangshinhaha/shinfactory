@@ -118,7 +118,7 @@ The brain isn't just for backlog items. Principles give the agent context about 
 ## How the pipeline runs
 
 ```sh
-noodle start
+shinfactory start
 ```
 
 1. The scheduler reads the backlog and creates multi-stage orders.

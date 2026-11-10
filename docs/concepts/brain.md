@@ -1,10 +1,10 @@
 # Self-Learning
 
-Install [brainmaxxing](https://github.com/poteto/brainmaxxing) to add this optional upgrade to Noodle.
+Install [brainmaxxing](https://github.com/poteto/brainmaxxing) to add this optional upgrade to shinfactory.
 
 This skill pack adds a brain, a directory of markdown files committed to your repo at `brain/`. It stores project knowledge: principles, patterns, past mistakes, codebase quirks, architectural decisions. With this skill pack installed, agents read the brain before they start working and write to it when they learn something.
 
-**Noodle works without this**. The noodle loop does not depend on it. This is entirely additive, and you can skip this if you prefer.
+**shinfactory works without this**. The shinfactory loop does not depend on it. This is entirely additive, and you can skip this if you prefer.
 
 The brain becomes useful when you want agents to share context across sessions: avoiding repeated mistakes, following project-specific conventions, building on past decisions.
 
@@ -18,7 +18,7 @@ Install brainmaxxing from https://github.com/poteto/brainmaxxing into this proje
 
 This copies a `brain/` starter vault, the `reflect`/`meditate`/`ruminate` skills, and hooks into your project.
 
-After installing, add `schedule:` fields to reflect and meditate so the noodle loop runs them automatically. For example, tell your agent:
+After installing, add `schedule:` fields to reflect and meditate so the shinfactory loop runs them automatically. For example, tell your agent:
 
 ```md
 Add `schedule:` fields to the reflect and meditate skills.

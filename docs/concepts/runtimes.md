@@ -1,6 +1,6 @@
 # Runtimes
 
-A runtime is where an agent session executes. Noodle ships with two: local processes and [Sprites](https://sprites.dev) cloud sandboxes. The scheduling agent can pick a runtime per stage, or you can set a project-wide default. Custom runtime plugins are on the roadmap, so you'll be able to define your own.
+A runtime is where an agent session executes. shinfactory ships with two: local processes and [Sprites](https://sprites.dev) cloud sandboxes. The scheduling agent can pick a runtime per stage, or you can set a project-wide default. Custom runtime plugins are on the roadmap, so you'll be able to define your own.
 
 ## Process
 
@@ -70,7 +70,7 @@ The scheduling agent can override this per stage by setting the `runtime` field 
 }
 ```
 
-Process is always available. Sprites requires a valid token in the configured environment variable. Noodle checks for this at startup and only advertises runtimes that have working credentials.
+Process is always available. Sprites requires a valid token in the configured environment variable. shinfactory checks for this at startup and only advertises runtimes that have working credentials.
 
 ### Teaching your scheduler to use runtimes
 
@@ -94,4 +94,4 @@ Because the scheduler is just a skill, you have full control over how it assigns
 
 ## Custom Runtimes
 
-Custom runtime plugins are coming. You'll be able to add your own VM or execution environment by implementing Noodle's runtime interface. If you run your own infrastructure and the built-in runtimes don't fit, this will let you plug it in directly.
+Custom runtime plugins are coming. You'll be able to add your own VM or execution environment by implementing shinfactory's runtime interface. If you run your own infrastructure and the built-in runtimes don't fit, this will let you plug it in directly.

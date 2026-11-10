@@ -1,23 +1,23 @@
 # Scheduling
 
-The noodle loop decides what work to do, when to do it, and which agent handles it. The scheduler is itself a [skill](/concepts/skills). It reads project state, evaluates skills with `schedule` fields, and writes work orders.
+The shinfactory loop decides what work to do, when to do it, and which agent handles it. The scheduler is itself a [skill](/concepts/skills). It reads project state, evaluates skills with `schedule` fields, and writes work orders.
 
-## The Noodle Loop
+## The shinfactory Loop
 
 Each cycle follows this sequence:
 
-1. **Brief.** Noodle gathers current project state into a mise (short for _mise en place_, a French culinary term which means "putting in place"). This snapshot includes the backlog, active agents, recent history, available capacity, and registered schedulable skills.
+1. **Brief.** shinfactory gathers current project state into a mise (short for _mise en place_, a French culinary term which means "putting in place"). This snapshot includes the backlog, active agents, recent history, available capacity, and registered schedulable skills.
 2. **Schedule.** The scheduling agent reads the mise and decides what to work on next. It writes decisions as orders to `.noodle/orders-next.json`.
-3. **Validate.** Noodle reads the new orders and validates them against the skill registry, then promotes the file to `.noodle/orders.json`.
-4. **Dispatch.** For each pending stage, Noodle spawns an agent session to do the work.
+3. **Validate.** shinfactory reads the new orders and validates them against the skill registry, then promotes the file to `.noodle/orders.json`.
+4. **Dispatch.** For each pending stage, shinfactory spawns an agent session to do the work.
 5. **Execute.** The agent executes in an isolated worktree, reads the skill prompt, and does the work.
 6. **Merge.** When an agent finishes making changes, its changes merge back to the main branch. Merges are serialized to avoid conflicts.
 
-The noodle loop runs continuously and reacts to file changes: when `orders-next.json` or `control.ndjson` changes on disk, Noodle runs a cycle immediately.
+The shinfactory loop runs continuously and reacts to file changes: when `orders-next.json` or `control.ndjson` changes on disk, shinfactory runs a cycle immediately.
 
 ## Mise en Place
 
-Before each scheduling decision, Noodle builds a mise (a snapshot of everything the scheduler needs). Written to `.noodle/mise.json`, it contains:
+Before each scheduling decision, shinfactory builds a mise (a snapshot of everything the scheduler needs). Written to `.noodle/mise.json`, it contains:
 
 | Section          | Contents                                                                    |
 | ---------------- | --------------------------------------------------------------------------- |

@@ -1,6 +1,6 @@
-# Thinking in Noodle
+# Thinking in shinfactory
 
-The [Introduction](/introduction) and [Getting Started](/getting-started) cover what Noodle does. This page is about how to think when using it.
+The [Introduction](/introduction) and [Getting Started](/getting-started) cover what shinfactory does. This page is about how to think when using it.
 
 ## Start with what you repeat
 
@@ -66,7 +66,7 @@ Start vague, tighten as you see what the scheduler does.
 
 ## Let the scheduler compose
 
-With traditional tools, you'd wire skills together: review calls deploy, deploy calls notify. In Noodle, each skill describes when it should run, and the scheduler figures out the order.
+With traditional tools, you'd wire skills together: review calls deploy, deploy calls notify. In shinfactory, each skill describes when it should run, and the scheduler figures out the order.
 
 This feels weird at first. You might want to write `after: review` in your deploy skill. But the scheduler already knows that review runs after execute. It reads all the `schedule:` fields together and sequences them.
 
@@ -79,7 +79,7 @@ You don't need ten skills on day one.
 - **schedule** reads the backlog and picks what to work on
 - **execute** picks up a task and does the work
 
-That's a working noodle loop. Run it. Watch what happens. You'll quickly feel what's missing. Agents commit with bad messages? Write a `commit` skill. You're reviewing every PR yourself? Write a `review` skill and schedule it. Agents keep making the same mistakes? Add a `reflect` skill.
+That's a working shinfactory loop. Run it. Watch what happens. You'll quickly feel what's missing. Agents commit with bad messages? Write a `commit` skill. You're reviewing every PR yourself? Write a `review` skill and schedule it. Agents keep making the same mistakes? Add a `reflect` skill.
 
 Your skill library grows from what you notice, not what you plan.
 
@@ -101,6 +101,6 @@ npx skills add https://github.com/anthropics/skills --skill skill-creator
 
 ## What to read next
 
-- [Getting Started](/getting-started) — install Noodle and get a loop running
+- [Getting Started](/getting-started) — install shinfactory and get a loop running
 - [Skills](/concepts/skills) — scheduled vs general skills, discovery, composition
-- [Scheduling](/concepts/scheduling) — how the noodle loop works under the hood
+- [Scheduling](/concepts/scheduling) — how the shinfactory loop works under the hood

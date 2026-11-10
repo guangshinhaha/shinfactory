@@ -196,7 +196,7 @@ export function Dashboard() {
                   colSpan={7}
                   className="px-3 py-8 text-center font-mono text-sm text-text-tertiary"
                 >
-                  No sessions yet. Noodle runs sessions when the scheduler creates orders from your
+                  No sessions yet. shinfactory runs sessions when the scheduler creates orders from your
                   backlog.
                   <br />
                   <Link to="/onboarding" className="text-accent hover:underline">
