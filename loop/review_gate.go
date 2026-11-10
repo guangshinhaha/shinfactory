@@ -242,21 +242,27 @@ func (l *Loop) postVerdict(ctx context.Context, order Order, cook *cookHandle, v
 		fence += "`" // evidence may quote code; the fence must outlast any backtick run in it
 	}
 	body := "Verify verdict at head " + v.HeadSHA + ", copied from the verify stage's file:\n\n" + fence + "json\n" + raw + "\n" + fence + "\n"
-	ctx, cancel := context.WithTimeout(ctx, shipTimeout)
-	defer cancel()
 	// Push first (a no-op when nothing is new): the PR must exist and sit at
 	// the head the verifier judged. Targeting the PR by URL keeps an older
 	// closed PR on the same branch name out of it.
-	pr, err := l.lander().PushAndEnsureDraft(ctx, cook.worktreePath, l.prSpec(order, cook))
+	pushCtx, cancelPush := context.WithTimeout(ctx, shipTimeout)
+	pr, err := l.lander().PushAndEnsureDraft(pushCtx, cook.worktreePath, l.prSpec(order, cook))
+	cancelPush()
 	if err != nil {
 		return fmt.Errorf("push before posting the verify verdict: %w", err)
 	}
 	for attempt := 1; ; attempt++ {
-		err = l.lander().PostVerdict(ctx, cook.worktreePath, pr, body)
-		if err == nil || attempt == verdictPostAttempts {
+		postCtx, cancelPost := context.WithTimeout(ctx, shipTimeout)
+		err = l.lander().PostVerdict(postCtx, cook.worktreePath, pr, body)
+		cancelPost()
+		if err == nil || attempt == verdictPostAttempts || ctx.Err() != nil {
 			break
 		}
-		time.Sleep(verdictPostBackoff) // a transient gh error must not kill a verified order
+		// A transient gh error must not kill a verified order; shutdown still ends the wait.
+		select {
+		case <-ctx.Done():
+		case <-time.After(verdictPostBackoff):
+		}
 	}
 	if err != nil {
 		return fmt.Errorf("post verify verdict on the PR: %w", err)
