@@ -74,7 +74,7 @@ A stage is a single step within an order.
 | `runtime`      | Where to run: `process` or `sprites`             |
 | `group`        | Parallel execution group number                 |
 | `extra_prompt` | Supplemental instructions for the cook          |
-| `extra.writes` | Shared files the stage writes, as repo-relative paths (`["brain/index.md"]`). Two stages that name the same file never run at the same time. |
+| `extra.writes` | Shared files the stage writes, as repo-relative paths (`["brain/index.md"]`). Two stages that name the same file never run at the same time. `.` means the whole repository; paths outside it are ignored. A parked order keeps its files held until you act on it, and a stage it blocks adds an `action_needed` line naming it. |
 
 The loop manages stage lifecycle transitions automatically (pending, active, merging, completed, failed, cancelled). The scheduler does not write status fields.
 

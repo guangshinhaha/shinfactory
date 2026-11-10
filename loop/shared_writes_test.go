@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/guangshinhaha/shinfactory/adapter"
@@ -17,8 +18,8 @@ func writesStage(paths ...string) Stage {
 }
 
 func TestStageWritesNormalizesPathsAndIgnoresBadValues(t *testing.T) {
-	got := stageWrites(writesStage("./brain/index.md", "brain//index.md", " ", "."))
-	want := []string{"brain/index.md", "brain/index.md"}
+	got := stageWrites(writesStage("./brain/index.md", "brain//index.md", " ", ".", "../x", "..", "a/../../y"))
+	want := []string{"brain/index.md", "brain/index.md", wholeRepoWrite}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("stageWrites = %v, want %v", got, want)
 	}
@@ -140,5 +141,31 @@ func TestParkedOrderHoldsFilesFromOrdersJSONAfterARestart(t *testing.T) {
 	h.l.cooks.pendingReview["a"] = &pendingReviewCook{cookIdentity: cookIdentity{orderID: "a", stageIndex: 0}}
 	if got := h.l.withoutWriteClashes([]dispatchCandidate{{OrderID: "b", Stage: writesStage("brain/index.md")}}); len(got) != 0 {
 		t.Fatalf("restarted parked order's file not held: kept %v", got)
+	}
+}
+
+func TestWholeRepoWriteOverlapsEveryPath(t *testing.T) {
+	if !writePathsOverlap(wholeRepoWrite, "brain/index.md") || !writePathsOverlap("a/b.go", wholeRepoWrite) {
+		t.Fatal("a bare . must overlap every path")
+	}
+}
+
+// A stage held back by a parked order's files tells a person once, naming the
+// parked order; a running holder needs no signal.
+func TestStageBlockedByAParkedOrderFlagsActionNeededOnce(t *testing.T) {
+	h := newGateHarness(t, "none", "execute")
+	cand := []dispatchCandidate{{OrderID: "b", Stage: writesStage("brain/index.md")}}
+	h.l.cooks.pendingReview["a"] = &pendingReviewCook{cookIdentity: cookIdentity{orderID: "a", stage: writesStage("brain/index.md")}}
+	for i := 0; i < 3; i++ {
+		if got := h.l.withoutWriteClashes(cand); len(got) != 0 {
+			t.Fatalf("parked order's file not held: kept %v", got)
+		}
+	}
+	orders, err := h.l.currentOrders()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(orders.ActionNeeded) != 1 || !strings.Contains(orders.ActionNeeded[0], "parked in pending review") || !strings.Contains(orders.ActionNeeded[0], "order a") {
+		t.Fatalf("action_needed = %q, want one line naming parked order a", orders.ActionNeeded)
 	}
 }

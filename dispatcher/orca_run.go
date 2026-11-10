@@ -200,8 +200,15 @@ func (d *OrcaDispatcher) launchedDispatchIDs() map[string]map[string]bool {
 			DispatchID string `json:"dispatch_id"`
 			RunID      string `json:"run_id"`
 		}
-		if json.Unmarshal(data, &rec) != nil || rec.DispatchID == "" || rec.RunID == "" {
+		if json.Unmarshal(data, &rec) != nil || rec.DispatchID == "" {
 			continue
+		}
+		if rec.RunID == "" {
+			// A record without a run id belongs to the run this factory records,
+			// else the configured one.
+			if rec.RunID = nonEmptyOr(d.recordedRun(), d.runID); rec.RunID == "" {
+				continue
+			}
 		}
 		if byRun[rec.RunID] == nil {
 			byRun[rec.RunID] = map[string]bool{}

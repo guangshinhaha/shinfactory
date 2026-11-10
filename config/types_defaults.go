@@ -60,9 +60,11 @@ const (
 // a person. Both caps are checked before each stage launch.
 type SpendConfig struct {
 	// MaxAttempts is how many times one order may launch the same stage.
+	// Zero turns the cap off; a negative value is invalid.
 	MaxAttempts int `toml:"max_attempts"`
 	// MaxCostUSD is the cost ceiling for one order, summed from the cost its
-	// finished stages reported in their session logs.
+	// finished stages reported in their session logs. Zero turns the cap off; a
+	// negative value is invalid.
 	MaxCostUSD float64 `toml:"max_cost_usd"`
 }
 

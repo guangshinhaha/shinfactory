@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/guangshinhaha/shinfactory/internal/orderx"
 )
@@ -171,7 +172,12 @@ func tail(s string, n int) string {
 	if len(s) <= n {
 		return s
 	}
-	return "..." + s[len(s)-n:]
+	cut := len(s) - n
+	// Step forward off a continuation byte so the cut never splits a rune.
+	for cut < len(s) && !utf8.RuneStart(s[cut]) {
+		cut++
+	}
+	return "..." + s[cut:]
 }
 
 // checkRepoChecks runs the checks declared in declaredIn's CLAUDE.md inside the
@@ -251,15 +257,20 @@ func isTestPath(p string) bool {
 func checkTestFirst(commits []commitFiles) error {
 	sawTestOnly := false
 	for _, c := range commits {
-		testOnly, docsOnly := len(c.Files) > 0, len(c.Files) > 0
+		// Markdown files never make a commit "code", so a commit of tests plus
+		// docs counts as test-only.
+		sawTest, sawOther := false, false
 		for _, f := range c.Files {
-			if !isTestPath(f) {
-				testOnly = false
-			}
-			if !strings.HasSuffix(strings.ToLower(f), ".md") {
-				docsOnly = false
+			switch {
+			case strings.HasSuffix(strings.ToLower(f), ".md"):
+			case isTestPath(f):
+				sawTest = true
+			default:
+				sawOther = true
 			}
 		}
+		testOnly := sawTest && !sawOther
+		docsOnly := len(c.Files) > 0 && !sawTest && !sawOther
 		switch {
 		case docsOnly && !testOnly:
 		case testOnly:

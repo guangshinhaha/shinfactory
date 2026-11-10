@@ -66,10 +66,14 @@ func (f *fakeWorktree) HasUnmergedCommits(name string) (bool, error) {
 
 type fakeAdapterRunner struct {
 	doneCalls       []string
+	stopCalls       []string // order IDs the backlog "stop" action received
 	doneHadDeadline bool // the last backlog done ran under a deadline
 }
 
 func (f *fakeAdapterRunner) Run(ctx context.Context, adapterName, action string, opts adapter.RunOptions) (string, error) {
+	if adapterName == "backlog" && action == "stop" && len(opts.Args) > 0 {
+		f.stopCalls = append(f.stopCalls, opts.Args[0])
+	}
 	if adapterName == "backlog" && action == "done" && len(opts.Args) > 0 {
 		f.doneCalls = append(f.doneCalls, opts.Args[0])
 		_, f.doneHadDeadline = ctx.Deadline()

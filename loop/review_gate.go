@@ -383,6 +383,40 @@ func (l *Loop) reopenStages(orderID string, from, to, round int) error {
 		return err
 	}
 	now := timeNowUTC(l.deps.Now)
+	// A failure after the first mutation must not leave the stages reopened
+	// in one store and not the other: snapshot both and roll back.
+	prevNode, hadNode := l.canonical.Orders[orderID]
+	if hadNode {
+		prevNode = state.State{Orders: map[string]state.OrderNode{orderID: prevNode}}.Clone().Orders[orderID]
+	}
+	var prevStatuses []orderx.StageStatus
+	prevRound := 0
+	ordersTouched := false
+	rollback := func(cause error) error {
+		if hadNode {
+			l.canonical.Orders[orderID] = prevNode
+		}
+		if !ordersTouched {
+			return cause
+		}
+		if rerr := l.mutateOrdersState(func(orders *OrdersFile) (bool, error) {
+			for oi := range orders.Orders {
+				order := &orders.Orders[oi]
+				if order.ID != orderID {
+					continue
+				}
+				for i, st := range prevStatuses {
+					order.Stages[from+i].Status = st
+				}
+				order.Round = prevRound
+				return true, nil
+			}
+			return false, nil
+		}); rerr != nil {
+			return errors.Join(cause, fmt.Errorf("restore stages after failed reopen: %w", rerr))
+		}
+		return cause
+	}
 	if node, ok := l.canonical.Orders[orderID]; ok {
 		for i := from; i <= to && i < len(node.Stages); i++ {
 			stage := node.Stages[i]
@@ -408,17 +442,24 @@ func (l *Loop) reopenStages(orderID string, from, to, round int) error {
 			if order.ID != orderID {
 				continue
 			}
+			prevStatuses = prevStatuses[:0]
 			for i := from; i <= to && i < len(order.Stages); i++ {
+				prevStatuses = append(prevStatuses, order.Stages[i].Status)
 				order.Stages[i].Status = StageStatusPending
 			}
+			prevRound = order.Round
 			order.Round = round
+			ordersTouched = true
 			return true, nil
 		}
 		return false, fmt.Errorf("order %q not found", orderID)
 	}); err != nil {
-		return err
+		return rollback(err)
 	}
-	return l.persistCanonicalCheckpoint()
+	if err := l.persistCanonicalCheckpoint(); err != nil {
+		return rollback(err)
+	}
+	return nil
 }
 
 // flagActionNeeded adds a line to the orders file's action_needed list.

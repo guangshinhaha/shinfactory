@@ -94,8 +94,8 @@ Caps what one order may spend. Before each stage launch the loop checks the orde
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `max_attempts` | int | `3` | Times one order may launch the same stage |
-| `max_cost_usd` | float | `20` | Cost ceiling per order, summed from the cost its finished stages reported in their session logs |
+| `max_attempts` | int | `3` | Times one order may launch the same stage; `0` turns the cap off |
+| `max_cost_usd` | float | `20` | Cost ceiling per order, summed from the cost its finished stages reported in their session logs; `0` turns the cap off |
 
 ```toml
 [spend]
@@ -219,7 +219,7 @@ close_issues = false  # true: PR body says "Closes #<order id>"; only for a GitH
 - Unset `mode` resolves per project: `pr` when `origin` is on github.com, `local` when it is not. An explicit value always wins.
 - In `pr` mode each order's worktree branches from the freshly fetched remote default branch (or `base`), so an order never starts from a main that an earlier PR has outdated. A failed fetch fails the dispatch.
 - `local`: for projects with no GitHub remote. Each stage's worktree is merged into the local default branch.
-- `pr` (default): one branch and worktree per order, created at the first stage. After a stage leaves commits, the loop pushes the branch and opens a draft PR, so CI runs during review and verify. Later stages push to the same PR. When the order's last stage completes, the loop marks the PR ready and merges it (`gh pr merge --squash`, never `--admin` or `--auto`), so the repository's checks and ruleset decide. While checks are still running the order stays parked ("waiting for required checks") and the loop retries every 30 seconds, merging once they pass; a merge GitHub refuses (a required check failing) fails the stage with that reason, or, after a wait, keeps the order parked with the refusal. The order is marked done only after the PR is merged. In `auto` mode this happens unasked; in `supervised` the draft PR stays up and the order parks until you approve the merge. Needs `git` and a signed-in `gh` on PATH.
+- `pr` (default): one branch and worktree per order, created at the first stage. After a stage leaves commits, the loop pushes the branch and opens a draft PR, so CI runs during review and verify. Later stages push to the same PR. When the order's last stage completes, the loop marks the PR ready and merges it (`gh pr merge --squash`, never `--admin` or `--auto`), so the repository's checks and ruleset decide. While checks are still running the order stays parked ("waiting for required checks") and the loop retries every 30 seconds, merging once they pass (a PR GitHub still reports no mergeability for after 10 minutes stops for a person); a merge GitHub refuses (a required check failing) fails the stage with that reason, or, after a wait, keeps the order parked with the refusal. The order is marked done only after the PR is merged. In `auto` mode this happens unasked; in `supervised` the draft PR stays up and the order parks until you approve the merge. Needs `git` and a signed-in `gh` on PATH.
 
 ### `[server]`
 

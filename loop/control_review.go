@@ -92,6 +92,8 @@ func (l *Loop) controlReject(orderID string) error {
 	if strings.TrimSpace(pending.worktreeName) != "" {
 		_ = l.deps.Worktree.Cleanup(pending.worktreeName, worktree.CleanupOpts{Force: true})
 	}
+	// A rejected order is abandoned; a requeue under the same ID starts clean.
+	l.clearRebased(orderID)
 	if err := l.emitEventChecked(ingest.EventStageReviewRejected, map[string]any{
 		"order_id":    orderID,
 		"stage_index": pending.stageIndex,

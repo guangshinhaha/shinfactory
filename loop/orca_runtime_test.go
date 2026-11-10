@@ -737,3 +737,51 @@ func TestOrcaRuntimeUsageLimitRequeuesAreBounded(t *testing.T) {
 		return len(of.Orders) == 1 && of.Orders[0].Status == OrderStatusFailed
 	})
 }
+
+// A launch that died on the usage limit did no work, so it does not count
+// against max_attempts.
+func TestOrcaRuntimeUsageLimitRequeueRefundsTheAttempt(t *testing.T) {
+	env := newOrcaEnv(t, oneStageOrder())
+	env.cycleUntil(t, "execute started", func() bool { return len(env.fake.Starts()) == 1 })
+	if n := env.loop.orderSpendOf("42").totalAttempts(); n != 1 {
+		t.Fatalf("attempts after launch = %d, want 1", n)
+	}
+	id := env.fake.LastDispatch(t)
+	env.fake.SetTranscript(t, id, "Claude usage limit reached.")
+	env.fake.Settle(t, id, "failed")
+	env.cycleUntil(t, "stage requeued", func() bool {
+		got := env.orderStages(t, "42")
+		return len(got) == 1 && got[0] == "execute:pending" && env.loop.cooks.activeCooksByOrder["42"] == nil
+	})
+	if n := env.loop.orderSpendOf("42").totalAttempts(); n != 0 {
+		t.Fatalf("attempts after a usage-limit requeue = %d, want 0", n)
+	}
+}
+
+func TestUsageLimitRequeueCountResetsOnAnyOtherOutcome(t *testing.T) {
+	var r usageLimitRequeues
+	r.bump("42", 0)
+	r.bump("42", 1)
+	r.reset("42", 0)
+	if n := r.bump("42", 0); n != 1 {
+		t.Fatalf("count after reset = %d, want 1", n)
+	}
+	if n := r.bump("42", 1); n != 2 {
+		t.Fatalf("other stage's count = %d, want 2 (untouched)", n)
+	}
+}
+
+// A stage that survived a requeue and then finished normally starts its
+// usage-limit count over.
+func TestOrcaRuntimeCompletedStageResetsTheUsageLimitCount(t *testing.T) {
+	env := newOrcaEnv(t, oneStageOrder())
+	env.loop.limitRequeues.bump("42", 0)
+	env.cycleUntil(t, "execute started", func() bool { return len(env.fake.Starts()) == 1 })
+	env.fake.Settle(t, env.fake.LastDispatch(t), "completed")
+	env.cycleUntil(t, "stage settled", func() bool {
+		return env.loop.cooks.activeCooksByOrder["42"] == nil
+	})
+	if n := env.loop.limitRequeues.bump("42", 0); n != 1 {
+		t.Fatalf("count after a normal finish = %d, want 1", n)
+	}
+}

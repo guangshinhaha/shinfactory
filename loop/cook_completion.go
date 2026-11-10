@@ -132,6 +132,11 @@ func (l *Loop) handleCompletion(ctx context.Context, cook *cookHandle, resultSta
 		status = stringx.Normalize(cook.session.Outcome().Status.String())
 	}
 
+	if !cook.session.Outcome().UsageLimit {
+		// Only consecutive usage-limit deaths count toward the requeue bound.
+		l.limitRequeues.reset(cook.orderID, cook.stageIndex)
+	}
+
 	if !isScheduleStage(cook.stage) {
 		if fail := l.readStageFail(cook.session.ID()); fail != nil {
 			reason := strings.TrimSpace(fail.Message)
@@ -300,9 +305,9 @@ func (l *Loop) handleStageFailure(ctx context.Context, cook *cookHandle, resultS
 }
 
 func (l *Loop) failStage(_ context.Context, cook *cookHandle, reason string) error {
-	// A failed stage ends this run of the order; a retry under the same ID
-	// must get its one rebase back.
-	l.clearRebased(cook.orderID)
+	// The rebase count stays: a persistent conflict plus unrelated failures
+	// must not earn a second rebase. It clears when a person takes over
+	// (stopForPerson), the review is rejected, or the order is skipped.
 	if err := l.ensureCanonicalOrderFromOrders(cook.orderID); err != nil {
 		return err
 	}

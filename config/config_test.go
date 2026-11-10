@@ -733,12 +733,19 @@ func TestSpendCapsDefaultAndOverride(t *testing.T) {
 	if cfg.Spend.MaxAttempts != 5 || cfg.Spend.MaxCostUSD != 7.5 {
 		t.Fatalf("spend = %#v, want 5 attempts and $7.5", cfg.Spend)
 	}
-	cfg, err = Parse([]byte("[spend]\nmax_attempts = 0\n"))
+	cfg, err = Parse([]byte("[spend]\nmax_attempts = 0\nmax_cost_usd = 0\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Spend.MaxAttempts != 0 || cfg.Spend.MaxCostUSD != 0 {
+		t.Fatalf("zero spend = %#v, want both caps off", cfg.Spend)
+	}
+	cfg, err = Parse([]byte("[spend]\nmax_attempts = -1\nmax_cost_usd = -2\n"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if cfg.Spend.MaxAttempts != 3 || cfg.Spend.MaxCostUSD != 20 {
-		t.Fatalf("invalid spend = %#v, want defaults", cfg.Spend)
+		t.Fatalf("negative spend = %#v, want defaults", cfg.Spend)
 	}
 }
 
