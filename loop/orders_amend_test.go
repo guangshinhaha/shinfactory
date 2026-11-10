@@ -1,11 +1,14 @@
 package loop
 
 import (
+	"context"
 	"path/filepath"
 	"reflect"
 	"testing"
 
+	"github.com/guangshinhaha/shinfactory/adapter"
 	"github.com/guangshinhaha/shinfactory/internal/orderx"
+	"github.com/guangshinhaha/shinfactory/mise"
 )
 
 // Trial 4, order 19: the scheduler rewrote an order mid-quality, which
@@ -68,4 +71,53 @@ func TestConsumeOrdersNextUnchangedProposalIsNotReportedAsRejected(t *testing.T)
 	if result := consumeOrdersNextAndPersist(t, nextPath, ordersPath); len(result.AmendRejected) != 0 {
 		t.Fatalf("AmendRejected = %v, want none for an unchanged proposal", result.AmendRejected)
 	}
+}
+
+// Trial 4, order 19, end to end: the scheduler proposes another execute round
+// while quality runs. Quality must finish and the order must land, with no
+// extra execute stage and no cancelled session.
+func TestSchedulerAmendmentMidQualityLetsQualityFinishAndTheOrderLand(t *testing.T) {
+	h := newGateHarness(t, "", "execute", "quality")
+	h.l.deps.OrdersNextFile = filepath.Join(h.l.projectDir, ".noodle", "orders-next.json")
+	h.l.deps.Mise = &fakeMise{brief: mise.Brief{Backlog: []adapter.BacklogItem{{ID: "42", Title: "t", Status: "open"}}}}
+
+	h.next(t) // execute runs and completes
+	if err := h.l.Cycle(context.Background()); err != nil {
+		t.Fatalf("quality dispatch cycle: %v", err)
+	}
+	if len(h.rt.sessions) != 2 {
+		t.Fatalf("sessions = %d, want quality dispatched as the second", len(h.rt.sessions))
+	}
+	quality := h.rt.sessions[1]
+
+	writeCompactOrders(t, h.l.deps.OrdersNextFile, orderx.CompactOrdersFile{Orders: []orderx.CompactOrder{
+		{ID: "42", Stages: []orderx.CompactStage{
+			{Do: "execute", With: "claude", Model: "claude-opus-4-6", Prompt: "another round"},
+			{Do: "quality", With: "claude", Model: "claude-opus-4-6", Prompt: "review again"},
+		}},
+	}})
+	if err := h.l.Cycle(context.Background()); err != nil {
+		t.Fatalf("amendment cycle: %v", err)
+	}
+	if quality.status != "running" {
+		t.Fatalf("quality session status = %q after the amendment, want it left running", quality.status)
+	}
+
+	// The reviewer writes its findings file while quality runs.
+	h.writeNow(t, 0, reviewFileName, "Covered: whole diff, high level, correctness and blast radius\nFindings: none\n")
+	quality.complete("completed")
+	if err := h.l.Cycle(context.Background()); err != nil {
+		t.Fatalf("completion cycle: %v", err)
+	}
+	h.settleEvidence(t)
+	executes := 0
+	for _, call := range h.rt.calls {
+		if call.Skill == "execute" {
+			executes++
+		}
+	}
+	if executes != 1 {
+		t.Fatalf("execute sessions dispatched = %d, want 1: the amendment added an execute stage", executes)
+	}
+	h.shipped(t)
 }
