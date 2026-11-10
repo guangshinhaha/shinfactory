@@ -260,3 +260,48 @@ func TestOrcaDispatchGivesUpWhenConsumerStaysFenced(t *testing.T) {
 		t.Fatalf("dispatch error = %v, want consumer_fenced surfaced after one recovery", err)
 	}
 }
+
+func TestOrcaSessionTerminateFailureDoesNotReportKilled(t *testing.T) {
+	fake := fakeorca.New(t)
+	d, dir := orcaTestDispatcher(t, fake)
+	s, err := d.Dispatch(context.Background(), orcaTestRequest(dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	fake.FailStop(t, true)
+	if err := s.Terminate(); err == nil {
+		t.Fatal("terminate returned nil although worker-stop failed")
+	}
+	select {
+	case <-s.Done():
+		t.Fatalf("session finished as %+v although the worker may still be live", s.Outcome())
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	// The worker is still tracked: it reports its own end when it settles.
+	id := fake.LastDispatch(t)
+	fake.Settle(t, id, "failed")
+	if out := waitDone(t, s); out.Status != StatusFailed {
+		t.Fatalf("outcome = %+v, want the worker's own failure", out)
+	}
+}
+
+func TestOrcaSessionTerminateRetrySucceedsAfterFailure(t *testing.T) {
+	fake := fakeorca.New(t)
+	d, dir := orcaTestDispatcher(t, fake)
+	s, err := d.Dispatch(context.Background(), orcaTestRequest(dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	fake.FailStop(t, true)
+	if err := s.Terminate(); err == nil {
+		t.Fatal("terminate returned nil although worker-stop failed")
+	}
+	fake.FailStop(t, false)
+	if err := s.Terminate(); err != nil {
+		t.Fatalf("second terminate: %v", err)
+	}
+	if out := waitDone(t, s); out.Status != StatusKilled {
+		t.Fatalf("outcome = %+v, want killed", out)
+	}
+}

@@ -136,6 +136,10 @@ worker-stop)
     [ "$prev" = "--dispatch" ] && id="$a"
     prev="$a"
   done
+  if [ -f "$D/stopfail" ]; then
+    echo '{"ok":false,"error":{"code":"internal","message":"worker-stop failed"}}' >&2
+    exit 1
+  fi
   [ -f "$D/w-$id" ] && echo "failed" > "$D/w-$id"
   echo '{"ok":true,"result":{}}'
   ;;
@@ -185,6 +189,22 @@ func (f *Fake) SetLimitMessage(t *testing.T, on bool, message string) {
 	}
 	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 		t.Fatalf("clear limit: %v", err)
+	}
+}
+
+// FailStop makes worker-stop exit non-zero and leave the worker running, until
+// cleared.
+func (f *Fake) FailStop(t *testing.T, on bool) {
+	t.Helper()
+	path := filepath.Join(f.Dir, "stopfail")
+	if on {
+		if err := os.WriteFile(path, []byte("1\n"), 0o644); err != nil {
+			t.Fatalf("fail stop: %v", err)
+		}
+		return
+	}
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		t.Fatalf("clear fail stop: %v", err)
 	}
 }
 
