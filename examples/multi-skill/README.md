@@ -31,7 +31,7 @@ The config sets project-wide routing defaults and concurrency for multi-stage ex
 ## Running
 
 ```sh
-noodle start
+shinfactory start
 ```
 
 Watch the web UI at `localhost:3000` to see multi-stage orders progress through their pipelines.

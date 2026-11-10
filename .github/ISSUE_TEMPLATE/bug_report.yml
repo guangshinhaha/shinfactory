@@ -10,7 +10,7 @@ body:
         Copy this prompt into Claude, Codex, or whatever agent you use. It will gather the right files and open the issue for you.
 
         ````
-        File a bug report on poteto/noodle for the issue I just hit.
+        File a bug report on guangshinhaha/shinfactory for the issue I just hit.
 
         1. Describe what I was trying to do and what went wrong. Be specific.
            State the failure, not what you expected. No filler, no hedging.
@@ -24,11 +24,11 @@ body:
            - .noodle/sessions/<relevant-session-id>/events.ndjson (last 50 lines)
            - .noodle/sessions/<relevant-session-id>/spawn.json
            - .noodle.toml (redact any tokens or secrets)
-        4. Include: Noodle version (noodle --version), OS, provider and model.
+        4. Include: shinfactory version (shinfactory --version), OS, provider and model.
         5. Do not write "I hope this helps", "Let me know if you need more info",
            or any other filler. Just state what happened.
 
-        Use `gh issue create` on poteto/noodle with the bug label.
+        Use `gh issue create` on guangshinhaha/shinfactory with the bug label.
         ````
 
         ---
@@ -54,7 +54,7 @@ body:
       placeholder: |
         1. Create a project with a schedule and execute skill
         2. Add a backlog item to brain/todos.md
-        3. Run `noodle start`
+        3. Run `shinfactory start`
         4. Wait for the scheduler to write orders-next.json
         5. Observe that orders.json never updates
     validations:
@@ -81,7 +81,7 @@ body:
     id: version
     attributes:
       label: Noodle version
-      description: Output of `noodle --version`
+      description: Output of `shinfactory --version`
       placeholder: "0.1.0"
     validations:
       required: true

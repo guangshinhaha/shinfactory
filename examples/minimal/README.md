@@ -21,7 +21,7 @@ brain/todos.md                  # Backlog with two items
 ## Running
 
 ```sh
-noodle start
+shinfactory start
 ```
 
 Noodle reads `.noodle.toml`, discovers the two skills, and begins cycling. Open the web UI (default `localhost:3000`) to watch progress.
