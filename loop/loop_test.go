@@ -1,9 +1,11 @@
 package loop
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -668,6 +670,39 @@ func TestCycleEntersIdleWhenNoPlansRemain(t *testing.T) {
 	}
 	if status.LoopState != "idle" {
 		t.Fatalf("status loop_state = %q, want idle", status.LoopState)
+	}
+}
+
+func TestIdleCyclesDoNotLogStateChanges(t *testing.T) {
+	projectDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(projectDir, ".noodle"), 0o755); err != nil {
+		t.Fatalf("mkdir runtime: %v", err)
+	}
+	var logs bytes.Buffer
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
+		Runtimes: map[string]loopruntime.Runtime{"process": newMockRuntime()},
+		Worktree: &fakeWorktree{},
+		Adapter:  &fakeAdapterRunner{},
+		Mise:     &fakeMise{},
+		Monitor:  fakeMonitor{},
+		Registry: testLoopRegistry(),
+		Now:      time.Now,
+		Logger:   slog.New(slog.NewTextHandler(&logs, nil)),
+	})
+	if err := l.Cycle(context.Background()); err != nil {
+		t.Fatalf("cycle 1: %v", err)
+	}
+	logs.Reset()
+	for i := 0; i < 3; i++ {
+		if err := l.Cycle(context.Background()); err != nil {
+			t.Fatalf("idle cycle %d: %v", i, err)
+		}
+	}
+	if l.state != StateIdle {
+		t.Fatalf("state = %s, want idle", l.state)
+	}
+	if strings.Contains(logs.String(), "state changed") {
+		t.Fatalf("idle cycles logged state changes:\n%s", logs.String())
 	}
 }
 
