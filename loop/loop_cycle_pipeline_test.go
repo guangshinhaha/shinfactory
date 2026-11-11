@@ -9,6 +9,7 @@ import (
 
 	"github.com/guangshinhaha/shinfactory/adapter"
 	"github.com/guangshinhaha/shinfactory/internal/orderx"
+	"github.com/guangshinhaha/shinfactory/mise"
 	loopruntime "github.com/guangshinhaha/shinfactory/runtime"
 )
 
@@ -209,5 +210,41 @@ func TestProposalOfUnreadyAndScheduleEntersCooldown(t *testing.T) {
 
 	if !l.scheduleNothingUntil.After(now) {
 		t.Fatalf("want empty-promotion cooldown after [unready, schedule], got %v", l.scheduleNothingUntil)
+	}
+}
+
+func TestMiseNoiseDuringInFlightStageDoesNotInjectSchedule(t *testing.T) {
+	l, _ := newPromotionTestLoop(t)
+	backlog := []adapter.BacklogItem{{ID: "121"}}
+	brief := mise.Brief{Backlog: backlog}
+
+	// First sight of the backlog with nothing running schedules once.
+	orders := OrdersFile{}
+	if _, err := l.ensureScheduleIfNeeded(brief, &orders, true); err != nil {
+		t.Fatalf("ensureScheduleIfNeeded: %v", err)
+	}
+	if !hasScheduleOrder(orders) {
+		t.Fatalf("want schedule injected for a new backlog, got %+v", orders)
+	}
+
+	// The schedule ran and was removed; order 121 now has a stage in flight.
+	orders = OrdersFile{Orders: []Order{{ID: "121", Status: OrderStatusActive, Stages: []Stage{{TaskKey: "execute", Status: StageStatusActive}}}}}
+	l.cooks.activeCooksByOrder["121"] = &cookHandle{cookIdentity: cookIdentity{orderID: "121", stage: orders.Orders[0].Stages[0]}}
+
+	// Tickets, events and resources keep changing mise.json while it runs.
+	if _, err := l.ensureScheduleIfNeeded(brief, &orders, true); err != nil {
+		t.Fatalf("ensureScheduleIfNeeded: %v", err)
+	}
+	if hasScheduleOrder(orders) {
+		t.Fatalf("schedule injected for mise noise while a stage is in flight, orders=%+v", orders)
+	}
+
+	// A real backlog change still schedules.
+	changed := mise.Brief{Backlog: []adapter.BacklogItem{{ID: "121"}, {ID: "122"}}}
+	if _, err := l.ensureScheduleIfNeeded(changed, &orders, true); err != nil {
+		t.Fatalf("ensureScheduleIfNeeded: %v", err)
+	}
+	if !hasScheduleOrder(orders) {
+		t.Fatalf("want schedule injected when the backlog changed, orders=%+v", orders)
 	}
 }
