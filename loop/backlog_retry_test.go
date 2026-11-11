@@ -67,9 +67,6 @@ func TestBuildCycleBriefRetriesTransientBacklogError(t *testing.T) {
 	if !running || m.calls != 3 {
 		t.Fatalf("running=%v calls=%d, want running after 3 sync attempts", running, m.calls)
 	}
-	if l.backlogRetry != nil {
-		t.Fatal("retry state kept after recovery, want it cleared")
-	}
 }
 
 // The cycle must return while waiting so control commands and status stamps
@@ -103,22 +100,8 @@ func TestCycleStampsWaitingStateDuringBacklogOutage(t *testing.T) {
 	if err := l.Cycle(context.Background()); err != nil {
 		t.Fatalf("Cycle error = %v, want the outage reported as a waiting state", err)
 	}
-	if len(l.lastStatus.Warnings) != 1 || !strings.Contains(l.lastStatus.Warnings[0], "backlog sync failing") {
+	if len(l.lastStatus.Warnings) != 1 || !strings.Contains(l.lastStatus.Warnings[0], "network unreachable") {
 		t.Fatalf("status warnings = %q, want the waiting state stamped", l.lastStatus.Warnings)
-	}
-}
-
-func TestBuildCycleBriefStopsOnPersistentBacklogError(t *testing.T) {
-	m := &fakeMise{err: errTransientGitHub}
-	l, clock := backlogRetryLoop(t, m)
-
-	_, _, elapsed, err := cycleUntilDone(t, l, clock)
-	if err == nil || !strings.Contains(err.Error(), "still failing after") {
-		t.Fatalf("error = %v, want a persistent-failure message naming the attempts", err)
-	}
-	// Default window is five minutes, counted from the first failure.
-	if elapsed < 5*time.Minute || elapsed > 5*time.Minute+time.Second {
-		t.Fatalf("elapsed = %s, want the 5m default window", elapsed)
 	}
 }
 
@@ -142,7 +125,6 @@ func TestBuildCycleBriefSurvivesLongNetworkOutage(t *testing.T) {
 	outage := 4 * time.Minute
 	end := clock.now.Add(outage)
 	l.deps.Mise = outageMise{down: func() bool { return clock.now.Before(end) }, calls: &calls}
-	l.config.Backlog.RetryWindowSeconds = 600
 
 	running, _, elapsed, err := cycleUntilDone(t, l, clock)
 	if err != nil {
@@ -153,43 +135,13 @@ func TestBuildCycleBriefSurvivesLongNetworkOutage(t *testing.T) {
 	}
 }
 
-func TestBuildCycleBriefHonorsConfiguredWindow(t *testing.T) {
-	m := &fakeMise{err: errTransientGitHub}
-	l, clock := backlogRetryLoop(t, m)
-	l.config.Backlog.RetryWindowSeconds = 20
-
-	_, _, elapsed, err := cycleUntilDone(t, l, clock)
-	if err == nil {
-		t.Fatal("error = nil, want a persistent-failure error after the window")
-	}
-	if elapsed < 20*time.Second || elapsed > 21*time.Second {
-		t.Fatalf("elapsed = %s, want the configured 20s window", elapsed)
-	}
-}
-
-// Time spent inside a slow sync call counts against the window.
-func TestBuildCycleBriefWindowCountsTimeInsideSync(t *testing.T) {
-	var calls int
-	l, clock := backlogRetryLoop(t, &fakeMise{})
-	l.deps.Mise = slowFailingMise{clock: clock, took: 15 * time.Second, calls: &calls}
-	l.config.Backlog.RetryWindowSeconds = 20
-
-	_, _, _, err := cycleUntilDone(t, l, clock)
-	if err == nil {
-		t.Fatal("error = nil, want the window spent")
-	}
-	if calls > 3 {
-		t.Fatalf("calls = %d, want the 15s sync time to eat the 20s window", calls)
-	}
-}
-
 func TestIsTransientBacklogErrorCoversDNSAndClientTimeouts(t *testing.T) {
 	for _, text := range []string{
 		`Get "https://api.github.com/repos": dial tcp: lookup api.github.com: no such host`,
 		`getaddrinfo ENOTFOUND api.github.com`,
 		`Get "https://api.github.com/issues": context deadline exceeded (Client.Timeout exceeded while awaiting headers)`,
 	} {
-		if !isTransientBacklogError(errors.New(text)) {
+		if !isNetworkError(errors.New(text)) {
 			t.Errorf("%q not classed transient", text)
 		}
 	}
@@ -207,17 +159,4 @@ func (o outageMise) Build(context.Context, mise.ActiveSummary, []mise.HistoryIte
 		return mise.Brief{}, nil, false, errTransientGitHub
 	}
 	return mise.Brief{}, nil, false, nil
-}
-
-// slowFailingMise advances the clock by took inside each failing sync call.
-type slowFailingMise struct {
-	clock *fakeClock
-	took  time.Duration
-	calls *int
-}
-
-func (s slowFailingMise) Build(context.Context, mise.ActiveSummary, []mise.HistoryItem) (mise.Brief, []string, bool, error) {
-	*s.calls++
-	s.clock.now = s.clock.now.Add(s.took)
-	return mise.Brief{}, nil, false, errTransientGitHub
 }

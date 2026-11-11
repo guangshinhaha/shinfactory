@@ -776,7 +776,7 @@ func (l *Loop) retryAwaitingChecks(ctx context.Context) error {
 			if perr := l.parkPendingReview(cook, reason); perr != nil {
 				return perr
 			}
-		case isTransientBacklogError(err):
+		case isNetworkError(err):
 			// A network or 5xx blip is not a refusal: keep the waiting reason
 			// and retry on the next poll.
 			l.logger.Warn("parked PR merge hit a transient error; will retry", "order", cook.orderID, "error", err)

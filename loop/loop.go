@@ -480,6 +480,10 @@ func (l *Loop) Cycle(ctx context.Context) error {
 	cycleCapacity := l.config.Concurrency.MaxConcurrency
 
 	ready, err := l.runCycleMaintenance(ctx)
+	if warning, ok := l.recordNetworkFailure("cycle.maintenance", err); ok {
+		l.lastMiseWarnings = []string{warning}
+		return l.stampCycleStatus()
+	}
 	if err != nil {
 		return l.classifySystemHard(
 			"cycle.maintenance",
@@ -528,6 +532,7 @@ func (l *Loop) Cycle(ctx context.Context) error {
 		)
 	}
 	if !shouldContinue {
+		l.clearNetworkOutage()
 		if err := l.stampStatus(); err != nil {
 			return l.classifySystemHard(
 				"persist.status_stamp",
@@ -547,11 +552,17 @@ func (l *Loop) Cycle(ctx context.Context) error {
 		)
 	}
 	if err := l.spawnPlannedCandidates(ctx, candidates, orders); err != nil {
-		return l.classifySystemHard(
-			"cycle.spawn",
-			formatCycleFailureMessage("cycle.spawn", "spawn cooks"),
-			err,
-		)
+		warning, ok := l.recordNetworkFailure("cycle.spawn", err)
+		if !ok {
+			return l.classifySystemHard(
+				"cycle.spawn",
+				formatCycleFailureMessage("cycle.spawn", "spawn cooks"),
+				err,
+			)
+		}
+		l.lastMiseWarnings = []string{warning}
+	} else {
+		l.clearNetworkOutage()
 	}
 	// Flush all in-memory state to disk at cycle end.
 	if err := l.flushState(); err != nil {
@@ -562,6 +573,17 @@ func (l *Loop) Cycle(ctx context.Context) error {
 		)
 	}
 	l.publishState()
+	if err := l.stampStatus(); err != nil {
+		return l.classifySystemHard(
+			"persist.status_stamp",
+			formatCycleFailureMessage("persist.status_stamp", "stamp status"),
+			err,
+		)
+	}
+	return nil
+}
+
+func (l *Loop) stampCycleStatus() error {
 	if err := l.stampStatus(); err != nil {
 		return l.classifySystemHard(
 			"persist.status_stamp",

@@ -23,9 +23,14 @@ func (l *Loop) stampStatus() error {
 		mode = l.config.Mode
 	}
 
+	loopState := string(l.state)
+	if l.outage != nil && l.state == StateRunning {
+		loopState = loopStateWaitingNetwork
+	}
+
 	status := statusfile.Status{
 		Active:         active,
-		LoopState:      string(l.state),
+		LoopState:      loopState,
 		Mode:           mode,
 		MaxConcurrency: l.config.Concurrency.MaxConcurrency,
 		Warnings:       l.lastMiseWarnings,

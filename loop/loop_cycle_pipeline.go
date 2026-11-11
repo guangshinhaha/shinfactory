@@ -466,88 +466,21 @@ func (l *Loop) spawnPlannedCandidates(ctx context.Context, candidates []dispatch
 	return nil
 }
 
-const (
-	defaultBacklogRetryBackoff = time.Second
-	// maxBacklogRetryBackoff caps the doubling so a long window keeps probing
-	// the network instead of waiting minutes between tries.
-	maxBacklogRetryBackoff = 30 * time.Second
-)
-
-// transientMarkers are lowercase fragments of network and 5xx failures from the
-// backlog adapter (gh, curl, DNS). Anything else, such as bad credentials or a
-// missing repo, fails at once.
-var transientMarkers = []string{
-	"no such host", "temporary failure in name resolution", "could not resolve host",
-	"connection refused", "connection reset", "i/o timeout", "operation timed out",
-	"tls handshake", "network is unreachable", "no route to host", "unexpected eof",
-	"error connecting to", "http 500", "http 502", "http 503", "http 504",
-	"500 internal server error", "bad gateway", "service unavailable", "gateway timeout",
-	"enotfound", "client.timeout exceeded", "timeout awaiting response headers",
-}
-
-func isTransientBacklogError(err error) bool {
-	text := strings.ToLower(err.Error())
-	for _, marker := range transientMarkers {
-		if strings.Contains(text, marker) {
-			return true
-		}
-	}
-	return false
-}
-
-// backlogRetry tracks a transient backlog sync failure across cycles. The loop
-// never sleeps inside a cycle: it records when the next try is due and returns,
-// so control commands and status stamps keep running during an outage.
-type backlogRetry struct {
-	firstFailure time.Time
-	nextAttempt  time.Time
-	attempts     int
-	backoff      time.Duration
-}
-
-// buildBriefWithRetry builds the brief. A transient backlog failure starts (or
-// continues) a retry that spans cycles, with capped exponential backoff, until
-// the configured window has passed since the first failure. While a retry is
-// pending it returns waiting=true with a warning and no brief. A persistent
-// failure returns an error that says so.
+// buildBriefWithRetry builds the brief. A network failure opens (or extends) an
+// outage that spans cycles, with capped exponential backoff, and never ends the
+// loop. While the backoff runs it returns waiting=true with a warning and no
+// brief. Other failures return the error.
 func (l *Loop) buildBriefWithRetry(ctx context.Context) (brief mise.Brief, warnings []string, changed, waiting bool, err error) {
-	now := l.deps.Now()
-	if r := l.backlogRetry; r != nil && now.Before(r.nextAttempt) {
-		return mise.Brief{}, []string{backlogRetryWarning(r, r.nextAttempt.Sub(now))}, false, true, nil
+	if !l.outageDue() {
+		return mise.Brief{}, []string{l.outage.warning(l.deps.Now())}, false, true, nil
 	}
-	started := now
 	brief, warnings, changed, err = l.deps.Mise.Build(ctx, l.snapshotActiveSummary(), l.snapshotRecentHistory())
-	if ctx.Err() != nil {
+	if ctx.Err() != nil || err == nil {
 		return brief, warnings, changed, false, err
 	}
-	if err == nil || !isTransientBacklogError(err) {
-		l.backlogRetry = nil
+	warning, ok := l.recordNetworkFailure("backlog.sync", err)
+	if !ok {
 		return brief, warnings, changed, false, err
 	}
-	now = l.deps.Now()
-	r := l.backlogRetry
-	if r == nil {
-		r = &backlogRetry{firstFailure: started, backoff: defaultBacklogRetryBackoff}
-		l.backlogRetry = r
-	}
-	r.attempts++
-	window := l.config.Backlog.RetryWindow()
-	remaining := window - now.Sub(r.firstFailure)
-	if remaining <= 0 {
-		l.backlogRetry = nil
-		return brief, warnings, changed, false, fmt.Errorf("backlog sync still failing after %d attempts over %s: %w",
-			r.attempts, now.Sub(r.firstFailure).Round(time.Second), err)
-	}
-	step := min(r.backoff, maxBacklogRetryBackoff, remaining)
-	r.nextAttempt = now.Add(step)
-	r.backoff = min(r.backoff*2, maxBacklogRetryBackoff)
-	if l.logger != nil {
-		l.logger.Warn("backlog sync failed with a transient error; retrying",
-			"attempt", r.attempts, "retry_in", step.String(), "cause", err)
-	}
-	return mise.Brief{}, []string{backlogRetryWarning(r, step)}, false, true, nil
-}
-
-func backlogRetryWarning(r *backlogRetry, retryIn time.Duration) string {
-	return fmt.Sprintf("backlog sync failing (attempt %d); retrying in %s", r.attempts, retryIn.Round(time.Second))
+	return mise.Brief{}, []string{warning}, false, true, nil
 }
