@@ -1,11 +1,11 @@
 package loop
 
 import (
-	"github.com/guangshinhaha/shinfactory/internal/linestatus"
-	"github.com/guangshinhaha/shinfactory/internal/loopreg"
 	"slices"
 	"sort"
 
+	"github.com/guangshinhaha/shinfactory/internal/linestatus"
+	"github.com/guangshinhaha/shinfactory/internal/loopreg"
 	"github.com/guangshinhaha/shinfactory/internal/statusfile"
 )
 
