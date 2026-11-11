@@ -223,6 +223,9 @@ type Loop struct {
 	limitRequeues usageLimitRequeues
 
 	reconciledFailures []reconciledFailure
+	// stoppedForPerson holds orders whose failure a stop already reached a
+	// person, until failStage consumes it or the order launches again.
+	stoppedForPerson map[string]struct{}
 	lastMiseWarnings   []string
 	backlogRetry       *backlogRetry // pending transient backlog failure; nil when synced
 	lastChecksPoll     time.Time // last time parked PRs were re-checked for merge

@@ -2,6 +2,7 @@ package loop
 
 import (
 	"context"
+	"errors"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -37,6 +38,18 @@ func (h *gateHarness) stops() int {
 	return n
 }
 
+// nextUntilFailed runs stages until the order fails, which a rejected stage does
+// once its attempts run out.
+func (h *gateHarness) nextUntilFailed(t *testing.T) {
+	t.Helper()
+	for i := 0; i < 10; i++ {
+		if o, ok := h.l.orderByID("42"); ok && o.Status == OrderStatusFailed {
+			return
+		}
+		h.next(t)
+	}
+}
+
 func (h *gateHarness) retrying(t *testing.T, stage string, attempts int) {
 	t.Helper()
 	o := h.order(t)
@@ -48,8 +61,10 @@ func (h *gateHarness) retrying(t *testing.T, stage string, attempts int) {
 			t.Fatalf("%s stage status = %q after attempt %d, want pending or active again", stage, s.Status, attempts)
 		}
 	}
-	if got := h.l.orderSpendOf("42").Attempts[stage]; got != attempts {
-		t.Fatalf("%s attempts = %d, want %d counted", stage, got, attempts)
+	// The retry launches in the same cycle that rejected the stage, so the
+	// ledger already counts the relaunch.
+	if got := h.l.orderSpendOf("42").Attempts[stage]; got != attempts+1 {
+		t.Fatalf("%s launches = %d after rejection %d, want %d counted", stage, got, attempts, attempts+1)
 	}
 	if n := h.stops(); n != 0 {
 		t.Fatalf("stop adapter ran %d times while the order was still retrying", n)
@@ -113,7 +128,7 @@ func TestReviewRetryThatWritesFindingsShips(t *testing.T) {
 	h.next(t) // no file: retried
 	h.review(t, 0, "none")
 	h.next(t)
-	if o := h.order(t); o.Status == OrderStatusFailed {
+	if o, ok := h.l.orderByID("42"); ok && o.Status == OrderStatusFailed {
 		t.Fatal("a review that wrote its file on the retry still failed the order")
 	}
 	if n := h.stops(); n != 0 {
@@ -211,5 +226,17 @@ func TestEveryOrderFailurePathEndsVisible(t *testing.T) {
 	}
 	if failedSites < 3 {
 		t.Fatalf("found %d functions that mark an order failed, want at least 3: the scan stopped matching the code", failedSites)
+	}
+}
+
+func TestDispatchFailureHandsTheOrderToAPerson(t *testing.T) {
+	h := newGateHarness(t, "none", "execute")
+	h.rt.dispatchErr = errors.New("worker-start refused")
+	if err := h.l.Cycle(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	h.failedWith(t, "dispatch failed")
+	if n := h.stops(); n != 1 {
+		t.Fatalf("stop adapter ran %d times for a dispatch failure, want 1", n)
 	}
 }

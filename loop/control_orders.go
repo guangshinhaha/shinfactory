@@ -168,7 +168,6 @@ func (l *Loop) controlSkip(orderID string) error {
 		return err
 	}
 	// A skipped order is abandoned, not retried: its spend goes with it.
-	l.clearFailedRounds(orderID)
 	l.clearRebased(orderID)
 	l.clearOrderSpend(orderID)
 	return nil

@@ -276,10 +276,11 @@ func TestOrcaRuntimeStageEventsDecideTheResult(t *testing.T) {
 	sid = env.activeSessionID(t, "42")
 	env.emitSessionEvent(t, sid, event.EventStageFail, "Rejected: Done when missed")
 	env.settleLatest(t, "succeeded")
-	env.cycleUntil(t, "quality rejected", func() bool {
-		of := env.readOrders(t)
-		return len(of.Orders) == 1 && of.Orders[0].Status == OrderStatusFailed
-	})
+	// The rejected stage goes back with its reason: a new worker, not a failed order.
+	env.cycleUntil(t, "quality retried", func() bool { return len(env.fake.Starts()) == 3 })
+	if of := env.readOrders(t); len(of.Orders) != 1 || of.Orders[0].Status == OrderStatusFailed {
+		t.Fatalf("orders after a rejected stage = %+v, want the order retrying", of.Orders)
+	}
 }
 
 // Issue #86: Orca has not noticed the stage's brand-new worktree when the

@@ -227,6 +227,10 @@ func TestHandleCompletionStageFailEventFailsCleanlyFinishedStage(t *testing.T) {
 	})
 
 	const reason = "Rejected: running ./greet prints nothing, Done when wants hello"
+	// The stage has used every attempt, so the rejection ends the order.
+	for i := 0; i < l.config.Spend.MaxAttempts; i++ {
+		l.recordStageLaunch("order-1", "quality", 0)
+	}
 	writer, err := event.NewEventWriter(runtimeDir, "order-1-session")
 	if err != nil {
 		t.Fatalf("event writer: %v", err)
@@ -276,6 +280,9 @@ func TestHandleCompletionStageFailEventFailsCleanlyFinishedStage(t *testing.T) {
 	}
 	if _, parked := l.cooks.pendingReview["order-1"]; parked {
 		t.Fatal("failed stage was parked for review")
+	}
+	if got := l.deps.Adapter.(*fakeAdapterRunner).stopCalls; len(got) != 1 || got[0] != "order-1" {
+		t.Fatalf("backlog stop calls = %v, want one for order-1: a failed order must reach a person", got)
 	}
 
 	// The scheduler reads loop events through mise, so the reason has to land there.

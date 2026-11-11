@@ -140,12 +140,3 @@ func (l *Loop) stageStillActive(cook *cookHandle) bool {
 	}
 	return order.Stages[cook.stageIndex].Status == StageStatusActive
 }
-
-// rejectStage fails a stage whose evidence is missing and tells the scheduler.
-func (l *Loop) rejectStage(ctx context.Context, cook *cookHandle, reason string) error {
-	if err := l.failStage(ctx, cook, reason); err != nil {
-		return err
-	}
-	l.noteRejectedStage(ctx, cook.orderID, reason)
-	return nil
-}

@@ -48,6 +48,7 @@ func (l *Loop) spawnCook(ctx context.Context, cand dispatchCandidate, order Orde
 	}
 
 	stage := cand.Stage
+	delete(l.stoppedForPerson, cand.OrderID) // a person put it back; a new failure needs its own stop
 	runtimeName := l.stageRuntime(stage)
 	if l.runtimeHeld(runtimeName) {
 		return nil // out of usage: the stage stays pending until a launch can succeed
@@ -90,7 +91,8 @@ func (l *Loop) spawnCook(ctx context.Context, cand dispatchCandidate, order Orde
 	if l.config.Landing.PR() {
 		l.clearGateFile(order, stage)
 	}
-	resumePrompt = stringx.JoinNonEmpty("\n\n", playbookNote(order, stage), l.gateNote(order, stage), resumePrompt)
+	retryNote := l.retryNote(cand.OrderID, cand.StageIndex)
+	resumePrompt = stringx.JoinNonEmpty("\n\n", playbookNote(order, stage), l.gateNote(order, stage), retryNote, resumePrompt)
 	rationale := order.Rationale
 	if gateStageKey(stage) == gateVerifyKey && l.config.Landing.PR() {
 		rationale = "" // a verifier works from the issue, not the scheduler's reasoning
@@ -160,6 +162,7 @@ func (l *Loop) spawnCook(ctx context.Context, cand dispatchCandidate, order Orde
 		dispatchedRuntime: dispatchedRuntime,
 	}
 	l.trackCookStarted(cook)
+	l.clearRetryNote(cand.OrderID)
 	if !opts.steered {
 		l.recordStageLaunch(cand.OrderID, spendTaskKey(stage), order.Round)
 	}
@@ -281,6 +284,7 @@ func (l *Loop) handleCookDispatchFailure(cand dispatchCandidate, stage Stage, wo
 	)
 	l.logger.Warn("cook dispatch failed; order marked failed",
 		"order", cand.OrderID, "stage", cand.StageIndex, "error", err, "class", envelope.Class)
+	l.stopFailedOrder(context.Background(), cand.OrderID, reason)
 	return nil
 }
 
