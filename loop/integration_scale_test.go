@@ -9,7 +9,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/guangshinhaha/shinfactory/adapter"
 	"github.com/guangshinhaha/shinfactory/internal/taskreg"
+	"github.com/guangshinhaha/shinfactory/mise"
 	loopruntime "github.com/guangshinhaha/shinfactory/runtime"
 	"github.com/guangshinhaha/shinfactory/skill"
 )
@@ -833,4 +835,59 @@ func TestMockRuntimeScaleBurstViaRuntimes(t *testing.T) {
 
 	current, _ := readOrders(ordersPath)
 	t.Fatalf("orders remaining after burst: %d", len(current.Orders))
+}
+
+func failedScheduleOrders() OrdersFile {
+	return OrdersFile{
+		Orders: []Order{{
+			ID:     ScheduleTaskKey(),
+			Status: OrderStatusFailed,
+			Stages: []Stage{{
+				TaskKey: ScheduleTaskKey(),
+				Skill:   "schedule",
+				Status:  StageStatusFailed,
+			}},
+		}},
+	}
+}
+
+// A failed schedule order left in orders.json used to stop all scheduling
+// after a restart: dispatch skips non-active orders and nothing revived it.
+func TestRestartWithFailedScheduleOrderAndReadyIssueDispatchesSchedule(t *testing.T) {
+	projectDir := t.TempDir()
+	runtimeDir := filepath.Join(projectDir, ".noodle")
+	if err := os.MkdirAll(filepath.Join(runtimeDir, "sessions"), 0o755); err != nil {
+		t.Fatalf("mkdir sessions: %v", err)
+	}
+	ordersPath := filepath.Join(runtimeDir, "orders.json")
+	if err := writeOrdersAtomic(ordersPath, failedScheduleOrders()); err != nil {
+		t.Fatalf("write orders: %v", err)
+	}
+
+	rt := newMockRuntime()
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
+		Runtimes: map[string]loopruntime.Runtime{"process": rt},
+		Worktree: &fakeWorktree{},
+		Adapter:  &fakeAdapterRunner{},
+		Mise: &fakeMise{brief: mise.Brief{
+			Backlog: []adapter.BacklogItem{{ID: "121", Title: "ready issue", Status: "open"}},
+		}},
+		Monitor:    fakeMonitor{},
+		Registry:   testLoopRegistry(),
+		Now:        time.Now,
+		OrdersFile: ordersPath,
+	})
+
+	if err := l.loadOrdersState(); err != nil {
+		t.Fatalf("loadOrdersState: %v", err)
+	}
+	if err := l.reconcile(context.Background()); err != nil {
+		t.Fatalf("reconcile: %v", err)
+	}
+	if err := l.Cycle(context.Background()); err != nil {
+		t.Fatalf("cycle: %v", err)
+	}
+	if len(rt.calls) != 1 || rt.calls[0].Skill != "schedule" {
+		t.Fatalf("expected a schedule dispatch after restart, calls=%#v", rt.calls)
+	}
 }
