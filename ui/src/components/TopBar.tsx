@@ -9,7 +9,7 @@ const STATE_CLASS: Record<LoopState, string> = {
   idle: "bg-transparent text-text-secondary border-border-active",
 };
 
-export function needsYouCount(snapshot: Snapshot): number {
+export function needsShinCount(snapshot: Snapshot): number {
   return snapshot.pending_review_count + snapshot.action_needed.length;
 }
 
@@ -17,7 +17,7 @@ export function tabTitle(repo: string, snapshot: Snapshot): string {
   return [
     repo || "shinfactory",
     `${snapshot.active.length} running`,
-    `${needsYouCount(snapshot)} needs you`,
+    `${needsShinCount(snapshot)} needs Shin`,
   ].join(" · ");
 }
 

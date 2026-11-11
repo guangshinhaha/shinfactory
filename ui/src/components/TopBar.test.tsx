@@ -86,13 +86,13 @@ describe("TopBar rendering", () => {
       action_needed: [],
     });
     renderBar();
-    expect(document.title).toBe("gantry · 2 running · 1 needs you");
+    expect(document.title).toBe("gantry · 2 running · 1 needs Shin");
   });
 
-  it("counts action_needed toward needs-you", () => {
+  it("counts action_needed toward needs-Shin", () => {
     mockSnapshot = buildSnapshot({ pending_review_count: 1, action_needed: ["x", "y"] });
     renderBar();
-    expect(document.title).toBe("gantry · 0 running · 3 needs you");
+    expect(document.title).toBe("gantry · 0 running · 3 needs Shin");
   });
 
   it("labels the websocket as the connection, apart from the loop state", () => {
