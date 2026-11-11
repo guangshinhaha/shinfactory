@@ -296,7 +296,7 @@ func (l *Loop) reviewGate(ctx context.Context, cook *cookHandle) (bool, error) {
 		path := filepath.Join(l.gateDir(order.ID, order.Round), reviewFileName)
 		data, err := os.ReadFile(path)
 		if err != nil {
-			return true, l.failStage(nil, cook, "review wrote no findings file at "+path+"; an empty review counts as not run")
+			return true, l.rejectStageUpTo(ctx, cook, "review wrote no findings file at "+path+"; an empty review counts as not run", reviewRetryAttempts)
 		}
 		rep, err := parseReview(data)
 		if err != nil {

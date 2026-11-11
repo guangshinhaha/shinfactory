@@ -129,6 +129,7 @@ func TestFailingRepoChecksRejectTheExecuteStage(t *testing.T) {
 	if len(ran) != 1 || ran[0] != "pnpm check" {
 		t.Fatalf("checks run = %v, want [pnpm check]", ran)
 	}
+	h.nextUntilFailed(t) // sent back with the reason until attempts run out
 	h.failedWith(t, "failing checks")
 	if len(h.ln.pushes) != 0 {
 		t.Fatal("a stage with failing checks was pushed")
@@ -147,7 +148,7 @@ func TestPassingRepoChecksLetTheStageThrough(t *testing.T) {
 
 func TestRealFailingCheckCommandRejectsTheStage(t *testing.T) {
 	h := evidenceHarness(t, "feature", "Before a PR:\n- `exit 3`\n")
-	h.next(t)
+	h.nextUntilFailed(t)
 	h.failedWith(t, "a check command that exits non-zero")
 }
 
@@ -156,7 +157,7 @@ func TestBugWithoutTestFirstCommitIsRejected(t *testing.T) {
 	branchCommits = func(string) ([]commitFiles, error) {
 		return []commitFiles{{SHA: "aaaa1111", Files: []string{"loop/x.go", "loop/x_test.go"}}}, nil
 	}
-	h.next(t)
+	h.nextUntilFailed(t)
 	h.failedWith(t, "bug without a test-first commit")
 }
 

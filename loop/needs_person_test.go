@@ -93,17 +93,18 @@ func newStopEnv(t *testing.T) *stopEnv {
 	return &stopEnv{loop: l, runtimeDir: runtimeDir, ordersPath: ordersPath, log: log}
 }
 
-// reject runs one round: a fresh active order for issue 7 whose quality stage
+// reject runs one round: a fresh active order for issue 7 whose execute stage
 // reports stage_fail with message.
 func (e *stopEnv) reject(t *testing.T, round int, message string) {
 	t.Helper()
 	if err := writeOrdersAtomic(e.ordersPath, OrdersFile{Orders: []Order{{
 		ID: "7", Status: OrderStatusActive,
-		Stages: []Stage{{TaskKey: "quality", Skill: "quality", Status: StageStatusActive}},
+		Stages: []Stage{{TaskKey: "execute", Skill: "execute", Status: StageStatusActive}},
 	}}}); err != nil {
 		t.Fatal(err)
 	}
 	e.loop.syncCanonicalOrderFromLegacy(mustOrder(t, e.ordersPath))
+	e.loop.recordStageLaunch("7", "execute", 0) // the launch that is now reporting
 	sid := "round-" + string(rune('0'+round))
 	writer, err := event.NewEventWriter(e.runtimeDir, sid)
 	if err != nil {
@@ -114,7 +115,7 @@ func (e *stopEnv) reject(t *testing.T, round int, message string) {
 		t.Fatal(err)
 	}
 	cook := &cookHandle{
-		cookIdentity: cookIdentity{orderID: "7", stage: Stage{TaskKey: "quality", Skill: "quality"}},
+		cookIdentity: cookIdentity{orderID: "7", stage: Stage{TaskKey: "execute", Skill: "execute"}},
 		worktreeName: "w",
 		session:      &mockSession{id: sid, status: "completed", done: make(chan struct{})},
 	}
@@ -152,50 +153,36 @@ func TestStopForPersonWhenTheIssueIsUnbuildable(t *testing.T) {
 	}
 }
 
-// Stop 2: the first rejected round retries quietly, the second asks a person
-// once, and a third rejection while the label is up adds no second comment.
-func TestStopForPersonAfterTwoFailedRounds(t *testing.T) {
+// Stop 2: a rejected stage retries quietly while it has attempts left, then
+// asks a person once; a later rejection while the label is up adds no second
+// comment.
+func TestStopForPersonWhenAttemptsRunOut(t *testing.T) {
 	env := newStopEnv(t)
+	max := env.loop.config.Spend.MaxAttempts
 
-	env.reject(t, 1, "Rejected: Done when missed, ./greet printed nothing.")
-	if log := ghLog(t, env.log); strings.Contains(log, "issue comment") || strings.Contains(log, "needs-shin") {
-		t.Fatalf("one failed round must not reach a person:\n%s", log)
+	for round := 1; round < max; round++ {
+		env.reject(t, round, "Rejected: Done when missed, ./greet printed nothing.")
+		if log := ghLog(t, env.log); strings.Contains(log, "issue comment") || strings.Contains(log, "needs-shin") {
+			t.Fatalf("rejection %d of %d must retry, not reach a person:\n%s", round, max, log)
+		}
+		if got := mustOrder(t, env.ordersPath).Status; got == OrderStatusFailed {
+			t.Fatalf("order failed on rejection %d; want a retry", round)
+		}
 	}
 
-	env.reject(t, 2, "Rejected: ./greet still prints nothing.")
+	env.reject(t, max, "Rejected: ./greet still prints nothing.")
 	log := ghLog(t, env.log)
 	if strings.Count(log, "issue comment 7") != 1 ||
-		!strings.Contains(log, "Last rejection: Rejected: ./greet still prints nothing.") {
-		t.Fatalf("want one comment after round 2 naming the decision:\n%s", log)
+		!strings.Contains(log, "Reason: Rejected: ./greet still prints nothing.") {
+		t.Fatalf("want one comment after the last attempt naming the reason:\n%s", log)
 	}
 	if !strings.Contains(log, "issue edit 7 --remove-label ready --add-label needs-shin") {
 		t.Fatalf("issue 7 not labelled needs-shin:\n%s", log)
 	}
 
-	env.reject(t, 3, "Rejected: again.")
-	env.reject(t, 4, "Rejected: and again.")
+	env.reject(t, max+1, "Rejected: again.")
 	if n := strings.Count(ghLog(t, env.log), "issue comment 7"); n != 1 {
 		t.Fatalf("comments = %d, want exactly 1 while the label is up", n)
-	}
-}
-
-// An old rejection must not combine with a much later one: only rounds inside
-// failedRoundsWindow count toward the stop.
-func TestFailedRoundsExpireAfterTheWindow(t *testing.T) {
-	env := newStopEnv(t)
-	now := time.Date(2026, 11, 1, 9, 0, 0, 0, time.UTC)
-	env.loop.deps.Now = func() time.Time { return now }
-
-	if got := env.loop.bumpFailedRounds("7"); got != 1 {
-		t.Fatalf("first rejection counted %d, want 1", got)
-	}
-	now = now.Add(failedRoundsWindow - time.Minute)
-	if got := env.loop.bumpFailedRounds("7"); got != 2 {
-		t.Fatalf("rejection inside the window counted %d, want 2", got)
-	}
-	now = now.Add(failedRoundsWindow + time.Minute)
-	if got := env.loop.bumpFailedRounds("7"); got != 1 {
-		t.Fatalf("rejection after the window counted %d, want 1 (the old rounds expired)", got)
 	}
 }
 

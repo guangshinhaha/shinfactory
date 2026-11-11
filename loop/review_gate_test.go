@@ -250,7 +250,7 @@ func TestEmptyReviewCountsAsNotRun(t *testing.T) {
 			if name != "missing" {
 				h.write(t, 0, reviewFileName, body)
 			}
-			h.next(t)
+			h.nextUntilFailed(t)
 			h.failedWith(t, "review not run")
 		})
 	}
@@ -458,6 +458,7 @@ func TestStaleReviewFileIsNotThisStagesReview(t *testing.T) {
 	h.writeNow(t, 0, reviewFileName, "Covered: an earlier run\nFindings: none\n")
 	h.next(t)
 	h.next(t) // the reviewer writes nothing
+	h.nextUntilFailed(t) // retried once, writes nothing again
 	h.failedWith(t, "stale review")
 }
 
@@ -526,6 +527,7 @@ func TestMissingReviewFileFailsBeforeAnyStageMessageCanPark(t *testing.T) {
 	// The reviewer's blocking stage message would park the stage; the gate has
 	// to run first, so a missing review file fails before anything parks.
 	h.next(t)
+	h.nextUntilFailed(t)
 	h.failedWith(t, "no review file")
 }
 

@@ -143,11 +143,7 @@ func (l *Loop) handleCompletion(ctx context.Context, cook *cookHandle, resultSta
 			if reason == "" {
 				reason = "stage reported failure with no reason"
 			}
-			if err := l.failStage(ctx, cook, reason); err != nil {
-				return err
-			}
-			l.noteRejectedStage(ctx, cook.orderID, reason)
-			return nil
+			return l.rejectStage(ctx, cook, reason)
 		}
 	}
 
@@ -304,10 +300,11 @@ func (l *Loop) handleStageFailure(ctx context.Context, cook *cookHandle, resultS
 	return l.failStage(nil, cook, reason)
 }
 
-func (l *Loop) failStage(_ context.Context, cook *cookHandle, reason string) error {
+func (l *Loop) failStage(ctx context.Context, cook *cookHandle, reason string) error {
 	// The rebase count stays: a persistent conflict plus unrelated failures
 	// must not earn a second rebase. It clears when a person takes over
 	// (stopForPerson), the review is rejected, or the order is skipped.
+	l.owePersonStop(cook.orderID, reason) // before anything below can fail or return early
 	if err := l.ensureCanonicalOrderFromOrders(cook.orderID); err != nil {
 		return err
 	}
@@ -338,6 +335,14 @@ func (l *Loop) failStage(_ context.Context, cook *cookHandle, reason string) err
 
 	l.forwardToScheduler(cook, "stage_failed", reason, nil)
 	l.cleanupCookWorktree(cook)
+	// A failed order is inert until a person acts, so a person must hear of it.
+	// Schedule stages have no issue behind them.
+	if !isScheduleStage(cook.stage) {
+		if ctx == nil {
+			ctx = context.Background()
+		}
+		l.stopFailedOrder(ctx, cook.orderID, reason)
+	}
 	return nil
 }
 
@@ -410,7 +415,6 @@ func (l *Loop) advanceAndPersist(ctx context.Context, cook *cookHandle, message 
 				return err
 			}
 		}
-		l.clearFailedRounds(cook.orderID)
 		l.clearRebased(cook.orderID)
 		l.clearOrderSpend(cook.orderID)
 	}

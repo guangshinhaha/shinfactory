@@ -172,6 +172,7 @@ func (l *Loop) handleMergeError(cook *cookHandle, err error) error {
 	schedulerHint := reason + ". Use Skill(schedule) and create a new order to fix this issue before retrying."
 	l.logger.Warn("merge failed, forwarding to scheduler", "order", cook.orderID, "reason", reason)
 	l.forwardToScheduler(cook, "merge_failed", schedulerHint, nil)
+	l.owePersonStop(cook.orderID, reason)
 	if err := l.ensureCanonicalOrderFromOrders(cook.orderID); err != nil {
 		return err
 	}
@@ -201,5 +202,6 @@ func (l *Loop) handleMergeError(cook *cookHandle, err error) error {
 		err,
 	)
 	l.cleanupCookWorktree(cook)
+	l.stopFailedOrder(context.Background(), cook.orderID, reason)
 	return nil
 }
