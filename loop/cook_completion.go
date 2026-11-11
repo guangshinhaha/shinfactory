@@ -208,6 +208,8 @@ func (l *Loop) completeAfterEvidence(ctx context.Context, cook *cookHandle) erro
 // handleScheduleCompletion handles a successful schedule stage completion.
 func (l *Loop) handleScheduleCompletion(cook *cookHandle) error {
 	l.logger.Info("schedule completed", "session", cook.session.ID())
+	l.scheduleFailures = 0
+	l.scheduleRetryAt = time.Time{}
 	_ = l.events.Emit(LoopEventScheduleCompleted, ScheduleCompletedPayload{
 		SessionID: cook.session.ID(),
 	})
@@ -335,6 +337,9 @@ func (l *Loop) failStage(ctx context.Context, cook *cookHandle, reason string) e
 
 	l.forwardToScheduler(cook, "stage_failed", reason, nil)
 	l.cleanupCookWorktree(cook)
+	if isScheduleStage(cook.stage) {
+		l.backOffFailedSchedule(reason)
+	}
 	// A failed order is inert until a person acts, so a person must hear of it.
 	// Schedule stages have no issue behind them.
 	if !isScheduleStage(cook.stage) {

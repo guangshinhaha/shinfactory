@@ -9,3 +9,9 @@
   - Reconcile resets stale schedule stage status `active -> pending` when no live session was recovered.
 
 See also [[principles/fix-root-causes]], [[principles/make-operations-idempotent]]
+
+## Failed schedule order (#156)
+
+- Dispatch skips non-active orders, so a `failed` schedule order in `orders.json` was inert: after a restart nothing scheduled, though `mise.json` listed ready issues.
+- Fix: `reviveFailedScheduleOrder` (called in `prepareOrdersForCycle`) resets it to active/pending once `scheduleRetryAt` passes. `backOffFailedSchedule` sets that time (30s doubling, cap 5m) and stores `failure_reason` on the stage; a completed schedule resets the count. After a restart the time is zero, so the retry is immediate.
+- `shinfactory status` prints `schedule order failed: <reason>`.

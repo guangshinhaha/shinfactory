@@ -891,3 +891,48 @@ func TestRestartWithFailedScheduleOrderAndReadyIssueDispatchesSchedule(t *testin
 		t.Fatalf("expected a schedule dispatch after restart, calls=%#v", rt.calls)
 	}
 }
+
+func TestFailedScheduleOrderIsRetriedOnlyAfterBackoff(t *testing.T) {
+	projectDir := t.TempDir()
+	runtimeDir := filepath.Join(projectDir, ".noodle")
+	if err := os.MkdirAll(filepath.Join(runtimeDir, "sessions"), 0o755); err != nil {
+		t.Fatalf("mkdir sessions: %v", err)
+	}
+	ordersPath := filepath.Join(runtimeDir, "orders.json")
+	if err := writeOrdersAtomic(ordersPath, failedScheduleOrders()); err != nil {
+		t.Fatalf("write orders: %v", err)
+	}
+
+	now := time.Now()
+	rt := newMockRuntime()
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
+		Runtimes:   map[string]loopruntime.Runtime{"process": rt},
+		Worktree:   &fakeWorktree{},
+		Adapter:    &fakeAdapterRunner{},
+		Mise:       &fakeMise{},
+		Monitor:    fakeMonitor{},
+		Registry:   testLoopRegistry(),
+		Now:        func() time.Time { return now },
+		OrdersFile: ordersPath,
+	})
+	if err := l.loadOrdersState(); err != nil {
+		t.Fatalf("loadOrdersState: %v", err)
+	}
+	l.scheduleFailures = 1
+	l.scheduleRetryAt = now.Add(scheduleRetryDelay(1))
+
+	if err := l.Cycle(context.Background()); err != nil {
+		t.Fatalf("cycle: %v", err)
+	}
+	if len(rt.calls) != 0 {
+		t.Fatalf("schedule retried before backoff elapsed, calls=%#v", rt.calls)
+	}
+
+	now = now.Add(scheduleRetryDelay(1) + time.Second)
+	if err := l.Cycle(context.Background()); err != nil {
+		t.Fatalf("cycle: %v", err)
+	}
+	if len(rt.calls) != 1 || rt.calls[0].Skill != "schedule" {
+		t.Fatalf("expected schedule retry after backoff, calls=%#v", rt.calls)
+	}
+}

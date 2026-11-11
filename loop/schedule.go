@@ -2,10 +2,12 @@ package loop
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/guangshinhaha/shinfactory/dispatcher"
 	"github.com/guangshinhaha/shinfactory/internal/ingest"
@@ -396,4 +398,79 @@ func ordersSchemaPrompt() string {
 		return "orders.json schema (JSON):\n{}\n\nSchema generation error: " + err.Error()
 	}
 	return prompt
+}
+
+const (
+	scheduleRetryBase = 30 * time.Second
+	scheduleRetryMax  = 5 * time.Minute
+)
+
+// scheduleRetryDelay doubles per consecutive failure, capped, so a schedule
+// stage that keeps failing does not burn a session every cycle.
+func scheduleRetryDelay(failures int) time.Duration {
+	delay := scheduleRetryBase
+	for i := 1; i < failures && delay < scheduleRetryMax; i++ {
+		delay *= 2
+	}
+	return min(delay, scheduleRetryMax)
+}
+
+// backOffFailedSchedule records a failed schedule stage and keeps its reason on
+// the failed stage so status can show why scheduling stopped.
+func (l *Loop) backOffFailedSchedule(reason string) {
+	l.scheduleFailures++
+	l.scheduleRetryAt = l.deps.Now().Add(scheduleRetryDelay(l.scheduleFailures))
+	raw, err := json.Marshal(reason)
+	if err != nil {
+		return
+	}
+	if err := l.mutateOrdersState(func(orders *OrdersFile) (bool, error) {
+		for i := range orders.Orders {
+			if !isScheduleOrder(orders.Orders[i]) || orders.Orders[i].Status != OrderStatusFailed {
+				continue
+			}
+			for j := range orders.Orders[i].Stages {
+				stage := &orders.Orders[i].Stages[j]
+				if stage.Status != StageStatusFailed {
+					continue
+				}
+				if stage.Extra == nil {
+					stage.Extra = map[string]json.RawMessage{}
+				}
+				stage.Extra["failure_reason"] = raw
+				return true, nil
+			}
+		}
+		return false, nil
+	}); err != nil {
+		l.logger.Warn("schedule failure reason not saved", "err", err)
+	}
+}
+
+// reviveFailedScheduleOrder makes a failed schedule order dispatchable again
+// once its backoff has passed. A failed order is inert, and a failed schedule
+// order leaves the loop idle with ready issues. After a restart the backoff
+// is zero, so the retry is immediate.
+func (l *Loop) reviveFailedScheduleOrder(orders *OrdersFile) bool {
+	if l.hasActiveScheduleCook() || l.deps.Now().Before(l.scheduleRetryAt) {
+		return false
+	}
+	revived := false
+	for i := range orders.Orders {
+		order := &orders.Orders[i]
+		if !isScheduleOrder(*order) || order.Status != OrderStatusFailed {
+			continue
+		}
+		order.Status = OrderStatusActive
+		for j := range order.Stages {
+			if order.Stages[j].Status == StageStatusFailed {
+				order.Stages[j].Status = StageStatusPending
+			}
+		}
+		revived = true
+	}
+	if revived {
+		l.logger.Info("retrying failed schedule order", "failures", l.scheduleFailures)
+	}
+	return revived
 }

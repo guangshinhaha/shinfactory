@@ -23,6 +23,9 @@ type statusSummary struct {
 	ActiveCooks int
 	OrdersDepth int
 	LoopState   string
+	// ScheduleFailure is set when orders.json holds a failed schedule order:
+	// the loop retries it, but until then nothing is being scheduled.
+	ScheduleFailure string
 }
 
 func newStatusCmd(app *App) *cobra.Command {
@@ -109,6 +112,10 @@ func runStatus(app *App) error {
 		return err
 	}
 
+	if summary.ScheduleFailure != "" {
+		defer fmt.Fprintf(os.Stdout, "schedule order failed: %s\n", summary.ScheduleFailure)
+	}
+
 	if summary.ActiveCooks == 0 {
 		fmt.Fprintf(
 			os.Stdout,
@@ -134,14 +141,15 @@ func readStatusSummary(runtimeDir string) (statusSummary, error) {
 	if err != nil {
 		return statusSummary{}, err
 	}
-	ordersDepth, err := readOrdersDepth(filepath.Join(runtimeDir, "orders.json"))
+	orders, err := orderx.ReadOrders(filepath.Join(runtimeDir, "orders.json"))
 	if err != nil {
 		return statusSummary{}, err
 	}
 	return statusSummary{
-		ActiveCooks: active,
-		OrdersDepth: ordersDepth,
-		LoopState:   loopState,
+		ActiveCooks:     active,
+		OrdersDepth:     len(orders.Orders),
+		LoopState:       loopState,
+		ScheduleFailure: scheduleFailure(orders),
 	}, nil
 }
 
@@ -183,10 +191,25 @@ func loopStateRank(state string) int {
 	}
 }
 
-func readOrdersDepth(path string) (int, error) {
-	orders, err := orderx.ReadOrders(path)
-	if err != nil {
-		return 0, err
+// scheduleFailure returns why the schedule order failed, or "" when it has not.
+func scheduleFailure(orders orderx.OrdersFile) string {
+	for _, order := range orders.Orders {
+		if !strings.EqualFold(strings.TrimSpace(order.ID), "schedule") || order.Status != orderx.OrderStatusFailed {
+			continue
+		}
+		for _, stage := range order.Stages {
+			if stage.Status != orderx.StageStatusFailed {
+				continue
+			}
+			var reason string
+			if raw, ok := stage.Extra["failure_reason"]; ok {
+				_ = json.Unmarshal(raw, &reason)
+			}
+			if reason != "" {
+				return reason
+			}
+		}
+		return "reason not recorded"
 	}
-	return len(orders.Orders), nil
+	return ""
 }

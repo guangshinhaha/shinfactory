@@ -203,6 +203,8 @@ type Loop struct {
 	ordersLoaded         bool
 	schedulePromoted     bool      // set when consumeOrdersNext promotes after a schedule dispatch
 	scheduleNothingUntil time.Time // cooldown: suppress schedule re-spawn until this time
+	scheduleFailures     int       // consecutive failed schedule stages; resets when one completes
+	scheduleRetryAt      time.Time // a failed schedule order is revived once this passes
 	lastPromotionError   string    // latest scheduler-output validation issue to inject into next schedule prompt
 	droppedOrderIDs      []string  // unready order ids dropped since the last schedule prompt; survives clean promotions
 

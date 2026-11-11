@@ -184,3 +184,35 @@ func TestRunStatusJSONKeepsRecordedStopsWithoutStoppedScript(t *testing.T) {
 		t.Fatalf("recorded stop dropped:\n%s", out.String())
 	}
 }
+
+func TestRunStatusShowsFailedScheduleOrderAndReason(t *testing.T) {
+	projectDir := t.TempDir()
+	runtimeDir := filepath.Join(projectDir, ".noodle")
+	if err := os.MkdirAll(runtimeDir, 0o755); err != nil {
+		t.Fatalf("mkdir runtime: %v", err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(runtimeDir, "orders.json"),
+		[]byte(`{"orders":[{"id":"schedule","status":"failed","stages":[{"task_key":"schedule","status":"failed","extra":{"failure_reason":"cook cancelled with status cancelled"}}]}]}`),
+		0o644,
+	); err != nil {
+		t.Fatalf("write orders: %v", err)
+	}
+	originalDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	if err := os.Chdir(projectDir); err != nil {
+		t.Fatalf("chdir project dir: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(originalDir) })
+
+	output := captureStdout(t, func() {
+		if err := runStatus(&App{}); err != nil {
+			t.Fatalf("runStatus: %v", err)
+		}
+	})
+	if !strings.Contains(output, "schedule order failed: cook cancelled with status cancelled") {
+		t.Fatalf("expected failed schedule order and reason, got: %q", output)
+	}
+}

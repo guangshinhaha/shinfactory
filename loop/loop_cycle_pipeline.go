@@ -297,6 +297,12 @@ func (l *Loop) prepareOrdersForCycle(brief mise.Brief, warnings []string, miseCh
 
 	l.emitSyncWarnings(warnings)
 
+	if l.reviveFailedScheduleOrder(&orders) {
+		if err := l.writeOrdersState(orders); err != nil {
+			return OrdersFile{}, false, err
+		}
+	}
+
 	idle, err := l.ensureScheduleIfNeeded(brief, &orders, miseChanged)
 	if err != nil {
 		return OrdersFile{}, false, err
