@@ -66,6 +66,13 @@ func (l *Loop) stopForPerson(ctx context.Context, orderID, summary, detail strin
 	}
 }
 
+// stopAfterShipFailure hands the issue to a person after a push, ship or merge
+// failure. The comment names that failure: the work was built, so the issue text
+// is not what blocked it.
+func (l *Loop) stopAfterShipFailure(ctx context.Context, orderID, failure string) {
+	l.stopForPerson(ctx, orderID, "Shipping failed after the work was built. Fix what blocks the merge, then put ready back. Failure:", failure)
+}
+
 // noteRejectedStage decides whether an agent-reported stage_fail needs a
 // person. An unbuildable issue always does; any other rejection does once the
 // order has failed maxFailedRounds rounds.

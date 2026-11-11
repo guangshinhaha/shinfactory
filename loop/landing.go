@@ -572,7 +572,9 @@ func (l *Loop) completeWithPR(ctx context.Context, cook *cookHandle, hasCommits 
 		var err error
 		pr, err = l.lander().PushAndEnsureDraft(ctx, cook.worktreePath, l.prSpec(order, cook))
 		if err != nil {
-			return l.failStage(ctx, cook, "push and open draft PR: "+err.Error())
+			reason := "push and open draft PR: " + err.Error()
+			l.stopAfterShipFailure(ctx, cook.orderID, reason)
+			return l.failStage(ctx, cook, reason)
 		}
 		pushed = true
 		l.logger.Info("order branch pushed", "order", cook.orderID, "stage", cook.stageIndex, "pr", pr.URL, "draft", pr.IsDraft)
@@ -598,7 +600,9 @@ func (l *Loop) completeWithPR(ctx context.Context, cook *cookHandle, hasCommits 
 				l.lastChecksPoll = l.deps.Now()
 				return l.parkPendingReview(cook, awaitingChecksReason(pr.URL, err))
 			}
-			return l.failStage(ctx, cook, "ship PR: "+err.Error())
+			reason := "ship PR: " + err.Error()
+			l.stopAfterShipFailure(ctx, cook.orderID, reason)
+			return l.failStage(ctx, cook, reason)
 		}
 	}
 	if err := l.emitEventChecked(ingest.EventStageCompleted, map[string]any{

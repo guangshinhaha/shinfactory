@@ -125,7 +125,7 @@ func TestRebaseCountIsWrittenAtomicallyAndSurvivesAReread(t *testing.T) {
 	}
 }
 
-func TestFailedStageKeepsTheRebaseCountButAPersonStopClearsIt(t *testing.T) {
+func TestAPersonStopClearsTheRebaseCount(t *testing.T) {
 	h := newGateHarness(t, "medium", "execute", "quality")
 	h.ln.conflicts = 1
 	h.next(t)
@@ -137,13 +137,9 @@ func TestFailedStageKeepsTheRebaseCountButAPersonStopClearsIt(t *testing.T) {
 	}
 	h.review(t, 0, "none")
 	h.ln.mergeErr = errors.New("boom")
-	h.next(t) // non-conflict ship error after the rebase fails the stage
-	if n := h.l.rebaseCount(id); n != 1 {
-		t.Fatalf("rebase count = %d after an unrelated failure, want 1 kept", n)
-	}
-	h.l.stopForPerson(t.Context(), id, "needs a look", "")
+	h.next(t) // non-conflict ship error after the rebase fails the stage and stops for a person
 	if n := h.l.rebaseCount(id); n != 0 {
-		t.Fatalf("rebase count = %d after a person stop, want 0", n)
+		t.Fatalf("rebase count = %d after the ship failure stopped for a person, want 0", n)
 	}
 }
 

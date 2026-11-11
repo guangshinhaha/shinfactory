@@ -169,6 +169,7 @@ func (l *Loop) handleMergeError(cook *cookHandle, err error) error {
 		return err
 	}
 	reason := "merge failed: " + err.Error()
+	l.stopAfterShipFailure(context.Background(), cook.orderID, reason)
 	schedulerHint := reason + ". Use Skill(schedule) and create a new order to fix this issue before retrying."
 	l.logger.Warn("merge failed, forwarding to scheduler", "order", cook.orderID, "reason", reason)
 	l.forwardToScheduler(cook, "merge_failed", schedulerHint, nil)
