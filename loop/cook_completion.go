@@ -304,6 +304,7 @@ func (l *Loop) failStage(ctx context.Context, cook *cookHandle, reason string) e
 	// The rebase count stays: a persistent conflict plus unrelated failures
 	// must not earn a second rebase. It clears when a person takes over
 	// (stopForPerson), the review is rejected, or the order is skipped.
+	l.owePersonStop(cook.orderID, reason) // before anything below can fail or return early
 	if err := l.ensureCanonicalOrderFromOrders(cook.orderID); err != nil {
 		return err
 	}

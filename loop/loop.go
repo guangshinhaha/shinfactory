@@ -474,6 +474,8 @@ func (l *Loop) Cycle(ctx context.Context) error {
 		}
 	}
 
+	l.settleStopDebts(ctx)
+
 	// Snapshot capacity before control commands can mutate it.
 	cycleCapacity := l.config.Concurrency.MaxConcurrency
 

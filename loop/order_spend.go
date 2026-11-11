@@ -124,6 +124,7 @@ func (l *Loop) recordStageCost(orderID string, costUSD float64) {
 
 func (l *Loop) clearOrderSpend(orderID string) {
 	l.clearRetryNote(orderID) // a note belongs to the order's life, like its spend
+	l.payStopDebt(orderID)    // a skipped or rejected order owes nobody a stop
 	orderSpendMu.Lock()
 	defer orderSpendMu.Unlock()
 	ledger := l.readOrderSpend()
@@ -158,6 +159,7 @@ func (l *Loop) overSpendCap(orderID, taskKey string, round int) string {
 func (l *Loop) stopOverCap(ctx context.Context, cand dispatchCandidate, stage Stage, why string) error {
 	spend := l.orderSpendOf(cand.OrderID)
 	reason := "spending cap reached: " + why
+	l.owePersonStop(cand.OrderID, reason)
 	if err := l.mutateOrdersState(func(orders *OrdersFile) (bool, error) {
 		updated, err := failStage(*orders, cand.OrderID, reason)
 		if err != nil {

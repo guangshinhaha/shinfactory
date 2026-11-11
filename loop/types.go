@@ -226,6 +226,7 @@ type Loop struct {
 	// stoppedForPerson holds orders whose failure a stop already reached a
 	// person, until failStage consumes it or the order launches again.
 	stoppedForPerson map[string]struct{}
+	lastStopRetry    time.Time // last retry of hand-offs that did not reach a person
 	lastMiseWarnings []string
 	backlogRetry     *backlogRetry // pending transient backlog failure; nil when synced
 	lastChecksPoll   time.Time     // last time parked PRs were re-checked for merge

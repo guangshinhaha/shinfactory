@@ -527,6 +527,7 @@ func (l *Loop) failMergingStage(orderID string, stageIdx int, reason string) err
 		return fmt.Errorf("canonical stage %d missing for order %q", stageIdx, orderID)
 	}
 	stage := order.Stages[stageIdx]
+	l.owePersonStop(orderID, reason)
 	cook := &cookHandle{
 		cookIdentity: cookIdentity{
 				orderID:    orderID,

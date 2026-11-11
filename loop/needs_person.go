@@ -51,11 +51,15 @@ func (l *Loop) stopForPerson(ctx context.Context, orderID, summary, detail strin
 			l.logger.Warn("could not record needs-shin for status", "order", orderID, "error", err)
 		}
 		l.clearOrderSpend(orderID)
+		l.payStopDebt(orderID)
 	case strings.Contains(err.Error(), `action "stop" script is not configured`):
 		l.markStopped(orderID) // nobody to tell; repeating the call changes nothing
+		l.payStopDebt(orderID)
 		l.logger.Info("backlog has no stop action; nobody to tell", "order", orderID, "reason", summary)
 	default:
-		l.logger.Warn("could not hand stopped order to a person", "order", orderID, "error", err)
+		// The order is failed and silent until this lands: keep owing it.
+		l.recordStopDebt(orderID, summary, detail)
+		l.logger.Warn("could not hand stopped order to a person; will retry", "order", orderID, "error", err)
 	}
 }
 
@@ -74,15 +78,15 @@ func (l *Loop) markStopped(orderID string) {
 // A stop the caller already made for this failure (a merge conflict, a landing
 // stop) is not repeated.
 func (l *Loop) stopFailedOrder(ctx context.Context, orderID, reason string) {
+	if isScheduleOrderID(orderID) {
+		return
+	}
 	if _, done := l.stoppedForPerson[orderID]; done {
 		delete(l.stoppedForPerson, orderID)
 		return
 	}
-	if detail, ok := strings.CutPrefix(reason, unbuildablePrefix); ok {
-		l.stopForPerson(ctx, orderID, "The issue has no observable Done when, or something only a person can settle blocks it.", detail)
-	} else {
-		l.stopForPerson(ctx, orderID, "The order failed and the factory will not retry it. Fix the cause or the Done when, then put ready back. Reason:", reason)
-	}
+	summary, detail := failureStopText(reason)
+	l.stopForPerson(ctx, orderID, summary, detail)
 	delete(l.stoppedForPerson, orderID)
 }
 

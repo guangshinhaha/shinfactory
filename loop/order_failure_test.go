@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // The reasons below are the real failures of 2026-11-10 (#161): three
@@ -156,9 +157,12 @@ func TestStageCrashHandsTheOrderToAPerson(t *testing.T) {
 // person through the backlog stop adapter. A failure path that skipped the
 // hand-off is what let four orders vanish. The scan is structural, so a failure
 // path added later cannot skip it unnoticed: wherever code marks an order
-// failed (the free failStage, EventStageFailed, Status = OrderStatusFailed), a
-// hand-off call must follow in the same block. A hand-off in some other branch
-// of the function does not count.
+// failed (the free failStage, EventStageFailed, EventOrderFailed, Status =
+// OrderStatusFailed), a statement calling owePersonStop must come before it in
+// the same block. The debt is written to disk first and paid by the stop
+// adapter or the retrying settler, so an early return or a failed gh call after
+// the mark cannot lose the order. A call in another branch, or nested in an if,
+// does not count.
 func TestEveryOrderFailurePathEndsVisible(t *testing.T) {
 	fset := token.NewFileSet()
 	files, err := filepath.Glob("*.go")
@@ -192,12 +196,12 @@ func TestEveryOrderFailurePathEndsVisible(t *testing.T) {
 						continue
 					}
 					failedSites++
-					handed := false
-					for _, later := range block.List[i:] {
-						handed = handed || handsOff(later)
+					owed := false
+					for _, earlier := range block.List[:i+1] {
+						owed = owed || owesStop(earlier)
 					}
-					if !handed {
-						t.Errorf("%s: %s marks an order failed at %s with no stopForPerson or stopFailedOrder after it in the same block, so the order can vanish",
+					if !owed {
+						t.Errorf("%s: %s marks an order failed at %s with no owePersonStop before it in the same block, so a later error can lose the order",
 							path, fn.Name.Name, fset.Position(stmt.Pos()))
 					}
 				}
@@ -232,7 +236,7 @@ func marksOrderFailed(stmt ast.Stmt) bool {
 				found = true
 			}
 		case *ast.SelectorExpr:
-			if v.Sel.Name == "EventStageFailed" {
+			if v.Sel.Name == "EventStageFailed" || v.Sel.Name == "EventOrderFailed" {
 				found = true
 			}
 		case *ast.AssignStmt:
@@ -251,17 +255,19 @@ func marksOrderFailed(stmt ast.Stmt) bool {
 	return found
 }
 
-func handsOff(stmt ast.Stmt) bool {
-	found := false
-	ast.Inspect(stmt, func(n ast.Node) bool {
-		if call, ok := n.(*ast.CallExpr); ok {
-			if sel, ok := call.Fun.(*ast.SelectorExpr); ok && (sel.Sel.Name == "stopForPerson" || sel.Sel.Name == "stopFailedOrder") {
-				found = true
-			}
-		}
-		return true
-	})
-	return found
+// owesStop reports whether stmt is a direct call to owePersonStop (not nested
+// in a branch or closure, which may not run).
+func owesStop(stmt ast.Stmt) bool {
+	es, ok := stmt.(*ast.ExprStmt)
+	if !ok {
+		return false
+	}
+	call, ok := es.X.(*ast.CallExpr)
+	if !ok {
+		return false
+	}
+	sel, ok := call.Fun.(*ast.SelectorExpr)
+	return ok && sel.Sel.Name == "owePersonStop"
 }
 
 func TestDispatchFailureHandsTheOrderToAPerson(t *testing.T) {
@@ -307,5 +313,63 @@ func TestRetriesAreBoundedWhenSpendCapsAreOff(t *testing.T) {
 	h.failedWith(t, "uncapped retries")
 	if got := h.l.orderSpendOf("42").Attempts["execute"]; got > fallbackRetryAttempts {
 		t.Fatalf("execute launched %d times, want at most %d", got, fallbackRetryAttempts)
+	}
+}
+
+// A schedule order has no issue behind it: failing it must not call the stop
+// adapter with "schedule".
+func TestScheduleOrderFailureDoesNotCallTheStopAdapter(t *testing.T) {
+	h := newGateHarness(t, "none", "execute")
+	for _, id := range []string{scheduleOrderID, scheduleBootstrapOrderID} {
+		h.l.owePersonStop(id, "dispatch failed: boom")
+		h.l.stopFailedOrder(context.Background(), id, "dispatch failed: boom")
+	}
+	if len(h.ar.stopCalls) != 0 {
+		t.Fatalf("stop adapter called for the scheduler's own order: %v", h.ar.stopCalls)
+	}
+	if debts := h.l.readStopDebts(); len(debts) != 0 {
+		t.Fatalf("scheduler order owes a stop: %v", debts)
+	}
+}
+
+// A stop that fails (gh down) leaves the order owing it. The settler retries
+// every interval, and the debt survives a restart, so the issue is not left
+// `ready` with nobody told.
+func TestFailedStopIsRetriedUntilItLands(t *testing.T) {
+	env := newStopEnv(t)
+	// Break the stop: gh exits non-zero.
+	ghDir := filepath.Dir(env.log)
+	stub, err := os.ReadFile(filepath.Join(ghDir, "gh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(ghDir, "gh"), []byte("#!/bin/sh\nexit 1\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 11, 11, 9, 0, 0, 0, time.UTC)
+	env.loop.deps.Now = func() time.Time { return now }
+
+	env.loop.owePersonStop("7", "bug fix has no test-first commit: commit 116a36c1 changes non-test files before any commit that touches only tests")
+	env.loop.stopFailedOrder(context.Background(), "7", "bug fix has no test-first commit")
+	if debts := env.loop.readStopDebts(); len(debts) != 1 {
+		t.Fatalf("debts = %v, want the failed stop still owed", debts)
+	}
+
+	// A retry just ran and failed; gh then comes back. Nothing retries until the interval passes.
+	env.loop.lastStopRetry = now
+	if err := os.WriteFile(filepath.Join(ghDir, "gh"), stub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	env.loop.settleStopDebts(context.Background())
+	if debts := env.loop.readStopDebts(); len(debts) != 1 {
+		t.Fatal("settler retried inside the retry interval")
+	}
+	now = now.Add(stopRetryInterval + time.Second)
+	env.loop.settleStopDebts(context.Background())
+	if debts := env.loop.readStopDebts(); len(debts) != 0 {
+		t.Fatalf("debts = %v after gh recovered, want paid", debts)
+	}
+	if log := ghLog(t, env.log); strings.Count(log, "issue comment 7") != 1 || !strings.Contains(log, "needs-shin") {
+		t.Fatalf("want one comment and needs-shin after the retry, got gh log:\n%s", log)
 	}
 }

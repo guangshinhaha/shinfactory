@@ -49,6 +49,7 @@ func (l *Loop) spawnCook(ctx context.Context, cand dispatchCandidate, order Orde
 
 	stage := cand.Stage
 	delete(l.stoppedForPerson, cand.OrderID) // a person put it back; a new failure needs its own stop
+	l.payStopDebt(cand.OrderID)
 	runtimeName := l.stageRuntime(stage)
 	if l.runtimeHeld(runtimeName) {
 		return nil // out of usage: the stage stays pending until a launch can succeed
@@ -248,6 +249,7 @@ func (l *Loop) handleCookDispatchFailure(cand dispatchCandidate, stage Stage, wo
 	}
 
 	reason := "dispatch failed: " + envelope.Error()
+	l.owePersonStop(cand.OrderID, reason)
 	if err := l.mutateOrdersState(func(orders *OrdersFile) (bool, error) {
 		updated, err := failStage(*orders, cand.OrderID, reason)
 		if err != nil {
