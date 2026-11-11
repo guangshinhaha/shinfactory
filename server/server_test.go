@@ -66,6 +66,25 @@ func TestGetSnapshot(t *testing.T) {
 	}
 }
 
+func TestGetConfigReportsRepoName(t *testing.T) {
+	project := filepath.Join(t.TempDir(), "my-repo")
+	s := New(Options{RuntimeDir: filepath.Join(project, ".noodle")})
+
+	w := httptest.NewRecorder()
+	s.httpServer.Handler.ServeHTTP(w, httptest.NewRequest("GET", "/api/config", nil))
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, body %s", w.Code, w.Body.String())
+	}
+	var body map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decoding config: %v", err)
+	}
+	if body["repo"] != "my-repo" {
+		t.Errorf("repo = %v, want my-repo", body["repo"])
+	}
+}
+
 func TestGetSessionEvents(t *testing.T) {
 	s, _ := testServer(t)
 

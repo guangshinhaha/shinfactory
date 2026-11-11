@@ -69,13 +69,7 @@ function channelEq(a: ChannelId, b: ChannelId): boolean {
 }
 
 function statusLabel(status: ReturnType<typeof useWSStatus>): string {
-  if (status === "connected") {
-    return "running";
-  }
-  if (status === "connecting") {
-    return "connecting";
-  }
-  return "offline";
+  return `connection: ${status}`;
 }
 
 function stageNodeKey(orderID: string, stageIndex: number): string {
