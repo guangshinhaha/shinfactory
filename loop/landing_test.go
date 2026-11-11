@@ -250,6 +250,36 @@ func TestPRLandingMergeRefusedFailsStageWithoutDone(t *testing.T) {
 	}
 }
 
+// #131: a merge GitHub refuses stops the order for a person, and the comment
+// names that refusal, not the Done when.
+func TestPRLandingShipFailureStopsForAPersonNamingTheFailure(t *testing.T) {
+	h := newLandingHarness(t, "auto", 1)
+	h.ln.mergeErr = errors.New("merge refused: verdict-check pending")
+
+	h.runStage(t, 1)
+	if len(h.ar.stopMessages) != 1 {
+		t.Fatalf("stop messages = %q, want the person told once", h.ar.stopMessages)
+	}
+	msg := h.ar.stopMessages[0]
+	if !strings.Contains(msg, "merge refused: verdict-check pending") {
+		t.Fatalf("stop comment = %q, want the ship failure named", msg)
+	}
+	if strings.Contains(msg, "Done when") {
+		t.Fatalf("stop comment = %q blames the Done when for a ship failure", msg)
+	}
+}
+
+// #131: a rejected push is a ship failure too.
+func TestPRLandingPushFailureStopsForAPersonNamingTheFailure(t *testing.T) {
+	h := newLandingHarness(t, "auto", 1)
+	h.ln.pushErr = errors.New("remote rejected")
+
+	h.runStage(t, 1)
+	if len(h.ar.stopMessages) != 1 || !strings.Contains(h.ar.stopMessages[0], "remote rejected") || strings.Contains(h.ar.stopMessages[0], "Done when") {
+		t.Fatalf("stop messages = %q, want the push failure named without the Done when", h.ar.stopMessages)
+	}
+}
+
 // Gantry's checks start on the final push. The order must wait for them, not
 // fail, and the loop merges by itself once they pass.
 func TestPRLandingWaitsForChecksThenMerges(t *testing.T) {

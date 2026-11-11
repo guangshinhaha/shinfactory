@@ -165,6 +165,8 @@ func TestStopForPersonAfterTwoFailedRounds(t *testing.T) {
 	env.reject(t, 2, "Rejected: ./greet still prints nothing.")
 	log := ghLog(t, env.log)
 	if strings.Count(log, "issue comment 7") != 1 ||
+		!strings.Contains(log, "Two fix rounds failed") ||
+		strings.Contains(log, "Shipping failed") ||
 		!strings.Contains(log, "Last rejection: Rejected: ./greet still prints nothing.") {
 		t.Fatalf("want one comment after round 2 naming the decision:\n%s", log)
 	}
@@ -222,7 +224,8 @@ func TestStopForPersonOnAnUnresolvableMergeConflict(t *testing.T) {
 	}
 
 	log := ghLog(t, logPath)
-	if strings.Count(log, "issue comment 7") != 1 || !strings.Contains(log, "A merge conflict the factory cannot resolve") {
+	if strings.Count(log, "issue comment 7") != 1 || !strings.Contains(log, "A merge conflict the factory cannot resolve") ||
+		strings.Contains(log, "Done when") || strings.Contains(log, "Shipping failed") {
 		t.Fatalf("want one comment on issue 7 naming the conflict:\n%s", log)
 	}
 	if !strings.Contains(log, "issue edit 7 --remove-label ready --add-label needs-shin") {
