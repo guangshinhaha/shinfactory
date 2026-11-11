@@ -415,6 +415,7 @@ func TestPRLandingApprovingNonFinalStageDoesNotShip(t *testing.T) {
 // keeps its waiting reason and merges on a later poll.
 func TestPRLandingWaitingPRTransientErrorKeepsWaitingAndRetries(t *testing.T) {
 	h := newLandingHarness(t, "auto", 1)
+	clock := setClock(h.l)
 	h.ln.pending = 1
 	h.runStage(t, 1)
 	waiting := h.l.cooks.pendingReview["42"].reason
@@ -431,6 +432,7 @@ func TestPRLandingWaitingPRTransientErrorKeepsWaitingAndRetries(t *testing.T) {
 
 	h.ln.mergeErr = nil
 	h.l.lastChecksPoll = time.Time{}
+	clock.now = clock.now.Add(10 * time.Second) // past the outage backoff
 	if err := h.l.Cycle(context.Background()); err != nil {
 		t.Fatal(err)
 	}

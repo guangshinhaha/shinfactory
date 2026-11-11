@@ -604,6 +604,9 @@ func (l *Loop) runCycleMaintenance(ctx context.Context) (bool, error) {
 	if err := l.retryAwaitingChecks(ctx); err != nil {
 		return false, err
 	}
+	if err := l.retryNetworkParked(ctx); err != nil {
+		return false, err
+	}
 	if err := l.drainCompletions(ctx); err != nil {
 		return false, err
 	}

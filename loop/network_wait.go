@@ -6,9 +6,12 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"slices"
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/guangshinhaha/shinfactory/internal/ingest"
 )
 
 const (
@@ -27,7 +30,7 @@ var networkMarkers = []string{
 	"no such host", "temporary failure in name resolution", "could not resolve host",
 	"connection refused", "connection reset", "i/o timeout", "operation timed out",
 	"connection timed out", "tls handshake", "network is unreachable", "no route to host",
-	"unexpected eof", "error connecting to", "can't assign requested address",
+	"error connecting to", "can't assign requested address",
 	"failed to connect to", "the remote end hung up",
 	"http 500", "http 502", "http 503", "http 504",
 	"500 internal server error", "bad gateway", "service unavailable", "gateway timeout",
@@ -110,11 +113,84 @@ func (l *Loop) recordNetworkFailure(step string, err error) (warning string, ok 
 	return o.warning(now), true
 }
 
+// awaitingNetworkPrefix marks a stage parked because a PR call (push, merge,
+// verdict post, rebase fetch) hit a network error after the cook finished.
+// retryNetworkParked re-runs the stage's completion once the backoff passes.
+const awaitingNetworkPrefix = "waiting for the network"
+
+// failStageOrWaitNetwork fails the stage, unless err is network-class: then the
+// stage parks (the order, its worktree and its session are kept) and the loop
+// retries its completion after the outage backoff. reason names the failed step.
+func (l *Loop) failStageOrWaitNetwork(ctx context.Context, cook *cookHandle, reason string, err error) error {
+	if _, ok := l.recordNetworkFailure(cook.orderID+": "+reason, err); !ok {
+		return l.failStage(ctx, cook, reason+": "+err.Error())
+	}
+	if l.networkReparked == nil {
+		l.networkReparked = map[string]bool{}
+	}
+	l.networkReparked[cook.orderID] = true
+	return l.parkPendingReview(cook, awaitingNetworkPrefix+" ("+reason+"): "+err.Error())
+}
+
+func (l *Loop) hasNetworkParked() bool {
+	for _, p := range l.cooks.pendingReview {
+		if strings.HasPrefix(p.reason, awaitingNetworkPrefix) {
+			return true
+		}
+	}
+	return false
+}
+
+// retryNetworkParked re-runs the completion of each stage parked for the
+// network, once the outage backoff has passed. A call that fails on the network
+// again re-parks the stage (refreshing the outage); any other result unparks it.
+func (l *Loop) retryNetworkParked(ctx context.Context) error {
+	if !l.config.Landing.PR() || !l.outageDue() {
+		return nil
+	}
+	var waiting []*pendingReviewCook
+	for _, p := range l.cooks.pendingReview {
+		if strings.HasPrefix(p.reason, awaitingNetworkPrefix) {
+			waiting = append(waiting, p)
+		}
+	}
+	slices.SortFunc(waiting, func(a, b *pendingReviewCook) int { return strings.Compare(a.orderID, b.orderID) })
+	for _, pending := range waiting {
+		cook := &cookHandle{
+			cookIdentity: pending.cookIdentity,
+			orderStatus:  OrderStatusActive,
+			worktreeName: pending.worktreeName,
+			worktreePath: pending.worktreePath,
+			session:      &adoptedSession{id: pending.sessionID, status: "completed"},
+		}
+		delete(l.networkReparked, cook.orderID)
+		if err := l.completeAfterEvidence(ctx, cook); err != nil {
+			return err
+		}
+		if l.networkReparked[cook.orderID] {
+			continue // still down: parked again with a longer backoff
+		}
+		if cur, ok := l.cooks.pendingReview[cook.orderID]; ok && strings.HasPrefix(cur.reason, awaitingNetworkPrefix) {
+			if err := l.emitEventChecked(ingest.EventStageReviewApproved, map[string]any{
+				"order_id":    cook.orderID,
+				"stage_index": cook.stageIndex,
+				"reason":      "network is back; completion retried",
+			}); err != nil {
+				return err
+			}
+			if err := l.syncPendingReviewProjection(); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 // clearNetworkOutage ends the open outage once a cycle got through every
 // network step.
 func (l *Loop) clearNetworkOutage() {
 	o := l.outage
-	if o == nil {
+	if o == nil || l.hasNetworkParked() {
 		return
 	}
 	l.outage = nil
