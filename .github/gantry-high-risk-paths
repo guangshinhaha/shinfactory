@@ -2,3 +2,7 @@
 loop/**
 dispatcher/**
 config/**
+# The factory steers itself through its own config, skills and backlog adapter, so a change to them gets High-tier review.
+.noodle.toml
+.agents/skills/**
+defaults/adapters/**
