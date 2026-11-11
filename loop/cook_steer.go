@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/guangshinhaha/shinfactory/event"
+	"github.com/guangshinhaha/shinfactory/internal/rtcap"
 	"github.com/guangshinhaha/shinfactory/internal/stringx"
 )
 
@@ -44,6 +45,9 @@ func (l *Loop) steer(target string, prompt string) error {
 			if !isScheduleStage(cook.stage) && !strings.EqualFold(cook.orderID, ScheduleTaskKey()) {
 				continue
 			}
+			if err := refuseUnsteerable(cook); err != nil {
+				return err
+			}
 			if !cook.session.Controller().Steerable() {
 				l.recordSteerPrompt(cook.session.ID(), prompt)
 				return l.rescheduleForChefPrompt(prompt)
@@ -61,7 +65,21 @@ func (l *Loop) steer(target string, prompt string) error {
 	return errors.New("session not found")
 }
 
+// refuseUnsteerable rejects a steer aimed at a worker whose runtime cannot take
+// one. Killing and respawning it would lose its work, and rewriting orders
+// would not reach it, so the dashboard points the user at the worker instead.
+func refuseUnsteerable(cook *cookHandle) error {
+	caps, ok := rtcap.NewRegistry().Get(cook.dispatchedRuntime)
+	if !ok || rtcap.CanSteer(caps) {
+		return nil
+	}
+	return fmt.Errorf("the %s worker can't be steered from the dashboard; use 'Open in Orca' to talk to it", caps.Name)
+}
+
 func (l *Loop) steerCook(cook *cookHandle, prompt string) error {
+	if err := refuseUnsteerable(cook); err != nil {
+		return err
+	}
 	steerPrompt := strings.TrimSpace(prompt)
 	l.recordSteerPrompt(cook.session.ID(), steerPrompt)
 
