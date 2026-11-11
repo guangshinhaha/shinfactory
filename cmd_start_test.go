@@ -40,7 +40,9 @@ func (f *fakeStartLoop) Run(ctx context.Context) error {
 
 func (f *fakeStartLoop) Shutdown() {}
 
-func (f *fakeStartLoop) State() loop.LoopState { return loop.LoopState{} }
+func (f *fakeStartLoop) State() loop.LoopState   { return loop.LoopState{} }
+func (f *fakeStartLoop) Announce(string, string) {}
+func (f *fakeStartLoop) SetPort(int)             {}
 
 func TestRunStartOnceUsesLoopCycle(t *testing.T) {
 	projectDir := t.TempDir()

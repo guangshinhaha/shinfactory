@@ -35,7 +35,7 @@ func NewRootCmd() *cobra.Command {
 			return cmd.Help()
 		},
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
-			if showVersion || rootSubcommandName(cmd) == "version" {
+			if showVersion || rootSubcommandName(cmd) == "version" || rootSubcommandName(cmd) == "ps" {
 				return nil
 			}
 			dir, err := resolveProjectDir(projectDirFlag)
@@ -72,6 +72,7 @@ func NewRootCmd() *cobra.Command {
 		newSkillsCmd(&app),
 		newSchemaCmd(&app),
 		newStatusCmd(&app),
+		newPsCmd(&app),
 		newControlCmd(&app),
 		newWorktreeCmd(&app),
 		newEventCmd(&app),

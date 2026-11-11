@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"github.com/guangshinhaha/shinfactory/internal/loopreg"
 	"io/fs"
 	"net"
 	"net/http"
@@ -32,6 +33,7 @@ type Options struct {
 	LoopStateProvider LoopStateProvider
 	Warnings          []string
 	Broker            *SessionEventBroker
+	LoopsDir          string // loop registry directory for GET /api/loops; empty = no loops listed
 }
 
 type LoopStateProvider interface {
@@ -41,6 +43,7 @@ type LoopStateProvider interface {
 // Server serves the web UI API.
 type Server struct {
 	runtimeDir string
+	loopsDir   string
 	now        func() time.Time
 	httpServer *http.Server
 	listener   net.Listener
@@ -86,6 +89,7 @@ func New(opts Options) *Server {
 		warnings:   opts.Warnings,
 		ready:      make(chan struct{}),
 		runOrca:    runOrcaCLI,
+		loopsDir:   opts.LoopsDir,
 	}
 
 	mux := http.NewServeMux()
@@ -95,6 +99,7 @@ func New(opts Options) *Server {
 	mux.HandleFunc("POST /api/control", s.handleControl)
 	mux.HandleFunc("POST /api/orca/open", s.handleOrcaOpen)
 	mux.HandleFunc("GET /api/config", s.handleConfig)
+	mux.HandleFunc("GET /api/loops", s.handleLoops)
 	mux.HandleFunc("GET /api/reviews/{id}/diff", s.handleReviewDiff)
 	mux.Handle("GET /", uiOrPlaceholder(opts.UI))
 
@@ -403,4 +408,20 @@ func isLocalhostOrigin(origin string) bool {
 	return strings.HasPrefix(origin, "http://localhost:") ||
 		strings.HasPrefix(origin, "http://127.0.0.1:") ||
 		strings.HasPrefix(origin, "http://[::1]:")
+}
+
+// handleLoops lists every loop registered on this machine, the same list
+// `shinfactory ps --json` prints.
+func (s *Server) handleLoops(w http.ResponseWriter, _ *http.Request) {
+	loops := []loopreg.Entry{}
+	if s.loopsDir != "" {
+		listed, err := loopreg.List(s.loopsDir)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		loops = listed
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(loops)
 }

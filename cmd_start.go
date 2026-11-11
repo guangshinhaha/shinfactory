@@ -12,6 +12,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -20,6 +21,7 @@ import (
 	"github.com/guangshinhaha/shinfactory/cmdmeta"
 	"github.com/guangshinhaha/shinfactory/config"
 	"github.com/guangshinhaha/shinfactory/internal/lockfile"
+	"github.com/guangshinhaha/shinfactory/internal/loopreg"
 	"github.com/guangshinhaha/shinfactory/internal/statever"
 	"github.com/guangshinhaha/shinfactory/loop"
 	"github.com/guangshinhaha/shinfactory/server"
@@ -31,6 +33,8 @@ type startRuntimeLoop interface {
 	Run(ctx context.Context) error
 	Shutdown()
 	State() loop.LoopState
+	Announce(dir, version string)
+	SetPort(port int)
 }
 
 var newStartRuntimeLoop = func(projectDir, noodleBin string, cfg config.Config, deps loop.Dependencies) startRuntimeLoop {
@@ -107,6 +111,12 @@ func runStart(ctx context.Context, app *App, opts startOptions) error {
 		return runtimeLoop.Cycle(ctx)
 	}
 
+	if regDir, err := loopreg.DefaultDir(); err != nil {
+		apiLogger.Warn("loop registry disabled", "error", err)
+	} else {
+		runtimeLoop.Announce(regDir, currentVersion())
+	}
+
 	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 	defer runtimeLoop.Shutdown()
@@ -141,11 +151,12 @@ func runWebServer(
 	ctx context.Context,
 	runtimeDir string,
 	cfg config.Config,
-	provider server.LoopStateProvider,
+	provider startRuntimeLoop,
 	warnings []string,
 	broker *server.SessionEventBroker,
 	logger *charmlog.Logger,
 ) error {
+	loopsDir, _ := loopreg.DefaultDir()
 	port := cfg.Server.Port
 	if port == 0 {
 		port = 3000
@@ -160,6 +171,7 @@ func runWebServer(
 		UI:                uiClientFS(),
 		Config:            &cfg,
 		LoopStateProvider: provider,
+		LoopsDir:          loopsDir,
 		Warnings:          warnings,
 		Broker:            broker,
 	})
@@ -170,6 +182,11 @@ func runWebServer(
 	}()
 
 	srv.WaitReady()
+	if _, portStr, err := net.SplitHostPort(srv.Addr()); err == nil {
+		if p, err := strconv.Atoi(portStr); err == nil {
+			provider.SetPort(p)
+		}
+	}
 	displayAddr := normalizeLoopbackHost(srv.Addr())
 	logger.Info("listening", "addr", displayAddr)
 

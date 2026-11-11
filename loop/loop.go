@@ -180,6 +180,11 @@ func (l *Loop) rebuildRegistry() {
 // Shutdown kills all active agent sessions. Called during process exit.
 func (l *Loop) Shutdown() {
 	l.shutdownOnce.Do(func() {
+		if l.announcer != nil {
+			if err := l.announcer.Remove(); err != nil {
+				l.logger.Warn("could not remove loop registry entry", "error", err)
+			}
+		}
 		if l.mergeQueue != nil {
 			closed := make(chan struct{})
 			go func() {
