@@ -204,6 +204,9 @@ func (l *Loop) spawnSchedule(ctx context.Context, order Order, attempt int, resu
 		worktreePath: l.projectDir,
 		attempt:      attempt,
 		generation:   l.nextDispatchGeneration(),
+		// The runtime that actually launched the scheduler decides whether a
+		// dashboard steer can reach it.
+		dispatchedRuntime: l.dispatchRuntime(req.Runtime),
 	}
 	l.trackCookStarted(cook)
 	l.cooks.activeCooksByOrder[order.ID] = cook

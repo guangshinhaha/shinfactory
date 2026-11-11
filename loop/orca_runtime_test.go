@@ -807,3 +807,39 @@ func TestOrcaRuntimeCompletedStageResetsTheUsageLimitCount(t *testing.T) {
 		t.Fatalf("count after a normal finish = %d, want 1", n)
 	}
 }
+
+// The scheduler launched on orca is as unsteerable as any orca worker: a
+// dashboard steer must be refused, leave orders.json alone, start no worker and
+// show the runtime in the snapshot so the dashboard hides its input box.
+func TestOrcaScheduleSteerRefused(t *testing.T) {
+	env := newOrcaEnv(t, scheduleOnlyOrders())
+	env.cycleUntil(t, "schedule worker started", func() bool { return len(env.fake.Starts()) == 1 })
+	before, err := os.ReadFile(env.ordersPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = env.loop.steer(ScheduleTaskKey(), "prioritize auth hardening")
+	if err == nil || !strings.Contains(err.Error(), "Open in Orca") {
+		t.Fatalf("steer err = %v, want a refusal that points to Open in Orca", err)
+	}
+	after, err := os.ReadFile(env.ordersPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(before) != string(after) {
+		t.Fatalf("orders.json changed by a refused steer:\nbefore: %s\nafter: %s", before, after)
+	}
+	if got := len(env.fake.Starts()); got != 1 {
+		t.Fatalf("worker-start calls = %d, want 1 (no respawn)", got)
+	}
+	var runtime string
+	for _, c := range env.loop.cooks.activeCooksByOrder {
+		var summaries []CookSummary
+		env.loop.appendActiveCookSummary(&summaries, new(float64), c)
+		runtime = summaries[0].Runtime
+	}
+	if runtime != "orca" {
+		t.Fatalf("scheduler CookSummary.Runtime = %q, want orca", runtime)
+	}
+}
