@@ -25,6 +25,8 @@ const (
 	LoopStatePaused   = "paused"
 	LoopStateDraining = "draining"
 	LoopStateIdle     = "idle"
+	// LoopStateWaitingNetwork is stamped while the loop waits out a network outage.
+	LoopStateWaitingNetwork = "waiting-network"
 )
 
 // Health constants.

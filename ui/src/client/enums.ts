@@ -1,7 +1,7 @@
 // Hand-written narrow union types for Go string constants.
 // Tygo generates `string` for these — these unions provide type safety.
 
-export type LoopState = "running" | "paused" | "draining" | "idle";
+export type LoopState = "running" | "paused" | "draining" | "idle" | "waiting-network";
 export type Health = "green" | "yellow" | "red";
 export type TraceFilter = "all" | "tools" | "think" | "ticket";
 

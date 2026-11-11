@@ -480,10 +480,6 @@ func (l *Loop) Cycle(ctx context.Context) error {
 	cycleCapacity := l.config.Concurrency.MaxConcurrency
 
 	ready, err := l.runCycleMaintenance(ctx)
-	if warning, ok := l.recordNetworkFailure("cycle.maintenance", err); ok {
-		l.lastMiseWarnings = []string{warning}
-		return l.stampCycleStatus()
-	}
 	if err != nil {
 		return l.classifySystemHard(
 			"cycle.maintenance",
@@ -560,7 +556,7 @@ func (l *Loop) Cycle(ctx context.Context) error {
 				err,
 			)
 		}
-		l.lastMiseWarnings = []string{warning}
+		l.lastMiseWarnings = append(l.lastMiseWarnings, warning)
 	} else {
 		l.clearNetworkOutage()
 	}
@@ -573,17 +569,6 @@ func (l *Loop) Cycle(ctx context.Context) error {
 		)
 	}
 	l.publishState()
-	if err := l.stampStatus(); err != nil {
-		return l.classifySystemHard(
-			"persist.status_stamp",
-			formatCycleFailureMessage("persist.status_stamp", "stamp status"),
-			err,
-		)
-	}
-	return nil
-}
-
-func (l *Loop) stampCycleStatus() error {
 	if err := l.stampStatus(); err != nil {
 		return l.classifySystemHard(
 			"persist.status_stamp",

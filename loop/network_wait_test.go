@@ -144,6 +144,10 @@ func TestNetworkOutageBacksOffToFiveMinutesAndWarnsOncePerOutage(t *testing.T) {
 	f := newNetworkWaitFixture(t)
 	end := f.clock.now.Add(time.Hour)
 	f.l.deps.Mise = outageMiseWith{down: func() bool { return f.clock.now.Before(end) }, err: networkErrorClasses[0].err}
+	f.cycle(t)
+	if got := f.l.buildLoopStateSnapshot().Status; got != "waiting-network" {
+		t.Fatalf("snapshot loop state = %q, want waiting-network visible to status and the dashboard", got)
+	}
 
 	attempts := 0
 	var last time.Time
@@ -187,6 +191,9 @@ func TestIsNetworkErrorClassifiesStructuredAndTextErrors(t *testing.T) {
 		if !isNetworkError(class.err) {
 			t.Errorf("%s not classed as a network error: %v", class.name, class.err)
 		}
+	}
+	if err := fmt.Errorf("run sync: %w", context.DeadlineExceeded); isNetworkError(err) {
+		t.Errorf("bare context deadline %v classed as a network error", err)
 	}
 	for _, text := range []string{"gh: HTTP 401: Bad credentials", "fatal: not a git repository", "permission denied"} {
 		if isNetworkError(errors.New(text)) {

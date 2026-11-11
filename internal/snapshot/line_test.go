@@ -72,3 +72,9 @@ func TestLoadSnapshotDegradesWhenLineStateIsUnreadable(t *testing.T) {
 		t.Fatalf("warnings = %v, want one", snap.Warnings)
 	}
 }
+
+func TestNormalizeLoopStateKeepsWaitingNetwork(t *testing.T) {
+	if got := NormalizeLoopState("waiting-network"); got != LoopStateWaitingNetwork {
+		t.Fatalf("NormalizeLoopState(waiting-network) = %q, want it kept so status shows the outage", got)
+	}
+}

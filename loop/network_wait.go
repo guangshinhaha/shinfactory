@@ -1,9 +1,11 @@
 package loop
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"strings"
 	"syscall"
 	"time"
@@ -26,7 +28,7 @@ var networkMarkers = []string{
 	"connection refused", "connection reset", "i/o timeout", "operation timed out",
 	"connection timed out", "tls handshake", "network is unreachable", "no route to host",
 	"unexpected eof", "error connecting to", "can't assign requested address",
-	"broken pipe", "failed to connect to", "the remote end hung up", "rpc failed",
+	"failed to connect to", "the remote end hung up",
 	"http 500", "http 502", "http 503", "http 504",
 	"500 internal server error", "bad gateway", "service unavailable", "gateway timeout",
 	"enotfound", "client.timeout exceeded", "timeout awaiting response headers",
@@ -39,8 +41,10 @@ func isNetworkError(err error) bool {
 	if err == nil {
 		return false
 	}
+	// A bare deadline (context or file) is not evidence about the network.
 	var netErr net.Error
-	if errors.As(err, &netErr) {
+	if errors.As(err, &netErr) &&
+		!errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, os.ErrDeadlineExceeded) {
 		return true
 	}
 	for _, errno := range []syscall.Errno{
@@ -117,4 +121,13 @@ func (l *Loop) clearNetworkOutage() {
 	if l.logger != nil {
 		l.logger.Info("network is back; resuming", "outage", l.deps.Now().Sub(o.since).Round(time.Second).String(), "attempts", o.attempts)
 	}
+}
+
+// stateLabel is the loop state as shown in status and snapshots: the lifecycle
+// state, or waiting-network while a running loop waits out an outage.
+func (l *Loop) stateLabel() string {
+	if l.outage != nil && l.state == StateRunning {
+		return loopStateWaitingNetwork
+	}
+	return string(l.state)
 }

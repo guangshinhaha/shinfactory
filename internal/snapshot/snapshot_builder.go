@@ -247,6 +247,8 @@ func NormalizeLoopState(value string) string {
 		return LoopStatePaused
 	case "draining":
 		return LoopStateDraining
+	case "waiting-network":
+		return LoopStateWaitingNetwork
 	default:
 		return ""
 	}
