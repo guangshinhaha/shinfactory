@@ -93,18 +93,18 @@ func newStopEnv(t *testing.T) *stopEnv {
 	return &stopEnv{loop: l, runtimeDir: runtimeDir, ordersPath: ordersPath, log: log}
 }
 
-// reject runs one round: a fresh active order for issue 7 whose quality stage
+// reject runs one round: a fresh active order for issue 7 whose execute stage
 // reports stage_fail with message.
 func (e *stopEnv) reject(t *testing.T, round int, message string) {
 	t.Helper()
 	if err := writeOrdersAtomic(e.ordersPath, OrdersFile{Orders: []Order{{
 		ID: "7", Status: OrderStatusActive,
-		Stages: []Stage{{TaskKey: "quality", Skill: "quality", Status: StageStatusActive}},
+		Stages: []Stage{{TaskKey: "execute", Skill: "execute", Status: StageStatusActive}},
 	}}}); err != nil {
 		t.Fatal(err)
 	}
 	e.loop.syncCanonicalOrderFromLegacy(mustOrder(t, e.ordersPath))
-	e.loop.recordStageLaunch("7", "quality", 0) // the launch that is now reporting
+	e.loop.recordStageLaunch("7", "execute", 0) // the launch that is now reporting
 	sid := "round-" + string(rune('0'+round))
 	writer, err := event.NewEventWriter(e.runtimeDir, sid)
 	if err != nil {
@@ -115,7 +115,7 @@ func (e *stopEnv) reject(t *testing.T, round int, message string) {
 		t.Fatal(err)
 	}
 	cook := &cookHandle{
-		cookIdentity: cookIdentity{orderID: "7", stage: Stage{TaskKey: "quality", Skill: "quality"}},
+		cookIdentity: cookIdentity{orderID: "7", stage: Stage{TaskKey: "execute", Skill: "execute"}},
 		worktreeName: "w",
 		session:      &mockSession{id: sid, status: "completed", done: make(chan struct{})},
 	}

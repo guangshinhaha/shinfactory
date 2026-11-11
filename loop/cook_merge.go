@@ -201,5 +201,6 @@ func (l *Loop) handleMergeError(cook *cookHandle, err error) error {
 		err,
 	)
 	l.cleanupCookWorktree(cook)
+	l.stopFailedOrder(context.Background(), cook.orderID, reason)
 	return nil
 }

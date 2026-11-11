@@ -31,11 +31,6 @@ func (l *Loop) stopForPerson(ctx context.Context, orderID, summary, detail strin
 	// A person now owns the order; when they put ready back it starts with
 	// its one rebase again.
 	l.clearRebased(orderID)
-	// Tell stopFailedOrder this failure already reached a person.
-	if l.stoppedForPerson == nil {
-		l.stoppedForPerson = map[string]struct{}{}
-	}
-	l.stoppedForPerson[orderID] = struct{}{}
 	message := strings.TrimSpace(summary + " " + truncateRunes(strings.TrimSpace(detail), stopMessageLimit))
 	if l.config.Routing.Sensitive {
 		// The comment lands on an issue other people can read; what the agent
@@ -50,16 +45,27 @@ func (l *Loop) stopForPerson(ctx context.Context, orderID, summary, detail strin
 	})
 	switch {
 	case err == nil:
+		l.markStopped(orderID)
 		l.logger.Info("order stopped for a person", "order", orderID)
 		if err := linestatus.RecordNeedsShin(l.runtimeDir, linestatus.NeedsShin{Order: orderID, Reason: message, At: l.deps.Now().UTC()}); err != nil {
 			l.logger.Warn("could not record needs-shin for status", "order", orderID, "error", err)
 		}
 		l.clearOrderSpend(orderID)
 	case strings.Contains(err.Error(), `action "stop" script is not configured`):
+		l.markStopped(orderID) // nobody to tell; repeating the call changes nothing
 		l.logger.Info("backlog has no stop action; nobody to tell", "order", orderID, "reason", summary)
 	default:
 		l.logger.Warn("could not hand stopped order to a person", "order", orderID, "error", err)
 	}
+}
+
+// markStopped tells stopFailedOrder this failure already reached a person. A
+// stop that failed is not marked, so the failure's own hand-off tries again.
+func (l *Loop) markStopped(orderID string) {
+	if l.stoppedForPerson == nil {
+		l.stoppedForPerson = map[string]struct{}{}
+	}
+	l.stoppedForPerson[orderID] = struct{}{}
 }
 
 // stopFailedOrder hands an order that failed for good to a person: attempts

@@ -12,17 +12,25 @@ import (
 // writes no findings file: the original run and one retry.
 const reviewRetryAttempts = 2
 
+// fallbackRetryAttempts bounds retries when both [spend] caps are off, so a
+// stage that never passes cannot loop forever.
+const fallbackRetryAttempts = 3
+
 // rejectStage handles a stage the loop or its agent rejected: evidence that
-// did not hold up, a stage_fail, a review that wrote nothing. While the stage
+// did not hold up, or a stage_fail. A build stage has work to fix, so while it
 // has attempts left it goes back to pending with the reason in its next
-// prompt, and the launch counts against max_attempts. With none left, or for a
-// failure no retry can fix (Unbuildable), the order fails and a person hears.
+// prompt, and the launch counts against max_attempts. Anything else (a
+// quality or verify verdict has nothing to fix), no attempts left, or a failure
+// no retry can fix (Unbuildable) fails the order and a person hears.
 func (l *Loop) rejectStage(ctx context.Context, cook *cookHandle, reason string) error {
+	if gateStageKey(cook.stage) != gateBuildKey {
+		return l.failStage(ctx, cook, reason)
+	}
 	return l.rejectStageUpTo(ctx, cook, reason, 0)
 }
 
-// rejectStageUpTo is rejectStage with a tighter attempt limit for the stage,
-// where 0 means only the spend cap applies.
+// rejectStageUpTo retries any stage kind up to limit launches (0 = the spend
+// cap). The review gate uses it: a review that wrote no file can simply run again.
 func (l *Loop) rejectStageUpTo(ctx context.Context, cook *cookHandle, reason string, limit int) error {
 	if !strings.HasPrefix(reason, unbuildablePrefix) && l.canRetryStage(cook, limit) {
 		return l.retryStage(cook, reason)
@@ -39,8 +47,14 @@ func (l *Loop) canRetryStage(cook *cookHandle, limit int) bool {
 	if l.overSpendCap(cook.orderID, key, order.Round) != "" {
 		return false
 	}
+	if limit <= 0 {
+		limit = l.config.Spend.MaxAttempts
+	}
+	if limit <= 0 {
+		limit = fallbackRetryAttempts
+	}
 	spend := l.orderSpendOf(cook.orderID)
-	return limit <= 0 || order.Round > spend.Round || spend.Attempts[key] < limit
+	return order.Round > spend.Round || spend.Attempts[key] < limit
 }
 
 // retryStage puts the rejected stage back to pending on the same worktree and

@@ -123,6 +123,7 @@ func (l *Loop) recordStageCost(orderID string, costUSD float64) {
 }
 
 func (l *Loop) clearOrderSpend(orderID string) {
+	l.clearRetryNote(orderID) // a note belongs to the order's life, like its spend
 	orderSpendMu.Lock()
 	defer orderSpendMu.Unlock()
 	ledger := l.readOrderSpend()

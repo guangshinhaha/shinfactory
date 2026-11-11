@@ -318,10 +318,6 @@ func (l *Loop) reconcileFailedOrders() error {
 	for _, f := range failures {
 		l.logger.Info("startup archived failed order",
 			"order", f.OrderID, "title", f.Title, "task_key", f.TaskKey)
-		// Archiving drops the order from orders.json. One that failed before
-		// it reached a person (an older build) must not vanish with it; the
-		// stop script does nothing for an issue already handed over.
-		l.stopFailedOrder(context.Background(), f.OrderID, f.Reason)
 	}
 	return nil
 }

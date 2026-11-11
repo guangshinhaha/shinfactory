@@ -154,15 +154,17 @@ func TestStageCrashHandsTheOrderToAPerson(t *testing.T) {
 // The invariant (#161): an order that leaves the active set ends in exactly one
 // visible state: merged, retrying with the attempt counted, or handed to a
 // person through the backlog stop adapter. A failure path that skipped the
-// hand-off is what let four orders vanish. The checks below are structural, so
-// a failure path added later cannot skip it unnoticed.
+// hand-off is what let four orders vanish. The scan is structural, so a failure
+// path added later cannot skip it unnoticed: wherever code marks an order
+// failed (the free failStage, EventStageFailed, Status = OrderStatusFailed), a
+// hand-off call must follow in the same block. A hand-off in some other branch
+// of the function does not count.
 func TestEveryOrderFailurePathEndsVisible(t *testing.T) {
 	fset := token.NewFileSet()
 	files, err := filepath.Glob("*.go")
 	if err != nil {
 		t.Fatal(err)
 	}
-	handoff := map[string]bool{"stopForPerson": true, "stopFailedOrder": true}
 	failedSites := 0
 	for _, path := range files {
 		if strings.HasSuffix(path, "_test.go") {
@@ -181,52 +183,85 @@ func TestEveryOrderFailurePathEndsVisible(t *testing.T) {
 			if !ok || fn.Body == nil {
 				continue
 			}
-			var marksFailed, handsOff bool
-			ast.Inspect(fn.Body, func(n ast.Node) bool {
-				switch v := n.(type) {
-				case *ast.CallExpr:
-					switch c := v.Fun.(type) {
-					case *ast.Ident:
-						if c.Name == "failStage" { // the free function that marks the order failed
-							marksFailed = true
-						}
-					case *ast.SelectorExpr:
-						if handoff[c.Sel.Name] {
-							handsOff = true
-						}
-					}
-				case *ast.SelectorExpr:
-					if v.Sel.Name == "EventStageFailed" {
-						marksFailed = true
-					}
-				case *ast.AssignStmt:
-					for _, lhs := range v.Lhs {
-						if sel, ok := lhs.(*ast.SelectorExpr); ok && sel.Sel.Name == "Status" {
-							for _, rhs := range v.Rhs {
-								if id, ok := rhs.(*ast.Ident); ok && id.Name == "OrderStatusFailed" {
-									marksFailed = true
-								}
-							}
-						}
-					}
-				}
-				return true
-			})
-			if !marksFailed {
-				continue
-			}
-			failedSites++
 			if fn.Name.Name == "failStage" && fn.Recv == nil {
 				continue // the pure state transition; its callers hand off
 			}
-			if !handsOff {
-				t.Errorf("%s: %s marks an order failed without handing it to a person (stopForPerson or stopFailedOrder), so the order can vanish", path, fn.Name.Name)
-			}
+			walkBlocks(fn.Body, func(block *ast.BlockStmt) {
+				for i, stmt := range block.List {
+					if !marksOrderFailed(stmt) {
+						continue
+					}
+					failedSites++
+					handed := false
+					for _, later := range block.List[i:] {
+						handed = handed || handsOff(later)
+					}
+					if !handed {
+						t.Errorf("%s: %s marks an order failed at %s with no stopForPerson or stopFailedOrder after it in the same block, so the order can vanish",
+							path, fn.Name.Name, fset.Position(stmt.Pos()))
+					}
+				}
+			})
 		}
 	}
-	if failedSites < 3 {
-		t.Fatalf("found %d functions that mark an order failed, want at least 3: the scan stopped matching the code", failedSites)
+	if failedSites < 4 {
+		t.Fatalf("found %d places that mark an order failed, want at least 4: the scan stopped matching the code", failedSites)
 	}
+}
+
+// walkBlocks visits fn's blocks but not function literals' bodies: a failure
+// marked inside a closure belongs to the statement that runs the closure.
+func walkBlocks(root ast.Node, visit func(*ast.BlockStmt)) {
+	ast.Inspect(root, func(n ast.Node) bool {
+		switch v := n.(type) {
+		case *ast.FuncLit:
+			return false
+		case *ast.BlockStmt:
+			visit(v)
+		}
+		return true
+	})
+}
+
+func marksOrderFailed(stmt ast.Stmt) bool {
+	found := false
+	ast.Inspect(stmt, func(n ast.Node) bool {
+		switch v := n.(type) {
+		case *ast.CallExpr:
+			if id, ok := v.Fun.(*ast.Ident); ok && id.Name == "failStage" {
+				found = true
+			}
+		case *ast.SelectorExpr:
+			if v.Sel.Name == "EventStageFailed" {
+				found = true
+			}
+		case *ast.AssignStmt:
+			for _, lhs := range v.Lhs {
+				if sel, ok := lhs.(*ast.SelectorExpr); ok && sel.Sel.Name == "Status" {
+					for _, rhs := range v.Rhs {
+						if id, ok := rhs.(*ast.Ident); ok && id.Name == "OrderStatusFailed" {
+							found = true
+						}
+					}
+				}
+			}
+		}
+		return true
+	})
+	return found
+}
+
+func handsOff(stmt ast.Stmt) bool {
+	found := false
+	ast.Inspect(stmt, func(n ast.Node) bool {
+		if call, ok := n.(*ast.CallExpr); ok {
+			if sel, ok := call.Fun.(*ast.SelectorExpr); ok && (sel.Sel.Name == "stopForPerson" || sel.Sel.Name == "stopFailedOrder") {
+				found = true
+			}
+		}
+		return true
+	})
+	return found
 }
 
 func TestDispatchFailureHandsTheOrderToAPerson(t *testing.T) {
@@ -238,5 +273,39 @@ func TestDispatchFailureHandsTheOrderToAPerson(t *testing.T) {
 	h.failedWith(t, "dispatch failed")
 	if n := h.stops(); n != 1 {
 		t.Fatalf("stop adapter ran %d times for a dispatch failure, want 1", n)
+	}
+}
+
+// A verdict stage (quality, verify) has no work to fix, so its stage_fail is
+// not retried: the order goes to a person at once.
+func TestQualityRejectionIsNotRetried(t *testing.T) {
+	h := newGateHarness(t, "none", "execute", "quality")
+	h.next(t) // execute ships
+	if err := h.l.Cycle(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	cook := &cookHandle{
+		cookIdentity: cookIdentity{orderID: "42", stageIndex: 1, stage: Stage{TaskKey: "quality", Skill: "quality"}},
+		worktreeName: "w",
+	}
+	if err := h.l.rejectStage(context.Background(), cook, "Rejected: Done when missed"); err != nil {
+		t.Fatal(err)
+	}
+	h.failedWith(t, "quality rejection")
+	if n := h.stops(); n != 1 {
+		t.Fatalf("stop adapter ran %d times, want 1", n)
+	}
+}
+
+// With both spend caps off a rejected stage still has a bound.
+func TestRetriesAreBoundedWhenSpendCapsAreOff(t *testing.T) {
+	h := evidenceHarness(t, "bug", "")
+	h.l.config.Spend.MaxAttempts = 0
+	h.l.config.Spend.MaxCostUSD = 0
+	branchCommits = nonTestFirstCommit("116a36c1")
+	h.nextUntilFailed(t)
+	h.failedWith(t, "uncapped retries")
+	if got := h.l.orderSpendOf("42").Attempts["execute"]; got > fallbackRetryAttempts {
+		t.Fatalf("execute launched %d times, want at most %d", got, fallbackRetryAttempts)
 	}
 }
