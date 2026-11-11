@@ -25,7 +25,7 @@ func (l *Loop) stampStatus() error {
 
 	status := statusfile.Status{
 		Active:         active,
-		LoopState:      string(l.state),
+		LoopState:      l.stateLabel(),
 		Mode:           mode,
 		MaxConcurrency: l.config.Concurrency.MaxConcurrency,
 		Warnings:       l.lastMiseWarnings,

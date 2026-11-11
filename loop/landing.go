@@ -572,7 +572,7 @@ func (l *Loop) completeWithPR(ctx context.Context, cook *cookHandle, hasCommits 
 		var err error
 		pr, err = l.lander().PushAndEnsureDraft(ctx, cook.worktreePath, l.prSpec(order, cook))
 		if err != nil {
-			return l.failStage(ctx, cook, "push and open draft PR: "+err.Error())
+			return l.failStageOrWaitNetwork(ctx, cook, "push and open draft PR", err)
 		}
 		pushed = true
 		l.logger.Info("order branch pushed", "order", cook.orderID, "stage", cook.stageIndex, "pr", pr.URL, "draft", pr.IsDraft)
@@ -598,7 +598,7 @@ func (l *Loop) completeWithPR(ctx context.Context, cook *cookHandle, hasCommits 
 				l.lastChecksPoll = l.deps.Now()
 				return l.parkPendingReview(cook, awaitingChecksReason(pr.URL, err))
 			}
-			return l.failStage(ctx, cook, "ship PR: "+err.Error())
+			return l.failStageOrWaitNetwork(ctx, cook, "ship PR", err)
 		}
 	}
 	if err := l.emitEventChecked(ingest.EventStageCompleted, map[string]any{
@@ -716,7 +716,7 @@ func (l *Loop) retryAwaitingChecks(ctx context.Context) error {
 	}
 	auto := (mode.ModeGate{}).CanAutoMerge(l.canonical.Mode)
 	now := l.deps.Now()
-	if now.Sub(l.lastChecksPoll) < checksPollInterval {
+	if now.Sub(l.lastChecksPoll) < checksPollInterval || !l.outageDue() {
 		return nil
 	}
 	var waiting []*pendingReviewCook
@@ -776,10 +776,10 @@ func (l *Loop) retryAwaitingChecks(ctx context.Context) error {
 			if perr := l.parkPendingReview(cook, reason); perr != nil {
 				return perr
 			}
-		case isTransientBacklogError(err):
+		case isNetworkError(err):
 			// A network or 5xx blip is not a refusal: keep the waiting reason
-			// and retry on the next poll.
-			l.logger.Warn("parked PR merge hit a transient error; will retry", "order", cook.orderID, "error", err)
+			// and retry after the outage backoff, with one warning per outage.
+			l.recordNetworkFailure(cook.orderID+": parked PR merge", err)
 		default:
 			l.logger.Warn("parked PR could not merge", "order", cook.orderID, "error", err)
 			pending.reason = "merge refused: " + err.Error()

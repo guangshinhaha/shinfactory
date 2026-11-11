@@ -749,30 +749,3 @@ func TestSpendCapsDefaultAndOverride(t *testing.T) {
 	}
 }
 
-func TestBacklogRetryWindowDiagnosesBadValues(t *testing.T) {
-	for _, tc := range []struct {
-		toml string
-		want int
-	}{
-		{"[backlog]\nretry_window_seconds = -5\n", 300},
-		{"[backlog]\nretry_window_seconds = 90000\n", 86400},
-		{"[backlog]\nretry_window_seconds = 600\n", 600},
-	} {
-		cfg, diags, err := parseWithDiagnostics([]byte(tc.toml))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if cfg.Backlog.RetryWindowSeconds != tc.want {
-			t.Errorf("%q: window = %d, want %d", tc.toml, cfg.Backlog.RetryWindowSeconds, tc.want)
-		}
-		got := 0
-		for _, d := range diags {
-			if strings.Contains(d.Message, "retry_window_seconds") {
-				got++
-			}
-		}
-		if wantDiag := tc.want != 600; (got == 1) != wantDiag {
-			t.Errorf("%q: %d retry_window_seconds diagnostics (%v), want diagnostic=%v", tc.toml, got, diags, wantDiag)
-		}
-	}
-}

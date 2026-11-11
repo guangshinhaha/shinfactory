@@ -228,8 +228,9 @@ type Loop struct {
 	stoppedForPerson map[string]struct{}
 	lastStopRetry    time.Time // last retry of hand-offs that did not reach a person
 	lastMiseWarnings []string
-	backlogRetry     *backlogRetry // pending transient backlog failure; nil when synced
-	lastChecksPoll   time.Time     // last time parked PRs were re-checked for merge
+	outage           *networkOutage  // open network outage; nil while the network works
+	networkReparked  map[string]bool // orders re-parked for the network during the current retry
+	lastChecksPoll   time.Time       // last time parked PRs were re-checked for merge
 	// checkWaitSince is when each parked order's PR first waited on GitHub's
 	// mergeability or a red check's re-run; in memory, so a restart restarts
 	// the wait.

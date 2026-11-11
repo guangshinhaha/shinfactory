@@ -71,6 +71,21 @@ func (l *Loop) bumpRebased(orderID string) error {
 	return l.writeRebased(counts)
 }
 
+// unbumpRebased takes back a bumpRebased for a rebase that did not run.
+func (l *Loop) unbumpRebased(orderID string) {
+	rebasedMu.Lock()
+	defer rebasedMu.Unlock()
+	counts := l.readRebased()
+	if counts[orderID] <= 1 {
+		delete(counts, orderID)
+	} else {
+		counts[orderID]--
+	}
+	if err := l.writeRebased(counts); err != nil {
+		l.logger.Warn("could not take back the rebase count", "order", orderID, "error", err)
+	}
+}
+
 func (l *Loop) clearRebased(orderID string) {
 	rebasedMu.Lock()
 	defer rebasedMu.Unlock()
@@ -130,7 +145,10 @@ func (l *Loop) onShipConflict(ctx context.Context, cook *cookHandle, pr PullRequ
 		if errors.As(err, &ce) {
 			return true, l.stopConflicted(ctx, cook, ce.Files, "the rebase onto the base branch conflicts")
 		}
-		return true, l.failStage(ctx, cook, "rebase onto the base branch: "+err.Error())
+		if isNetworkError(err) {
+			l.unbumpRebased(cook.orderID) // it never ran: the retry gets its one rebase
+		}
+		return true, l.failStageOrWaitNetwork(ctx, cook, "rebase onto the base branch", err)
 	}
 	l.logger.Info("order rebased onto the base branch", "order", cook.orderID, "pr", pr.URL)
 

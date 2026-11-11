@@ -77,7 +77,7 @@ func (l *Loop) buildLoopStateSnapshot() *LoopState {
 		Projection:         projected,
 		ActiveCooks:        activeCooks,
 		RecentHistory:      l.snapshotRecentHistory(),
-		Status:             string(l.state),
+		Status:             l.stateLabel(),
 		ActiveSummary:      l.snapshotActiveSummary(),
 		TotalCostUSD:       totalCost,
 		MaxConcurrency:     l.config.Concurrency.MaxConcurrency,

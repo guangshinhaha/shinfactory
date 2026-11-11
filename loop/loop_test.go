@@ -30,6 +30,7 @@ type fakeWorktree struct {
 	mergeErr           error
 	remoteMergeErr     error
 	createErr          error
+	createErrFn        func() error
 	createErrByName    map[string]error
 	hasUnmergedCommits map[string]bool
 }
@@ -40,6 +41,9 @@ func (f *fakeWorktree) Create(name string, _ ...worktree.CreateOpts) error {
 		if err, ok := f.createErrByName[name]; ok {
 			return err
 		}
+	}
+	if f.createErrFn != nil {
+		return f.createErrFn()
 	}
 	return f.createErr
 }

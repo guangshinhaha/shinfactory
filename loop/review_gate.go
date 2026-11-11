@@ -323,7 +323,7 @@ func (l *Loop) reviewGate(ctx context.Context, cook *cookHandle) (bool, error) {
 		}
 		// Before any merge, and for a FAIL too, so the PR shows why it is blocked.
 		if err := l.postVerdict(ctx, order, cook, v); err != nil {
-			return true, l.failStage(nil, cook, err.Error())
+			return true, l.failStageOrWaitNetwork(ctx, cook, "post the verify verdict", err)
 		}
 		if v.Verdict == VerdictFail {
 			return true, l.sendBack(cook, order, "verify returned FAIL: "+v.Evidence)
