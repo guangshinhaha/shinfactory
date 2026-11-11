@@ -13,3 +13,8 @@
   - this prevents stale sessions from continuing after scheduler-amended pipelines
 
 See also [[codebase/scheduler-steer-alias-prefers-live-session]], [[codebase/orders-lifecycle-defaults-on-promotion]], [[principles/make-operations-idempotent]], [[principles/serialize-shared-state-mutations]]
+
+## Mise churn must not re-run the scheduler (#157)
+- `ensureScheduleIfNeeded` injected a schedule order on every `miseChanged`. While a stage ran, tickets/events/resources changed mise.json constantly, so Haiku scheduler runs went back to back and each amendment was rejected (#106).
+- `miseChangeNeedsSchedule` skips the injection when a non-schedule stage is in flight and the backlog fingerprint equals the one the last schedule run saw. A backlog change, or the stage finishing, schedules again.
+- Test: `TestMiseNoiseDuringInFlightStageDoesNotInjectSchedule`.

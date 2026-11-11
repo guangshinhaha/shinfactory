@@ -2,6 +2,7 @@ package loop
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -239,7 +240,7 @@ func (l *Loop) ensureScheduleIfNeeded(brief mise.Brief, orders *OrdersFile, mise
 			return idle, err
 		}
 	}
-	if miseChanged && !l.hasActiveScheduleCook() && !hasScheduleOrder(*orders) {
+	if miseChanged && !l.hasActiveScheduleCook() && !hasScheduleOrder(*orders) && l.miseChangeNeedsSchedule(brief) {
 		orders.Orders = append(orders.Orders, scheduleOrder(""))
 		if err := l.writeOrdersState(*orders); err != nil {
 			return false, err
@@ -247,6 +248,34 @@ func (l *Loop) ensureScheduleIfNeeded(brief mise.Brief, orders *OrdersFile, mise
 		l.logger.Info("mise changed, injecting schedule order")
 	}
 	return false, nil
+}
+
+// miseChangeNeedsSchedule reports whether a mise change should start a
+// scheduler run, and records the backlog the run will see. While a stage is in
+// flight, mise.json churns from tickets, events and resources, and the
+// scheduler may not amend that order (#106), so such a run changes nothing.
+// Only a backlog change is worth a run then; once the stage finishes, the next
+// mise change schedules as usual.
+func (l *Loop) miseChangeNeedsSchedule(brief mise.Brief) bool {
+	fingerprint, err := json.Marshal(brief.Backlog)
+	if err != nil {
+		return true
+	}
+	if l.stageInFlight() && string(fingerprint) == l.scheduledBacklog {
+		return false
+	}
+	l.scheduledBacklog = string(fingerprint)
+	return true
+}
+
+// stageInFlight reports whether a non-schedule stage is running or adopted.
+func (l *Loop) stageInFlight() bool {
+	for _, cook := range l.cooks.activeCooksByOrder {
+		if !isScheduleStage(cook.stage) {
+			return true
+		}
+	}
+	return len(l.cooks.adoptedTargets) > 0
 }
 
 // bootstrapScheduleIfEmpty handles the case where no non-schedule orders
@@ -260,6 +289,7 @@ func (l *Loop) bootstrapScheduleIfEmpty(brief mise.Brief, orders *OrdersFile) (i
 		l.setState(StateIdle)
 		return true, nil
 	}
+	l.miseChangeNeedsSchedule(brief) // record the backlog this run sees
 	*orders = bootstrapScheduleOrder()
 	if err := l.writeOrdersState(*orders); err != nil {
 		return false, err

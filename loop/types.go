@@ -205,6 +205,7 @@ type Loop struct {
 	scheduleNothingUntil time.Time // cooldown: suppress schedule re-spawn until this time
 	lastPromotionError   string    // latest scheduler-output validation issue to inject into next schedule prompt
 	droppedOrderIDs      []string  // unready order ids dropped since the last schedule prompt; survives clean promotions
+	scheduledBacklog     string    // fingerprint of the backlog the last mise-change schedule injection saw
 
 	activeSummary  mise.ActiveSummary
 	recentHistory  []mise.HistoryItem
