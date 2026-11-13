@@ -260,3 +260,89 @@ func TestOrcaDispatchGivesUpWhenConsumerStaysFenced(t *testing.T) {
 		t.Fatalf("dispatch error = %v, want consumer_fenced surfaced after one recovery", err)
 	}
 }
+
+func TestOrcaSessionTerminateFailureDoesNotReportKilled(t *testing.T) {
+	fake := fakeorca.New(t)
+	d, dir := orcaTestDispatcher(t, fake)
+	s, err := d.Dispatch(context.Background(), orcaTestRequest(dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	fake.FailStop(t, true)
+	if err := s.Terminate(); err == nil {
+		t.Fatal("terminate returned nil although worker-stop failed")
+	}
+	select {
+	case <-s.Done():
+		t.Fatalf("session finished as %+v although the worker may still be live", s.Outcome())
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	// The worker is still tracked: it reports its own end when it settles.
+	id := fake.LastDispatch(t)
+	fake.Settle(t, id, "failed")
+	if out := waitDone(t, s); out.Status != StatusFailed {
+		t.Fatalf("outcome = %+v, want the worker's own failure", out)
+	}
+}
+
+func TestOrcaSessionTerminateRetrySucceedsAfterFailure(t *testing.T) {
+	fake := fakeorca.New(t)
+	d, dir := orcaTestDispatcher(t, fake)
+	s, err := d.Dispatch(context.Background(), orcaTestRequest(dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	fake.FailStop(t, true)
+	if err := s.Terminate(); err == nil {
+		t.Fatal("terminate returned nil although worker-stop failed")
+	}
+	fake.FailStop(t, false)
+	if err := s.Terminate(); err != nil {
+		t.Fatalf("second terminate: %v", err)
+	}
+	if out := waitDone(t, s); out.Status != StatusKilled {
+		t.Fatalf("outcome = %+v, want killed", out)
+	}
+}
+
+func TestOrcaSessionLostContactFenceFailureKeepsSessionLive(t *testing.T) {
+	fake := fakeorca.New(t)
+	d, dir := orcaTestDispatcher(t, fake)
+	s, err := d.Dispatch(context.Background(), orcaTestRequest(dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	fake.FailStop(t, true)
+	fake.FailList(t, true)
+	// Wait for the fence to be attempted: lost contact after the failure limit.
+	deadline := time.Now().Add(5 * time.Second)
+	for countCalls(fake, "worker-stop") == 0 {
+		if time.Now().After(deadline) {
+			t.Fatal("fence never tried to stop the worker")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	select {
+	case <-s.Done():
+		t.Fatalf("session finished as %+v although worker-stop failed and the worker may be live", s.Outcome())
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	// Once Orca answers again the fence lands and the session reports it.
+	fake.FailStop(t, false)
+	out := waitDone(t, s)
+	if out.Status != StatusFailed || !strings.Contains(out.Reason, "lost contact") {
+		t.Fatalf("outcome = %+v, want failed with lost contact", out)
+	}
+}
+
+func countCalls(fake *fakeorca.Fake, sub string) int {
+	n := 0
+	for _, c := range fake.Calls() {
+		if strings.Contains(c, sub) {
+			n++
+		}
+	}
+	return n
+}
