@@ -107,6 +107,19 @@ The cost cap does not apply where the runtime reports no cost: the Orca runtime 
 
 The cost check runs between stages, so one stage can finish past the ceiling before the order stops. There is no cap across orders.
 
+## `[backlog]`
+
+Spaces the loop's backlog syncs, each a GitHub API call that shares one user's rate limit across every loop. A loop with no work syncs every 5 minutes. A loop with work syncs at most once per interval and reuses the last result in between. `enqueue` and `requeue` sync on the next cycle regardless.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `sync_interval_seconds` | int | `60` | Minimum seconds between backlog syncs while the loop has work; `0` means the default |
+
+```toml
+[backlog]
+sync_interval_seconds = 60
+```
+
 ---
 
 ### `[agents]`

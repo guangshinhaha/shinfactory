@@ -62,6 +62,7 @@ func (l *Loop) controlEnqueue(cmd ControlCommand) error {
 	}); err != nil {
 		return err
 	}
+	l.requestSync()
 
 	// Emit V2 canonical state event for new order promotion.
 	stages := make([]map[string]any, len(newOrder.Stages))
@@ -198,6 +199,7 @@ func (l *Loop) controlRequeue(orderID string) error {
 	}); err != nil {
 		return err
 	}
+	l.requestSync()
 	orders, err := l.currentOrders()
 	if err != nil {
 		return err

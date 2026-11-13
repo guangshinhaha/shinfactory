@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestDefaultConfigValues(t *testing.T) {
@@ -749,3 +750,17 @@ func TestSpendCapsDefaultAndOverride(t *testing.T) {
 	}
 }
 
+
+func TestBacklogSyncIntervalDefaultAndOverride(t *testing.T) {
+	if got := DefaultConfig().Backlog.SyncInterval(); got != time.Minute {
+		t.Fatalf("default sync interval = %s, want 1m", got)
+	}
+	cfg, err := Parse([]byte("[backlog]\nsync_interval_seconds = 15\n"))
+	if err != nil || cfg.Backlog.SyncInterval() != 15*time.Second {
+		t.Fatalf("sync interval = %s, %v, want 15s", cfg.Backlog.SyncInterval(), err)
+	}
+	cfg, err = Parse([]byte("[backlog]\nsync_interval_seconds = -5\n"))
+	if err != nil || cfg.Backlog.SyncInterval() != time.Minute {
+		t.Fatalf("negative sync interval = %s, %v, want the 1m default", cfg.Backlog.SyncInterval(), err)
+	}
+}
