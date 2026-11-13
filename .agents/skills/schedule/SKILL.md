@@ -34,7 +34,7 @@ Set `"tier"` on every order that builds a backlog item: `none` (docs or inert co
 - `low`, `medium`: `execute`, then `quality` (after the last `execute`).
 - `high`: `execute`, then `quality`, then `verify` (a fresh verifier that writes a verdict at the branch head).
 
-Nothing merges before the order's last stage. Findings from `quality` or a `FAIL` from `verify` send the order back to `execute` on the same branch, at most 2 times, then the order stops and lands in `action_needed`. Don't add stages to answer a rejection yourself.
+Nothing merges before the order's last stage. A rejection from `quality` or `verify` (findings, a `FAIL` or a `stage_fail`) sends the order back to `execute` on the same branch once, with the findings in its prompt; a second rejection stops the order, lands it in `action_needed` and hands the issue to a person. Don't add stages to answer a rejection yourself.
 
 ### Work type
 

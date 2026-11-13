@@ -20,10 +20,20 @@ const fallbackRetryAttempts = 3
 // did not hold up, or a stage_fail. A build stage has work to fix, so while it
 // has attempts left it goes back to pending with the reason in its next
 // prompt, and the launch counts against max_attempts. Anything else (a
-// quality or verify verdict has nothing to fix), no attempts left, or a failure
-// no retry can fix (Unbuildable) fails the order and a person hears.
+// quality or verify verdict has nothing to fix itself), no attempts left, or a
+// failure no retry can fix (Unbuildable) fails the order and a person hears.
+// A quality or verify rejection in PR mode sends the order back to execute with
+// its findings (once, see sendBack) before a person hears.
 func (l *Loop) rejectStage(ctx context.Context, cook *cookHandle, reason string) error {
-	if gateStageKey(cook.stage) != gateBuildKey {
+	switch gateStageKey(cook.stage) {
+	case gateBuildKey:
+	case gateReviewKey, gateVerifyKey:
+		if order, ok := l.orderByID(cook.orderID); ok && l.config.Landing.PR() &&
+			!strings.HasPrefix(reason, unbuildablePrefix) && !isScheduleOrder(order) {
+			return l.sendBack(cook, order, reason)
+		}
+		return l.failStage(ctx, cook, reason)
+	default:
 		return l.failStage(ctx, cook, reason)
 	}
 	return l.rejectStageUpTo(ctx, cook, reason, 0)

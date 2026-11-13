@@ -191,7 +191,7 @@ func TestVerifyFailSendsOrderBackToExecuteOnSameBranch(t *testing.T) {
 
 	// The fix round reruns execute in the same worktree and reviews again.
 	p := h.next(t)
-	if !strings.Contains(p, "Fix round 1 of 2") || !strings.Contains(p, "round-0/verify.json") {
+	if !strings.Contains(p, "Rework 1 of 1") || !strings.Contains(p, "round-0/verify.json") {
 		t.Fatalf("fix-round execute prompt = %s", p)
 	}
 	if h.rt.calls[3].WorktreePath != h.rt.calls[0].WorktreePath {
@@ -206,23 +206,21 @@ func TestVerifyFailSendsOrderBackToExecuteOnSameBranch(t *testing.T) {
 	}
 }
 
-func TestThirdRoundStopsTheOrderAndFlagsAPerson(t *testing.T) {
+func TestSecondRejectionStopsTheOrderAndFlagsAPerson(t *testing.T) {
 	h := newGateHarness(t, "high", "execute", "quality", "verify")
-	for round := 0; round < 2; round++ {
-		h.next(t) // execute
-		h.review(t, round, "\n- the thing is broken")
-		h.next(t) // quality finds issues -> back to execute
-		if got := h.order(t).Round; got != round+1 {
-			t.Fatalf("round after findings = %d, want %d", got, round+1)
-		}
+	h.next(t) // execute
+	h.review(t, 0, "\n- the thing is broken")
+	h.next(t) // quality finds issues -> back to execute
+	if got := h.order(t).Round; got != 1 {
+		t.Fatalf("round after findings = %d, want 1", got)
 	}
-	h.next(t) // execute, third time
-	h.review(t, 2, "\n- still broken")
-	h.next(t) // quality finds issues again: no rounds left
+	h.finishRework(t) // execute, second time
+	h.review(t, 1, "\n- still broken")
+	h.next(t) // quality finds issues again: no rework left
 
 	o := h.order(t)
 	if o.Status != OrderStatusFailed {
-		t.Fatalf("order status = %q, want failed after round 2 still had findings", o.Status)
+		t.Fatalf("order status = %q, want failed after the second rejection", o.Status)
 	}
 	if len(h.ln.merged) != 0 {
 		t.Fatal("PR merged although the order stopped")
@@ -231,7 +229,7 @@ func TestThirdRoundStopsTheOrderAndFlagsAPerson(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(orders.ActionNeeded) != 1 || !strings.Contains(orders.ActionNeeded[0], "fix rounds") {
+	if len(orders.ActionNeeded) != 1 || !strings.Contains(orders.ActionNeeded[0], "rejected 2 times") {
 		t.Fatalf("action_needed = %v, want one line flagging the stopped order", orders.ActionNeeded)
 	}
 }
