@@ -26,6 +26,9 @@ const (
 	// ready issues, no orders and no active cooks. Every sync costs GraphQL
 	// points from a limit that all loops, workers and the coordinator share.
 	idleSyncInterval = 5 * time.Minute
+	// minRateLimitWait floors the wait after a rate limit: a reset time already
+	// in the past (a stale or just-rolled window) must not retry after a second.
+	minRateLimitWait = 30 * time.Second
 )
 
 // rateLimitMarkers are lowercase fragments of GitHub rate-limit failures: the
@@ -131,7 +134,10 @@ func (l *Loop) rateLimitResume(ctx context.Context, err error) time.Time {
 	if reset.IsZero() { // no window is empty: a secondary limit with no header
 		return now.Add(rateLimitFallbackWait)
 	}
-	return maxTime(reset.Add(rateLimitSlack), now.Add(rateLimitSlack))
+	if !reset.After(now) { // the window already rolled over: don't retry after a second
+		return now.Add(minRateLimitWait)
+	}
+	return reset.Add(rateLimitSlack)
 }
 
 func maxTime(a, b time.Time) time.Time {
@@ -141,10 +147,11 @@ func maxTime(a, b time.Time) time.Time {
 	return b
 }
 
-// syncIdle reports whether the backlog sync may be skipped: the last sync found
-// no ready issues and nothing is running, queued or waiting to be promoted.
+// syncIdle reports whether the backlog sync may be skipped because the loop
+// has nothing to do: the last sync found no ready issues and nothing is
+// running, queued or waiting to be promoted. It skips for idleSyncInterval.
 func (l *Loop) syncIdle() bool {
-	if l.outage != nil || l.lastSyncAt.IsZero() || !l.lastSyncEmpty ||
+	if l.outage != nil || l.syncRequested || l.lastSyncAt.IsZero() || !l.lastSyncEmpty ||
 		l.deps.Now().Sub(l.lastSyncAt) >= idleSyncInterval ||
 		l.activeSummary.Total > 0 || len(l.cooks.pendingReview) > 0 {
 		return false
@@ -154,6 +161,17 @@ func (l *Loop) syncIdle() bool {
 	}
 	orders, err := l.currentOrders()
 	return err == nil && len(orders.Orders) == 0
+}
+
+// requestSync makes the next cycle read the backlog again: a control action
+// (enqueue, requeue) changed what it should show. It ends the idle skip and
+// drops the builder's cached sync, which a busy loop reuses for the configured
+// interval (backlog.sync_interval_seconds).
+func (l *Loop) requestSync() {
+	l.syncRequested = true
+	if inv, ok := l.deps.Mise.(backlogInvalidator); ok {
+		inv.InvalidateBacklog()
+	}
 }
 
 // graphQLUsed reads the GraphQL points used in the current window, for the

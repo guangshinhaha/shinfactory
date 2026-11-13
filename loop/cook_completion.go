@@ -410,7 +410,9 @@ func (l *Loop) advanceAndPersist(ctx context.Context, cook *cookHandle, message 
 			}
 		}
 		// Final stage of a non-failing order — fire adapter "done".
-		if _, err := l.deps.Adapter.Run(ctx, "backlog", "done", adapter.RunOptions{Args: []string{cook.orderID}}); err != nil {
+		_, err := l.deps.Adapter.Run(ctx, "backlog", "done", adapter.RunOptions{Args: []string{cook.orderID}})
+		l.requestSync() // a cached backlog would still list the finished issue as ready
+		if err != nil {
 			if !isMissingAdapter(err) {
 				return err
 			}

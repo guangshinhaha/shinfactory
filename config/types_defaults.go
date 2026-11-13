@@ -25,6 +25,28 @@ type Config struct {
 	Server      ServerConfig             `toml:"server"`
 	Landing     LandingConfig            `toml:"landing"`
 	Spend       SpendConfig              `toml:"spend"`
+	Backlog     BacklogConfig            `toml:"backlog"`
+}
+
+const (
+	defaultBacklogSyncInterval = time.Minute
+	maxBacklogSyncSeconds      = 24 * 60 * 60 // a larger value would overflow a Duration
+)
+
+// BacklogConfig tunes how often the loop reads the backlog (a GitHub API call).
+type BacklogConfig struct {
+	// SyncIntervalSeconds spaces backlog syncs while the loop has work. A
+	// control action that needs fresh backlog data (enqueue, requeue) syncs
+	// right away. Zero means the default (60s); a negative value is invalid.
+	SyncIntervalSeconds int `toml:"sync_interval_seconds"`
+}
+
+// SyncInterval is the minimum gap between backlog syncs while the loop is busy.
+func (c BacklogConfig) SyncInterval() time.Duration {
+	if c.SyncIntervalSeconds <= 0 {
+		return defaultBacklogSyncInterval
+	}
+	return time.Duration(min(c.SyncIntervalSeconds, maxBacklogSyncSeconds)) * time.Second
 }
 
 const (

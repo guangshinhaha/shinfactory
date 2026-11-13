@@ -518,6 +518,7 @@ func (l *Loop) buildBriefWithRetry(ctx context.Context) (brief mise.Brief, warni
 	}
 	if err == nil {
 		l.lastSyncAt, l.lastSyncEmpty, l.lastSyncWarnings = l.deps.Now(), len(brief.Backlog) == 0, warnings
+		l.syncRequested = false
 	}
 	if ctx.Err() != nil || err == nil {
 		return brief, warnings, changed, false, err

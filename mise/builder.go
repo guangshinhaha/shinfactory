@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/guangshinhaha/shinfactory/adapter"
@@ -24,6 +25,36 @@ type Builder struct {
 	now         func() time.Time
 	TaskTypes   []TaskTypeSummary
 	lastContent []byte // JSON sans GeneratedAt for change detection
+
+	// syncMu guards the cached backlog sync. A sync is a GitHub API call, so a
+	// loop with work reuses the last result for the configured interval.
+	syncMu       sync.Mutex
+	syncedAt     time.Time // zero: no cached sync
+	syncedItems  []adapter.BacklogItem
+	syncWarnings []string
+}
+
+// InvalidateBacklog drops the cached backlog sync, so the next Build syncs.
+func (b *Builder) InvalidateBacklog() {
+	b.syncMu.Lock()
+	defer b.syncMu.Unlock()
+	b.syncedAt = time.Time{}
+}
+
+// syncBacklog runs the backlog sync, or returns the last successful result
+// when it is younger than the configured interval. A failed sync is not cached.
+func (b *Builder) syncBacklog(ctx context.Context) ([]adapter.BacklogItem, []string, error) {
+	b.syncMu.Lock()
+	defer b.syncMu.Unlock()
+	if !b.syncedAt.IsZero() && b.now().Sub(b.syncedAt) < b.config.Backlog.SyncInterval() {
+		return b.syncedItems, b.syncWarnings, nil
+	}
+	items, warnings, err := b.runner.SyncBacklog(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	b.syncedAt, b.syncedItems, b.syncWarnings = b.now(), items, warnings
+	return items, warnings, nil
 }
 
 func NewBuilder(projectDir string, cfg config.Config) *Builder {
@@ -45,7 +76,7 @@ func (b *Builder) Build(ctx context.Context, activeSummary ActiveSummary, recent
 		if strings.TrimSpace(b.config.Adapters["backlog"].Scripts["sync"]) == "" {
 			warnings = append(warnings, "backlog sync script missing; returning empty backlog")
 		} else {
-			items, parseWarnings, err := b.runner.SyncBacklog(ctx)
+			items, parseWarnings, err := b.syncBacklog(ctx)
 			if err != nil {
 				if isMissingSyncScriptError(err) {
 					warnings = append(warnings, "backlog sync script missing; returning empty backlog")
