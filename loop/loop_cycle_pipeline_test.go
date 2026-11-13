@@ -1,6 +1,8 @@
 package loop
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -209,5 +211,61 @@ func TestProposalOfUnreadyAndScheduleEntersCooldown(t *testing.T) {
 
 	if !l.scheduleNothingUntil.After(now) {
 		t.Fatalf("want empty-promotion cooldown after [unready, schedule], got %v", l.scheduleNothingUntil)
+	}
+}
+
+func TestCancelSupersededCookKeepsCookWhenForceKillFails(t *testing.T) {
+	for _, resume := range []bool{true, false} {
+		t.Run(fmt.Sprintf("resume=%v", resume), func(t *testing.T) {
+			projectDir := t.TempDir()
+			ordersPath := filepath.Join(projectDir, ".noodle", "orders.json")
+			if err := writeOrdersAtomic(ordersPath, OrdersFile{Orders: []Order{{
+				ID:     "97",
+				Status: OrderStatusActive,
+				Stages: []Stage{{TaskKey: "execute", Status: StageStatusActive}},
+			}}}); err != nil {
+				t.Fatalf("write orders: %v", err)
+			}
+			worktree := &fakeWorktree{}
+			l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
+				Runtimes:   map[string]loopruntime.Runtime{"process": newMockRuntime()},
+				Worktree:   worktree,
+				Adapter:    &fakeAdapterRunner{},
+				Mise:       &fakeMise{},
+				Monitor:    fakeMonitor{},
+				Registry:   testLoopRegistry(),
+				Now:        time.Now,
+				OrdersFile: ordersPath,
+			})
+			session := &failingKillSession{mockSession: &mockSession{id: "sess-97", status: "running", done: make(chan struct{})}, err: errors.New("worker-stop failed")}
+			cook := &cookHandle{
+				cookIdentity: cookIdentity{
+					orderID: "97", stageIndex: 0,
+					stage: Stage{TaskKey: "execute", Status: StageStatusActive},
+				},
+				session:      session,
+				worktreeName: "97-0-execute",
+				worktreePath: filepath.Join(projectDir, ".worktrees", "97-0-execute"),
+			}
+			l.cooks.activeCooksByOrder["97"] = cook
+
+			err := l.cancelSupersededCook("97", cook, resume)
+			if err == nil {
+				t.Fatal("cancelSupersededCook returned nil although the worker could not be stopped")
+			}
+			if l.cooks.activeCooksByOrder["97"] != cook {
+				t.Fatal("cook was untracked while its worker may still be live")
+			}
+			if len(worktree.cleaned) != 0 {
+				t.Fatalf("worktree cleaned %v while its worker may still be live", worktree.cleaned)
+			}
+			orders, err := l.currentOrders()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := orders.Orders[0].Stages[0].Status; got != StageStatusActive {
+				t.Fatalf("stage status = %q, want active (no respawn into the same worktree)", got)
+			}
+		})
 	}
 }
