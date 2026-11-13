@@ -3,6 +3,7 @@ package loop
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 	"time"
@@ -474,7 +475,23 @@ func (l *Loop) buildBriefWithRetry(ctx context.Context) (brief mise.Brief, warni
 	if !l.outageDue() {
 		return mise.Brief{}, []string{l.outage.warning(l.deps.Now())}, false, true, nil
 	}
+	if l.syncIdle() {
+		return mise.Brief{}, l.lastSyncWarnings, false, true, nil
+	}
+	var costBefore rateWindow
+	measure := l.logger.Enabled(ctx, slog.LevelDebug)
+	if measure {
+		costBefore, measure = l.graphQLUsed(ctx)
+	}
 	brief, warnings, changed, err = l.deps.Mise.Build(ctx, l.snapshotActiveSummary(), l.snapshotRecentHistory())
+	if measure {
+		if costAfter, ok := l.graphQLUsed(ctx); ok {
+			l.logSyncCost(costBefore, costAfter)
+		}
+	}
+	if err == nil {
+		l.lastSyncAt, l.lastSyncEmpty, l.lastSyncWarnings = l.deps.Now(), len(brief.Backlog) == 0, warnings
+	}
 	if ctx.Err() != nil || err == nil {
 		return brief, warnings, changed, false, err
 	}

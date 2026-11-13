@@ -776,7 +776,7 @@ func (l *Loop) retryAwaitingChecks(ctx context.Context) error {
 			if perr := l.parkPendingReview(cook, reason); perr != nil {
 				return perr
 			}
-		case isNetworkError(err):
+		case isWaitableError(err):
 			// A network or 5xx blip is not a refusal: keep the waiting reason
 			// and retry after the outage backoff, with one warning per outage.
 			l.recordNetworkFailure(cook.orderID+": parked PR merge", err)

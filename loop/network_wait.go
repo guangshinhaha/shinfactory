@@ -75,9 +75,14 @@ type networkOutage struct {
 	nextAttempt time.Time
 	attempts    int
 	backoff     time.Duration
+	rateLimited bool // waiting for a GitHub rate-limit reset, not a network backoff
 }
 
 func (o *networkOutage) warning(now time.Time) string {
+	if o.rateLimited {
+		return fmt.Sprintf("GitHub rate limit reached (attempt %d); retrying in %s",
+			o.attempts, o.nextAttempt.Sub(now).Round(time.Second))
+	}
 	return fmt.Sprintf("network unreachable (attempt %d); retrying in %s",
 		o.attempts, o.nextAttempt.Sub(now).Round(time.Second))
 }
@@ -88,11 +93,14 @@ func (l *Loop) outageDue() bool {
 	return l.outage == nil || !l.deps.Now().Before(l.outage.nextAttempt)
 }
 
-// recordNetworkFailure opens an outage, or extends the open one with a longer
-// backoff, when err is network-class. It logs one warning per outage and
-// returns the status warning to show; ok is false for any other error.
+// recordNetworkFailure opens an outage, or extends the open one, when err is
+// network-class or a GitHub rate limit. A network error backs off with a longer
+// delay each time; a rate limit waits until the reset. It logs one warning per
+// outage and returns the status warning to show; ok is false for any other
+// error.
 func (l *Loop) recordNetworkFailure(step string, err error) (warning string, ok bool) {
-	if !isNetworkError(err) {
+	limited := isRateLimitError(err)
+	if !limited && !isNetworkError(err) {
 		return "", false
 	}
 	now := l.deps.Now()
@@ -107,8 +115,17 @@ func (l *Loop) recordNetworkFailure(step string, err error) (warning string, ok 
 	}
 	if o.attempts == 0 || !now.Before(o.nextAttempt) {
 		o.attempts++
-		o.nextAttempt = now.Add(o.backoff)
-		o.backoff = min(o.backoff*2, maxNetworkBackoff)
+		o.rateLimited = limited
+		if limited {
+			o.nextAttempt = l.rateLimitResume(err)
+			if l.logger != nil {
+				l.logger.Warn("GitHub rate limit; waiting for the reset",
+					"step", step, "retry_at", o.nextAttempt.UTC().Format(time.RFC3339))
+			}
+		} else {
+			o.nextAttempt = now.Add(o.backoff)
+			o.backoff = min(o.backoff*2, maxNetworkBackoff)
+		}
 	}
 	return o.warning(now), true
 }

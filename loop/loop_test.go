@@ -722,6 +722,7 @@ func TestCycleIdleWakesWhenPlansAppear(t *testing.T) {
 	}
 
 	fm := &fakeMise{}
+	clock := &fakeClock{now: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)}
 	rt := newMockRuntime()
 	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
 		Runtimes: map[string]loopruntime.Runtime{"process": rt},
@@ -730,7 +731,7 @@ func TestCycleIdleWakesWhenPlansAppear(t *testing.T) {
 		Mise:     fm,
 		Monitor:  fakeMonitor{},
 		Registry: testLoopRegistry(),
-		Now:      time.Now,
+		Now:      clock.Now,
 	})
 
 	// First cycle: no plans → idle
@@ -743,6 +744,9 @@ func TestCycleIdleWakesWhenPlansAppear(t *testing.T) {
 
 	// Simulate new backlog items appearing
 	fm.brief = mise.Brief{Backlog: []adapter.BacklogItem{{ID: "1", Title: "test", Status: "open"}}}
+
+	// An idle loop syncs the backlog slowly: the next look is idleSyncInterval away.
+	clock.now = clock.now.Add(idleSyncInterval)
 
 	// Second cycle: idle → running, bootstraps schedule
 	if err := l.Cycle(context.Background()); err != nil {
