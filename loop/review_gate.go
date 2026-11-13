@@ -22,16 +22,25 @@ import (
 //
 //	execute -> quality (review) -> verify (high tier only) -> ship
 //
-// Review and verify each leave a file the loop reads. Findings or a FAIL send
-// the order back to execute on the same branch, at most maxFixRounds times.
+// Review and verify each leave a file the loop reads. Findings, a FAIL or a
+// stage_fail send the order back to execute on the same branch with the
+// rejection attached, at most maxFixRounds times.
 const (
 	gateBuildKey  = "execute"
 	gateReviewKey = "quality"
 	gateVerifyKey = "verify"
 
-	// maxFixRounds is how many times findings may send an order back to
-	// execute. A review that still finds problems after that stops the order.
-	maxFixRounds = 2
+	// maxFixRounds is how many times a rejection may send an order back to
+	// execute: rework once, and a second rejection goes to a person.
+	maxFixRounds = 1
+
+	// rejectionFileName holds the reason a round was rejected, so the stop
+	// comment can show every rejection.
+	rejectionFileName = "rejection.txt"
+
+	// rejectionQuoteLimit bounds each rejection quoted in a stop comment, so
+	// both fit within stopMessageLimit.
+	rejectionQuoteLimit = 280
 
 	reviewFileName = "review.md"
 	verifyFileName = "verify.json"
@@ -303,7 +312,7 @@ func (l *Loop) reviewGate(ctx context.Context, cook *cookHandle) (bool, error) {
 			return true, l.failStage(nil, cook, err.Error()+" ("+path+")")
 		}
 		if !rep.Clean {
-			return true, l.sendBack(cook, order, "review found issues, listed in "+path)
+			return true, l.sendBack(cook, order, "review found issues, listed in "+path+":\n"+strings.TrimSpace(string(data)))
 		}
 		// Remember the head the review saw, so a later stage can't ship more.
 		head, err := headSHA(cook.worktreePath)
@@ -348,11 +357,13 @@ func (l *Loop) reviewGate(ctx context.Context, cook *cookHandle) (bool, error) {
 	return false, nil
 }
 
-// sendBack returns the order to its last execute stage on the same branch, or
-// stops it once maxFixRounds fix rounds are used up.
+// sendBack returns the order to its last execute stage on the same branch,
+// with the rejection in its next prompt, or stops it once maxFixRounds rework
+// rounds are used up. The stop comment carries every rejection of the order.
 func (l *Loop) sendBack(cook *cookHandle, order Order, reason string) error {
+	l.recordRejection(order, reason)
 	if order.Round >= maxFixRounds {
-		msg := fmt.Sprintf("stopped after %d fix rounds, needs a person: %s", maxFixRounds, reason)
+		msg := fmt.Sprintf("rejected %d times, needs a person: %s", order.Round+1, l.rejectionHistory(order))
 		if err := l.flagActionNeeded(cook.orderID + ": " + msg); err != nil {
 			return err
 		}
@@ -367,6 +378,9 @@ func (l *Loop) sendBack(cook *cookHandle, order Order, reason string) error {
 	if buildIdx < 0 {
 		return l.failStage(nil, cook, "no execute stage to send the order back to: "+reason)
 	}
+	if err := l.writeRetryNote(cook.orderID, buildIdx, reworkPrompt(reason)); err != nil {
+		return err
+	}
 	if err := l.reopenStages(cook.orderID, buildIdx, cook.stageIndex, order.Round+1); err != nil {
 		return err
 	}
@@ -374,6 +388,38 @@ func (l *Loop) sendBack(cook *cookHandle, order Order, reason string) error {
 		"order", cook.orderID, "from_stage", cook.stageIndex, "to_stage", buildIdx, "round", order.Round+1, "reason", reason)
 	l.forwardToScheduler(cook, "sent_back", reason, nil)
 	return nil
+}
+
+// reworkPrompt is what the rework's execute reads: the rejection, whole.
+func reworkPrompt(reason string) string {
+	return "Your work was rejected by the review gate. The rejection:\n\n" + reason +
+		"\n\nThe work is still on this branch. Fix every point it names with new commits, then finish the stage again."
+}
+
+// recordRejection keeps the reason this round was rejected.
+func (l *Loop) recordRejection(order Order, reason string) {
+	dir := l.gateDir(order.ID, order.Round)
+	if err := os.MkdirAll(dir, 0o755); err == nil {
+		err = os.WriteFile(filepath.Join(dir, rejectionFileName), []byte(reason), 0o644)
+		if err == nil {
+			return
+		}
+	}
+	l.logger.Warn("rejection reason not recorded", "order", order.ID, "round", order.Round)
+}
+
+// rejectionHistory quotes every rejection the order has had, oldest first.
+func (l *Loop) rejectionHistory(order Order) string {
+	var parts []string
+	for round := 0; round <= order.Round; round++ {
+		data, err := os.ReadFile(filepath.Join(l.gateDir(order.ID, round), rejectionFileName))
+		if err != nil {
+			continue
+		}
+		quote := strings.Join(strings.Fields(string(data)), " ")
+		parts = append(parts, fmt.Sprintf("rejection %d: %s", round+1, truncateRunes(quote, rejectionQuoteLimit)))
+	}
+	return strings.Join(parts, " | ")
 }
 
 // reopenStages sets stages from..to back to pending in the canonical state and
@@ -487,10 +533,10 @@ func (l *Loop) gateNote(order Order, stage Stage) string {
 			return ""
 		}
 		prev := l.gateDir(order.ID, order.Round-1)
-		return fmt.Sprintf("Fix round %d of %d. Review or verify sent this order back. Read %s and %s (whichever exists), fix every finding on this branch with new commits, and do not open a new PR.",
+		return fmt.Sprintf("Rework %d of %d. Review or verify sent this order back. Read %s and %s (whichever exists), fix every finding on this branch with new commits, and do not open a new PR.",
 			order.Round, maxFixRounds, filepath.Join(prev, reviewFileName), filepath.Join(prev, verifyFileName))
 	case gateReviewKey:
-		return fmt.Sprintf("Review gate, tier %s. Review at the depth your skill sets for this tier. Write %s with a line \"Covered: <what you read, the level, the kinds of problem you checked>\" and a line \"Findings: none\" or \"Findings:\" followed by a list. An empty file or one with no Covered line counts as not run and fails the stage. Findings send the order back to execute (round %d of %d used).",
+		return fmt.Sprintf("Review gate, tier %s. Review at the depth your skill sets for this tier. Write %s with a line \"Covered: <what you read, the level, the kinds of problem you checked>\" and a line \"Findings: none\" or \"Findings:\" followed by a list. An empty file or one with no Covered line counts as not run and fails the stage. Findings send the order back to execute (rework %d of %d used).",
 			tier, filepath.Join(dir, reviewFileName), order.Round, maxFixRounds)
 	case gateVerifyKey:
 		return fmt.Sprintf("Verify gate, tier %s. You are a fresh verifier: you have not seen the builder's reasoning, so test the branch against the issue's Done when yourself. Write %s as {\"head_sha\": <git rev-parse HEAD of this worktree>, \"verdict\": \"PASS\"|\"PASS+NOTES\"|\"FAIL\", \"evidence\": <what you ran and saw>}. A verdict for any other head is rejected.",

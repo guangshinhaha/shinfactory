@@ -2,6 +2,7 @@ package loop
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	loopruntime "github.com/guangshinhaha/shinfactory/runtime"
@@ -38,8 +39,15 @@ func (m *mockRuntime) Dispatch(_ context.Context, req loopruntime.DispatchReques
 		return nil, m.dispatchErr
 	}
 
+	id := req.Name + "-id"
+	for _, prev := range m.sessions {
+		if prev.id == id {
+			id = fmt.Sprintf("%s-id-%d", req.Name, len(m.sessions)) // a session's event log is its own
+			break
+		}
+	}
 	s := &mockSession{
-		id:     req.Name + "-id",
+		id:     id,
 		status: "running",
 		done:   make(chan struct{}),
 	}

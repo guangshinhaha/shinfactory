@@ -283,7 +283,8 @@ func TestDispatchFailureHandsTheOrderToAPerson(t *testing.T) {
 }
 
 // A verdict stage (quality, verify) has no work to fix, so its stage_fail is
-// not retried: the order goes to a person at once.
+// not retried. An Unbuildable one cannot be reworked either: the order goes to
+// a person at once.
 func TestQualityRejectionIsNotRetried(t *testing.T) {
 	h := newGateHarness(t, "none", "execute", "quality")
 	h.next(t) // execute ships
@@ -294,7 +295,7 @@ func TestQualityRejectionIsNotRetried(t *testing.T) {
 		cookIdentity: cookIdentity{orderID: "42", stageIndex: 1, stage: Stage{TaskKey: "quality", Skill: "quality"}},
 		worktreeName: "w",
 	}
-	if err := h.l.rejectStage(context.Background(), cook, "Rejected: Done when missed"); err != nil {
+	if err := h.l.rejectStage(context.Background(), cook, "Unbuildable: Done when missed"); err != nil {
 		t.Fatal(err)
 	}
 	h.failedWith(t, "quality rejection")

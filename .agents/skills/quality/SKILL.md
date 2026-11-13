@@ -65,7 +65,7 @@ Covered: <the diff or files you read, the review level, the kinds of problem you
 Findings: none
 ```
 
-or `Findings:` followed by a list, one proven finding per line starting with `- `. Review at the depth for the order's tier: none, no review; low, `/code-review low`; medium, `/code-review medium`; high, `/shinstack:blast-radius` then `/shinstack:interrogate` (when shinstack is installed). An empty file, or one with no `Covered:` line, counts as not run and fails the stage. Findings send the order back to execute on the same branch, at most 2 times; after that the order stops for a person.
+or `Findings:` followed by a list, one proven finding per line starting with `- `. Review at the depth for the order's tier: none, no review; low, `/code-review low`; medium, `/code-review medium`; high, `/shinstack:blast-radius` then `/shinstack:interrogate` (when shinstack is installed). An empty file, or one with no `Covered:` line, counts as not run and fails the stage. Findings send the order back to execute on the same branch, once; a second rejection (a `stage_fail` counts too) stops the order for a person.
 
 ## Verdict
 
