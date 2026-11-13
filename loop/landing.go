@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"regexp"
 	"slices"
@@ -244,6 +245,30 @@ type prState struct {
 	MergeStateStatus  string        `json:"mergeStateStatus"`
 	Mergeable         string        `json:"mergeable"` // MERGEABLE, CONFLICTING, UNKNOWN
 	StatusCheckRollup []rollupCheck `json:"statusCheckRollup"`
+	Comments          []struct {
+		Body string `json:"body"`
+	} `json:"comments"`
+}
+
+// verdictMissing reports a verdict-check that is red while no comment carries
+// a verdict for the PR's head: waiting cannot turn it green, only a verifier
+// running at this head can.
+func (p prState) verdictMissing() bool {
+	red := false
+	for _, c := range p.StatusCheckRollup {
+		if c.failing() && strings.Contains(c.label(), "verdict-check") {
+			red = true
+		}
+	}
+	if !red || p.HeadRefOid == "" {
+		return false
+	}
+	for _, c := range p.Comments {
+		if strings.Contains(c.Body, p.HeadRefOid) && strings.Contains(c.Body, `"verdict"`) {
+			return false
+		}
+	}
+	return true
 }
 
 // unknownMergeabilityDetail is what a PR waits on while GitHub has not
@@ -331,7 +356,7 @@ func (e pendingError) Error() string {
 func (e pendingError) Is(target error) bool { return target == ErrChecksPending }
 
 func (g ghLander) view(ctx context.Context, dir string, pr PullRequest) (prState, error) {
-	out, err := g.run(ctx, dir, "gh", "pr", "view", pr.URL, "--json", "headRefName,headRefOid,state,isDraft,isCrossRepository,mergeStateStatus,mergeable,statusCheckRollup")
+	out, err := g.run(ctx, dir, "gh", "pr", "view", pr.URL, "--json", "headRefName,headRefOid,state,isDraft,isCrossRepository,mergeStateStatus,mergeable,statusCheckRollup,comments")
 	if err != nil {
 		return prState{}, err
 	}
@@ -377,7 +402,7 @@ func (g ghLander) MarkReadyAndMerge(ctx context.Context, dir string, pr PullRequ
 		}
 	}
 	if detail := st.checksPending(); detail != "" {
-		return pendingError{url: pr.URL, detail: detail}
+		return pendingError{url: pr.URL, detail: detail, noVerdict: strings.HasPrefix(detail, redCheckPrefix) && st.verdictMissing()}
 	}
 	if st.HeadRefOid != head {
 		return pendingError{url: pr.URL, detail: fmt.Sprintf("GitHub shows head %.12s, not the pushed %.12s", st.HeadRefOid, head)}
@@ -456,7 +481,28 @@ func (g ghLander) PostVerdict(ctx context.Context, dir string, pr PullRequest, b
 }
 
 func (g ghLander) BranchPRClosed(ctx context.Context, dir, branch string) (bool, error) {
-	return false, nil
+	out, err := g.run(ctx, dir, "gh", "pr", "list", "--head", branch, "--state", "all", "--json", "state,isCrossRepository", "--limit", "30")
+	if err != nil {
+		return false, err
+	}
+	var prs []struct {
+		State             string `json:"state"`
+		IsCrossRepository bool   `json:"isCrossRepository"`
+	}
+	if err := json.Unmarshal([]byte(out), &prs); err != nil {
+		return false, fmt.Errorf("parse gh pr list output %q: %w", out, err)
+	}
+	closed := false
+	for _, pr := range prs {
+		if pr.IsCrossRepository {
+			continue // a fork's branch of the same name is not this order's
+		}
+		if pr.State == "OPEN" {
+			return false, nil
+		}
+		closed = true
+	}
+	return closed, nil
 }
 
 func (g ghLander) ConflictingFiles(ctx context.Context, dir, base string) ([]string, error) {
@@ -604,6 +650,9 @@ func (l *Loop) completeWithPR(ctx context.Context, cook *cookHandle, hasCommits 
 		}
 		if err != nil {
 			if errors.Is(err, ErrChecksPending) {
+				if rerun, rerr := l.rerunVerifyForMissingVerdict(cook, err); rerun || rerr != nil {
+					return rerr
+				}
 				// Gantry's checks run on the final push. Wait for them: the
 				// order stays parked and each cycle retries the merge.
 				l.lastChecksPoll = l.deps.Now()
@@ -769,6 +818,11 @@ func (l *Loop) retryAwaitingChecks(ctx context.Context) error {
 			if !errors.As(err, &pe) {
 				break
 			}
+			if rerun, rerr := l.rerunVerifyForMissingVerdict(cook, err); rerr != nil {
+				return rerr
+			} else if rerun {
+				break
+			}
 			if stuck := l.noteCheckWait(cook.orderID, pe.detail, now); stuck {
 				if serr := l.stopStuckWait(ctx, cook, pe.url, pe.detail); serr != nil {
 					return serr
@@ -891,8 +945,35 @@ func (l *Loop) pushAndShip(ctx context.Context, cook *cookHandle, order Order) (
 	return pr, nil
 }
 
-// prepareOrderBranch clears out an earlier order's leftovers before a new
-// order starts on the branch name.
+// prepareOrderBranch clears an earlier order's leftovers before a new order
+// starts on the branch name. When the issue went back to ready after its PR was
+// closed (or merged), the new order has the same id, so the same branch and
+// worktree. Reusing them would carry the old commits, and often their
+// conflicts, into the new order (#186). The branch, the worktree and the
+// remote branch go; ensureWorktree then cuts a fresh one off the remote's
+// default branch. A branch with an open PR, or none, is the order's own and
+// stays. GitHub is asked only when a branch or worktree already exists.
 func (l *Loop) prepareOrderBranch(ctx context.Context, name string) error {
+	if !l.config.Landing.PR() {
+		return nil
+	}
+	_, statErr := os.Stat(l.worktreePath(name))
+	if statErr != nil && !branchExists(l.projectDir, name) {
+		return nil
+	}
+	closed, err := l.lander().BranchPRClosed(ctx, l.projectDir, name)
+	if err != nil {
+		return fmt.Errorf("check for an earlier PR on branch %s: %w", name, err)
+	}
+	if !closed {
+		return nil
+	}
+	l.logger.Warn("discarding the branch of an earlier order whose PR is closed", "branch", name)
+	if err := l.deps.Worktree.Cleanup(name, worktree.CleanupOpts{Force: true}); err != nil {
+		return fmt.Errorf("discard stale branch %s: %w", name, err)
+	}
+	// A closed PR leaves its branch on the remote, and a push of the new
+	// branch would be refused as a non-fast-forward. Best effort: it may be gone.
+	_ = exec.CommandContext(ctx, "git", "-C", l.projectDir, "push", "origin", "--delete", name).Run()
 	return nil
 }

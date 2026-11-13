@@ -66,6 +66,14 @@ func (l *Loop) spawnCook(ctx context.Context, cand dispatchCandidate, order Orde
 
 	name := l.cookWorktreeName(cand.OrderID, cand.StageIndex, stage.TaskKey)
 
+	// A new order's first launch: an earlier order of the same id may have
+	// left a branch behind (#186).
+	if cand.StageIndex == 0 && opts.attempt == 0 && !opts.steered && order.Round == 0 {
+		if err := l.prepareOrderBranch(ctx, name); err != nil {
+			return err
+		}
+	}
+
 	created, err := l.ensureWorktree(name)
 	if err != nil {
 		return fmt.Errorf("create worktree %s: %w", name, err)

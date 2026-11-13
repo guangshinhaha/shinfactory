@@ -28,8 +28,14 @@ func TestShipWithNoVerdictAtHeadRerunsVerifyOnceThenShips(t *testing.T) {
 	if len(h.ln.merged) != 1 {
 		t.Fatalf("merged = %d, want the order shipped after the verify rerun", len(h.ln.merged))
 	}
-	if h.ln.verdictTries != 2 || len(h.rt.sessions) != 4 {
-		t.Fatalf("verdict posts = %d, sessions = %d; want verify run twice, no more", h.ln.verdictTries, len(h.rt.sessions))
+	verifyRuns := 0
+	for _, c := range h.rt.calls {
+		if c.Skill == "verify" {
+			verifyRuns++
+		}
+	}
+	if h.ln.verdictTries != 2 || verifyRuns != 2 {
+		t.Fatalf("verdict posts = %d, verify runs = %d; want verify run twice, no more", h.ln.verdictTries, verifyRuns)
 	}
 }
 

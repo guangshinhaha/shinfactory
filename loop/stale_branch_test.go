@@ -2,6 +2,7 @@ package loop
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -111,5 +112,48 @@ func TestPrepareOrderBranchKeepsABranchWhosePRIsNotClosed(t *testing.T) {
 	}
 	if ln.closedPRChecks != 0 {
 		t.Fatalf("asked GitHub about a branch that does not exist (%d calls)", ln.closedPRChecks)
+	}
+}
+
+// The first launch of an order runs the cleanup; the dispatch path calls it.
+func TestFirstLaunchDiscardsAClosedPRsBranch(t *testing.T) {
+	h := newLandingHarness(t, "auto", 1)
+	name := h.l.cookWorktreeName("42", 0, "execute")
+	if err := os.MkdirAll(h.l.worktreePath(name), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	h.ln.closedPR = true
+	if err := h.l.Cycle(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(h.wt.cleaned) == 0 || h.wt.cleaned[0] != name {
+		t.Fatalf("cleaned = %v, want the stale %s discarded before the first stage launched", h.wt.cleaned, name)
+	}
+}
+
+func TestVerdictMissingNeedsARedVerdictCheckAndNoVerdictCommentAtHead(t *testing.T) {
+	red := []rollupCheck{{Name: "verdict-check / verdict-check", Status: "COMPLETED", Conclusion: "FAILURE"}}
+	comment := func(body string) []struct {
+		Body string `json:"body"`
+	} {
+		return []struct {
+			Body string `json:"body"`
+		}{{Body: body}}
+	}
+	cases := []struct {
+		name string
+		st   prState
+		want bool
+	}{
+		{"red, no comments", prState{HeadRefOid: "aaa", StatusCheckRollup: red}, true},
+		{"red, verdict for an older head", prState{HeadRefOid: "bbb", StatusCheckRollup: red, Comments: comment(`{"head_sha": "aaa", "verdict": "PASS"}`)}, true},
+		{"red, verdict at head (stale check)", prState{HeadRefOid: "aaa", StatusCheckRollup: red, Comments: comment(`{"head_sha": "aaa", "verdict": "PASS"}`)}, false},
+		{"another check red", prState{HeadRefOid: "aaa", StatusCheckRollup: []rollupCheck{{Name: "build", Status: "COMPLETED", Conclusion: "FAILURE"}}}, false},
+		{"verdict-check green", prState{HeadRefOid: "aaa", StatusCheckRollup: []rollupCheck{{Name: "verdict-check", Status: "COMPLETED", Conclusion: "SUCCESS"}}}, false},
+	}
+	for _, tc := range cases {
+		if got := tc.st.verdictMissing(); got != tc.want {
+			t.Errorf("%s: verdictMissing = %v, want %v", tc.name, got, tc.want)
+		}
 	}
 }
