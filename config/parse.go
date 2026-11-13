@@ -303,7 +303,7 @@ func normalizeParsedValues(config *Config, metadata toml.MetaData, diagnostics *
 
 	if config.Backlog.SyncIntervalSeconds < 0 {
 		appendNormalizedValueDiagnostic(diagnostics, "backlog.sync_interval_seconds",
-			fmt.Sprintf("sync_interval_seconds=%d is invalid; using %s", config.Backlog.SyncIntervalSeconds, defaultBacklogSyncInterval),
+			fmt.Sprintf("sync_interval_seconds=%d is invalid; using the default %s", config.Backlog.SyncIntervalSeconds, defaultBacklogSyncInterval),
 		)
 		config.Backlog.SyncIntervalSeconds = 0
 	}

@@ -134,7 +134,10 @@ func (l *Loop) rateLimitResume(ctx context.Context, err error) time.Time {
 	if reset.IsZero() { // no window is empty: a secondary limit with no header
 		return now.Add(rateLimitFallbackWait)
 	}
-	return maxTime(reset.Add(rateLimitSlack), now.Add(minRateLimitWait))
+	if !reset.After(now) { // the window already rolled over: don't retry after a second
+		return now.Add(minRateLimitWait)
+	}
+	return reset.Add(rateLimitSlack)
 }
 
 func maxTime(a, b time.Time) time.Time {
@@ -148,7 +151,8 @@ func maxTime(a, b time.Time) time.Time {
 // has nothing to do: the last sync found no ready issues and nothing is
 // running, queued or waiting to be promoted. It skips for idleSyncInterval.
 func (l *Loop) syncIdle() bool {
-	if !l.syncSpaced(idleSyncInterval) || !l.lastSyncEmpty ||
+	if l.outage != nil || l.syncRequested || l.lastSyncAt.IsZero() || !l.lastSyncEmpty ||
+		l.deps.Now().Sub(l.lastSyncAt) >= idleSyncInterval ||
 		l.activeSummary.Total > 0 || len(l.cooks.pendingReview) > 0 {
 		return false
 	}
@@ -159,23 +163,16 @@ func (l *Loop) syncIdle() bool {
 	return err == nil && len(orders.Orders) == 0
 }
 
-// syncSpaced reports whether the last sync is recent enough (under interval) to
-// skip the next one. An open outage, no sync yet, or a control action waiting
-// for fresh backlog data all force a sync.
-func (l *Loop) syncSpaced(interval time.Duration) bool {
-	return l.outage == nil && !l.syncRequested && !l.lastSyncAt.IsZero() &&
-		l.deps.Now().Sub(l.lastSyncAt) < interval
+// requestSync makes the next cycle read the backlog again: a control action
+// (enqueue, requeue) changed what it should show. It ends the idle skip and
+// drops the builder's cached sync, which a busy loop reuses for the configured
+// interval (backlog.sync_interval_seconds).
+func (l *Loop) requestSync() {
+	l.syncRequested = true
+	if inv, ok := l.deps.Mise.(backlogInvalidator); ok {
+		inv.InvalidateBacklog()
+	}
 }
-
-// syncBusyThrottled reports whether a loop with work may reuse the last brief
-// instead of syncing: the last sync was under the configured interval ago.
-func (l *Loop) syncBusyThrottled() bool {
-	return l.syncSpaced(l.config.Backlog.SyncInterval())
-}
-
-// requestSync makes the next cycle sync the backlog regardless of the interval:
-// a control action (enqueue, requeue) changed what the backlog should show.
-func (l *Loop) requestSync() { l.syncRequested = true }
 
 // graphQLUsed reads the GraphQL points used in the current window, for the
 // debug cost line. ok is false when the lookup fails.

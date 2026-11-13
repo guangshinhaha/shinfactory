@@ -495,8 +495,7 @@ func (l *Loop) spawnPlannedCandidates(ctx context.Context, candidates []dispatch
 // opens (or extends) an outage that spans cycles (capped exponential backoff, or
 // until the rate-limit reset) and never ends the loop. While the outage runs, or
 // while an idle loop skips its slow backlog sync, it returns waiting=true and no
-// brief. A busy loop within the sync interval returns the last brief instead,
-// so orders keep moving without a GitHub call; the idle skip returns the last sync's warnings and leaves
+// brief; the idle skip returns the last sync's warnings and leaves
 // clearNetworkOutage alone (syncIdle is false during an outage). Other failures
 // return the error.
 func (l *Loop) buildBriefWithRetry(ctx context.Context) (brief mise.Brief, warnings []string, changed, waiting bool, err error) {
@@ -505,11 +504,6 @@ func (l *Loop) buildBriefWithRetry(ctx context.Context) (brief mise.Brief, warni
 	}
 	if l.syncIdle() {
 		return mise.Brief{}, l.lastSyncWarnings, false, true, nil
-	}
-	if l.syncBusyThrottled() {
-		// Busy: keep driving the orders on the last brief, without the GitHub
-		// call. Warnings were emitted when that sync ran.
-		return l.lastBrief, nil, false, false, nil
 	}
 	var costBefore rateWindow
 	measure := l.logger.Enabled(ctx, slog.LevelDebug)
@@ -524,7 +518,7 @@ func (l *Loop) buildBriefWithRetry(ctx context.Context) (brief mise.Brief, warni
 	}
 	if err == nil {
 		l.lastSyncAt, l.lastSyncEmpty, l.lastSyncWarnings = l.deps.Now(), len(brief.Backlog) == 0, warnings
-		l.lastBrief, l.syncRequested = brief, false
+		l.syncRequested = false
 	}
 	if ctx.Err() != nil || err == nil {
 		return brief, warnings, changed, false, err

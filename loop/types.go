@@ -145,6 +145,10 @@ type MiseBuilder interface {
 	Build(ctx context.Context, activeSummary mise.ActiveSummary, recentHistory []mise.HistoryItem) (mise.Brief, []string, bool, error)
 }
 
+// backlogInvalidator is implemented by a MiseBuilder that caches the backlog
+// sync between cycles (mise.Builder does).
+type backlogInvalidator interface{ InvalidateBacklog() }
+
 type Monitor interface {
 	RunOnce(ctx context.Context) ([]monitor.SessionMeta, error)
 }
@@ -231,8 +235,7 @@ type Loop struct {
 	lastSyncAt       time.Time // when the backlog last synced successfully
 	lastSyncEmpty    bool      // that sync found no ready issues
 	lastSyncWarnings []string
-	lastBrief        mise.Brief // the last successful sync's brief, reused while the next sync is throttled
-	syncRequested    bool       // a control action wants the next cycle to sync now
+	syncRequested    bool            // a control action wants the next cycle to sync now
 	outage           *networkOutage  // open network outage; nil while the network works
 	networkReparked  map[string]bool // orders re-parked for the network during the current retry
 	lastChecksPoll   time.Time       // last time parked PRs were re-checked for merge

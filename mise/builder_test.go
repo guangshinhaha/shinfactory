@@ -330,3 +330,79 @@ func TestReadRecentEventsSummaryDoesNotPrefixBackendOwner(t *testing.T) {
 		t.Fatalf("summary[0] = %q", events[0].Summary)
 	}
 }
+
+// syncCountingBuilder builds a Builder whose backlog sync script appends a line
+// to a counter file, and a clock the test moves.
+func syncCountingBuilder(t *testing.T, cfg config.Config) (b *Builder, runs func() int, clock *time.Time) {
+	t.Helper()
+	dir := t.TempDir()
+	counter := filepath.Join(dir, "runs")
+	cfg.Adapters = map[string]config.AdapterConfig{
+		"backlog": {Scripts: map[string]string{
+			"sync": "echo x >> '" + counter + "'; printf '%s\\n' '{\"id\":\"42\",\"title\":\"Fix\",\"status\":\"open\"}'",
+		}},
+	}
+	b = NewBuilder(dir, cfg)
+	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	b.now = func() time.Time { return now }
+	runs = func() int {
+		data, _ := os.ReadFile(counter)
+		return strings.Count(string(data), "x")
+	}
+	return b, runs, &now
+}
+
+func TestBuilderSyncsBacklogOncePerMinuteWhileBuildingEveryCycle(t *testing.T) {
+	cfg := config.DefaultConfig()
+	b, runs, clock := syncCountingBuilder(t, cfg)
+	for i := 0; i < 60; i++ { // a busy minute of one-second cycles
+		brief, _, _, err := b.Build(context.Background(), ActiveSummary{Total: i}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(brief.Backlog) != 1 || brief.ActiveSummary.Total != i {
+			t.Fatalf("cycle %d: backlog=%d active=%d, want the cached backlog with a fresh active summary", i, len(brief.Backlog), brief.ActiveSummary.Total)
+		}
+		*clock = clock.Add(time.Second)
+	}
+	if got := runs(); got != 1 {
+		t.Fatalf("backlog synced %d times in a busy minute, want at most 1", got)
+	}
+	if _, _, _, err := b.Build(context.Background(), ActiveSummary{}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := runs(); got != 2 {
+		t.Fatalf("backlog synced %d times after the minute, want a second sync", got)
+	}
+}
+
+func TestBuilderSyncIntervalIsConfigurable(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.Backlog.SyncIntervalSeconds = 10
+	b, runs, clock := syncCountingBuilder(t, cfg)
+	for i := 0; i < 30; i++ {
+		if _, _, _, err := b.Build(context.Background(), ActiveSummary{}, nil); err != nil {
+			t.Fatal(err)
+		}
+		*clock = clock.Add(time.Second)
+	}
+	if got := runs(); got != 3 {
+		t.Fatalf("10s interval synced %d times in 30s, want 3", got)
+	}
+}
+
+func TestBuilderInvalidateBacklogSyncsOnTheNextBuild(t *testing.T) {
+	b, runs, clock := syncCountingBuilder(t, config.DefaultConfig())
+	for _, invalidate := range []bool{false, true} {
+		if invalidate {
+			b.InvalidateBacklog()
+		}
+		*clock = clock.Add(time.Second)
+		if _, _, _, err := b.Build(context.Background(), ActiveSummary{}, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := runs(); got != 2 {
+		t.Fatalf("backlog synced %d times, want 2 (first build, then right after the invalidation)", got)
+	}
+}

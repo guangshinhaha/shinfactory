@@ -145,63 +145,26 @@ func TestIdleLoopSyncsBacklogLessOften(t *testing.T) {
 	}
 }
 
-func TestBusyLoopSyncsBacklogOncePerMinute(t *testing.T) {
-	f := newNetworkWaitFixture(t) // order 42 is active
-	for i := 0; i < 60; i++ {     // one busy minute of one-second cycles
-		f.cycle(t)
-		f.clock.now = f.clock.now.Add(time.Second)
-	}
-	if f.mise.calls > 1 {
-		t.Fatalf("busy loop synced the backlog %d times in a minute, want at most 1", f.mise.calls)
-	}
-	f.cycle(t) // the minute is up
-	if f.mise.calls != 2 {
-		t.Fatalf("busy loop synced %d times after a minute, want a second sync", f.mise.calls)
-	}
+// invalidatingMise counts how often the loop drops the builder's cached sync.
+type invalidatingMise struct {
+	fakeMise
+	invalidated int
 }
 
-func TestBusySyncIntervalIsConfigurable(t *testing.T) {
-	f := newNetworkWaitFixture(t)
-	f.l.config.Backlog.SyncIntervalSeconds = 10
-	for i := 0; i < 30; i++ {
-		f.cycle(t)
-		f.clock.now = f.clock.now.Add(time.Second)
-	}
-	if f.mise.calls != 3 {
-		t.Fatalf("busy loop with a 10s sync interval synced %d times in 30s, want 3", f.mise.calls)
-	}
-}
+func (m *invalidatingMise) InvalidateBacklog() { m.invalidated++ }
 
-func TestBusySkipStillRunsTheCycle(t *testing.T) {
+func TestControlActionsInvalidateTheCachedSync(t *testing.T) {
 	f := newNetworkWaitFixture(t)
-	f.cycle(t)
-	f.clock.now = f.clock.now.Add(time.Second)
-	f.cycle(t) // skips the sync but must keep driving the active order
-	if f.mise.calls != 1 {
-		t.Fatalf("synced %d times, want the second cycle to skip", f.mise.calls)
-	}
-	if f.loopState(t) != string(StateRunning) {
-		t.Fatalf("loop state %q after a skipped sync, want running", f.loopState(t))
-	}
-}
-
-func TestControlActionsSyncRightAway(t *testing.T) {
-	f := newNetworkWaitFixture(t)
+	im := &invalidatingMise{}
+	f.l.deps.Mise = im
 	f.cycle(t)
 	f.clock.now = f.clock.now.Add(time.Second)
 	if err := f.l.controlEnqueue(ControlCommand{OrderID: "43", Prompt: "do it"}); err != nil {
 		t.Fatalf("enqueue: %v", err)
 	}
-	f.cycle(t)
-	if f.mise.calls != 2 {
-		t.Fatalf("synced %d times after enqueue, want a sync on the next cycle", f.mise.calls)
+	if im.invalidated != 1 {
+		t.Fatalf("enqueue invalidated the cached sync %d times, want 1", im.invalidated)
 	}
-	f.clock.now = f.clock.now.Add(time.Second)
-	f.cycle(t)
-	if f.mise.calls != 2 {
-		t.Fatalf("synced %d times, want the forced sync to happen once", f.mise.calls)
-	}
-
 	if err := f.l.mutateOrdersState(func(o *OrdersFile) (bool, error) {
 		o.Orders[0].Status = OrderStatusFailed
 		return true, nil
@@ -211,10 +174,34 @@ func TestControlActionsSyncRightAway(t *testing.T) {
 	if err := f.l.controlRequeue("42"); err != nil {
 		t.Fatalf("requeue: %v", err)
 	}
+	if im.invalidated != 2 {
+		t.Fatalf("requeue invalidated the cached sync %d times, want 2 in total", im.invalidated)
+	}
+}
+
+func TestControlActionEndsTheIdleSkip(t *testing.T) {
+	f := idleFixture(t)
+	f.cycle(t) // an empty sync: the loop is idle
 	f.clock.now = f.clock.now.Add(time.Second)
 	f.cycle(t)
-	if f.mise.calls != 3 {
-		t.Fatalf("synced %d times after requeue, want a sync on the next cycle", f.mise.calls)
+	if f.mise.calls != 1 {
+		t.Fatalf("idle loop synced %d times, want the second cycle to skip", f.mise.calls)
+	}
+	f.l.requestSync()
+	f.clock.now = f.clock.now.Add(time.Second)
+	f.cycle(t)
+	if f.mise.calls != 2 {
+		t.Fatalf("synced %d times after a control action, want a sync on the next cycle", f.mise.calls)
+	}
+}
+
+func TestRateLimitResumeKeepsANearResetShort(t *testing.T) {
+	f := newNetworkWaitFixture(t)
+	now := f.clock.now
+	soon := now.Add(5 * time.Second)
+	installFakeGh(t, "cat <<'EOF'\n"+rateLimitJSON(soon, soon, 0)+"\nEOF")
+	if got := f.l.rateLimitResume(t.Context(), rateLimitErrors[0].err); got.After(now.Add(7 * time.Second)) {
+		t.Fatalf("a reset 5s away resumes at +%s, want about 6s", got.Sub(now))
 	}
 }
 

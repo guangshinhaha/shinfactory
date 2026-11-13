@@ -750,7 +750,6 @@ func TestSpendCapsDefaultAndOverride(t *testing.T) {
 	}
 }
 
-
 func TestBacklogSyncIntervalDefaultAndOverride(t *testing.T) {
 	if got := DefaultConfig().Backlog.SyncInterval(); got != time.Minute {
 		t.Fatalf("default sync interval = %s, want 1m", got)

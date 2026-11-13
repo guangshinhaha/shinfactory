@@ -28,7 +28,10 @@ type Config struct {
 	Backlog     BacklogConfig            `toml:"backlog"`
 }
 
-const defaultBacklogSyncInterval = time.Minute
+const (
+	defaultBacklogSyncInterval = time.Minute
+	maxBacklogSyncSeconds      = 24 * 60 * 60 // a larger value would overflow a Duration
+)
 
 // BacklogConfig tunes how often the loop reads the backlog (a GitHub API call).
 type BacklogConfig struct {
@@ -43,7 +46,7 @@ func (c BacklogConfig) SyncInterval() time.Duration {
 	if c.SyncIntervalSeconds <= 0 {
 		return defaultBacklogSyncInterval
 	}
-	return time.Duration(c.SyncIntervalSeconds) * time.Second
+	return time.Duration(min(c.SyncIntervalSeconds, maxBacklogSyncSeconds)) * time.Second
 }
 
 const (
