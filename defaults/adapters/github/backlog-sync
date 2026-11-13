@@ -6,7 +6,7 @@
 #   NOODLE_GH_LABEL       the label that marks an issue ready (default: ready)
 #   NOODLE_GH_DONE_LABEL  label that backlog-done adds (default: shinfactory-done);
 #                         open issues carrying it sync as status "done"
-#   NOODLE_GH_LIMIT       max issues to read (default: 200)
+#   NOODLE_GH_LIMIT       max open issues to read, ready or not (default: 1000)
 #
 # A plan is linked by a line in the issue body: "Plan: brain/plans/NN-slug/overview.md".
 set -eu
@@ -30,5 +30,5 @@ filter='.[]
   + (if ($tags | length) > 0 then {tags: $tags} else {} end)
   + (if $plan then {plan: $plan} else {} end)'
 
-gh issue list --state open --limit "${NOODLE_GH_LIMIT:-200}" \
+gh issue list --state open --limit "${NOODLE_GH_LIMIT:-1000}" \
   --json number,title,labels,body,url --jq "$filter"

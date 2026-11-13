@@ -23,6 +23,8 @@ func (l *Loop) buildCycleBrief(ctx context.Context) (mise.Brief, []string, bool,
 	if waiting {
 		return mise.Brief{}, warnings, false, false, nil
 	}
+	// The scheduler, ensureScheduleIfNeeded and the promotion all read this list.
+	brief.Backlog = l.withoutUnsentStops(brief.Backlog)
 	if l.state != StateRunning && l.state != StateIdle {
 		return brief, warnings, false, miseChanged, nil
 	}
@@ -38,7 +40,7 @@ func (l *Loop) mergeOrdersNext(brief mise.Brief) (mergeResult, error) {
 	if err != nil {
 		return mergeResult{}, err
 	}
-	return consumeOrdersNext(l.deps.OrdersNextFile, orders, l.withoutUnsentStops(brief.Backlog))
+	return consumeOrdersNext(l.deps.OrdersNextFile, orders, brief.Backlog)
 }
 
 // withoutUnsentStops drops the issues of failed orders whose hand-off to a person has not
