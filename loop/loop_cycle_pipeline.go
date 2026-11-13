@@ -153,10 +153,9 @@ func (l *Loop) cancelSupersededCook(orderID string, cook *cookHandle, resume boo
 		"session", cook.session.ID(),
 		"stage", cook.stage.TaskKey)
 	if err := cook.session.ForceKill(); err != nil {
-		l.logger.Warn("cancel superseded cook force kill failed",
-			"order", orderID,
-			"session", cook.session.ID(),
-			"error", err)
+		// The worker may still be live. Keep the cook tracked, so nothing
+		// respawns into its worktree, and leave the worktree alone.
+		return fmt.Errorf("cancelling superseded cook %s for order %s: %w", cook.session.ID(), orderID, err)
 	}
 	l.trackCookCompleted(cook, StageResult{
 		SessionID:   cook.session.ID(),

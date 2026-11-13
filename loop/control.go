@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/guangshinhaha/shinfactory/internal/filex"
+	"github.com/guangshinhaha/shinfactory/internal/ingest"
 	"github.com/guangshinhaha/shinfactory/internal/stringx"
 )
 
@@ -356,8 +357,10 @@ func (l *Loop) controlStop(name string) error {
 	return fmt.Errorf("session not found")
 }
 
-// controlStopKill is the fallback for non-steerable sessions: kill the process
-// and clean up the cook.
+// controlStopKill is the fallback for non-steerable sessions: end the worker
+// and park the order as stopped. The worktree and branch stay in every landing
+// mode, so the work is not lost and a requeue resumes from it. A worker that
+// cannot be stopped leaves the cook active and the error goes to the caller.
 func (l *Loop) controlStopKill(cook *cookHandle) error {
 	if err := cook.session.ForceKill(); err != nil {
 		return fmt.Errorf("force kill session %q failed: %w", cook.session.ID(), err)
@@ -368,7 +371,34 @@ func (l *Loop) controlStopKill(cook *cookHandle) error {
 		CompletedAt: l.deps.Now(),
 	})
 	delete(l.cooks.activeCooksByOrder, cook.orderID)
-	l.cleanupCookWorktree(cook)
+	return l.parkStoppedCook(cook)
+}
+
+// stoppedByUserReason is the reason a Stop leaves on the order.
+const stoppedByUserReason = "stopped by user"
+
+// parkStoppedCook fails the stage with the stop reason and keeps its worktree.
+// The order is requeueable like any failed one.
+func (l *Loop) parkStoppedCook(cook *cookHandle) error {
+	if err := l.ensureCanonicalOrderFromOrders(cook.orderID); err != nil {
+		return err
+	}
+	if err := l.emitEventChecked(ingest.EventStageFailed, map[string]any{
+		"order_id":    cook.orderID,
+		"stage_index": cook.stageIndex,
+		"error":       stoppedByUserReason,
+		"attempt_id":  dispatchAttemptID(cook.orderID, cook.stageIndex, cook.attempt),
+		"session_id":  sessionIDPtr(cook),
+	}); err != nil {
+		return err
+	}
+	if err := l.mirrorLegacyOrderFromCanonical(cook.orderID); err != nil {
+		return err
+	}
+	if err := l.syncPendingReviewProjection(); err != nil {
+		return err
+	}
+	l.recordStageFailure(cook, stoppedByUserReason, OrderFailureClassStageTerminal, nil)
 	return nil
 }
 
