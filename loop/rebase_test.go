@@ -3,8 +3,13 @@ package loop
 import (
 	"errors"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/guangshinhaha/shinfactory/adapter"
+	"github.com/guangshinhaha/shinfactory/internal/orderx"
 )
 
 func actionNeeded(t *testing.T, h *gateHarness) string {
@@ -217,5 +222,63 @@ func TestFailedReopenOfAParkedOrderRestoresItsPendingReviewAndStages(t *testing.
 	}
 	if got := h.l.canonical.Orders["42"].Stages[0].Status; got != before {
 		t.Fatalf("stage 0 status = %s after the failed reopen, want %s", got, before)
+	}
+}
+
+// repropose has the scheduler propose order 42 again while the backlog still lists it
+// as ready, as it does when the stop could not remove the label.
+func (h *gateHarness) repropose(t *testing.T) {
+	t.Helper()
+	h.l.deps.Mise.(*fakeMise).brief.Backlog = []adapter.BacklogItem{{ID: "42", Title: "t", Status: "open"}}
+	writeCompactOrders(t, h.l.deps.OrdersNextFile, orderx.CompactOrdersFile{
+		Orders: []orderx.CompactOrder{{ID: "42", Stages: []orderx.CompactStage{{Do: "execute"}}}},
+	})
+	if err := h.l.Cycle(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func countLoopEvents(t *testing.T, h *gateHarness, typ string) int {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(h.l.runtimeDir, "loop-events.ndjson"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return strings.Count(string(data), `"type":"`+typ+`"`)
+}
+
+func TestConflictedOrderIsNotReplannedWhileItsStopIsUnsent(t *testing.T) {
+	h := newGateHarness(t, "medium", "execute", "quality")
+	h.l.deps.OrdersNextFile = filepath.Join(h.l.runtimeDir, "orders-next.json")
+	h.ln.conflicts = 1
+	h.ln.rebaseErr = &RebaseConflictError{Files: []string{"README.md"}}
+	h.ar.stopErr = errors.New("GraphQL: API rate limit already exceeded")
+	h.next(t)
+	h.review(t, 0, "none")
+	h.next(t)
+	h.failedWith(t, "rebase conflict")
+	sessions := len(h.rt.sessions)
+
+	// The stop failed, so the issue is still ready and the scheduler keeps proposing it.
+	for i := 0; i < 5; i++ {
+		h.repropose(t)
+	}
+	if h.ln.rebases != 1 || len(h.rt.sessions) != sessions {
+		t.Fatalf("conflicted order re-ran: rebases=%d (want 1), new sessions=%d (want 0)", h.ln.rebases, len(h.rt.sessions)-sessions)
+	}
+	if got := h.order(t).Status; got != OrderStatusFailed {
+		t.Fatalf("order status = %s, want failed until a person puts ready back", got)
+	}
+	if got := countLoopEvents(t, h, "order.failed"); got != 1 {
+		t.Fatalf("order.failed events = %d, want 1", got)
+	}
+
+	// The stop lands once gh recovers, and the order stays put.
+	h.ar.stopErr = nil
+	h.l.lastStopRetry = time.Time{}
+	h.repropose(t)
+	h.repropose(t)
+	if h.ln.rebases != 1 || len(h.rt.sessions) != sessions {
+		t.Fatalf("order ran after its stop landed: rebases=%d new sessions=%d", h.ln.rebases, len(h.rt.sessions)-sessions)
 	}
 }
