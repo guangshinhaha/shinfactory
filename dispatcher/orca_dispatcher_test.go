@@ -39,8 +39,10 @@ func waitDone(t *testing.T, s Session) SessionOutcome {
 	// A poll still mid-call would write into the fake's state dir while
 	// t.TempDir cleanup removes it.
 	if orca, ok := s.(*orcaSession); ok {
+		stopped := make(chan struct{})
+		go func() { orca.wg.Wait(); close(stopped) }()
 		select {
-		case <-orca.pollDone:
+		case <-stopped:
 		case <-time.After(5 * time.Second):
 			t.Fatal("orca poll did not stop")
 		}
@@ -126,6 +128,49 @@ func TestOrcaSessionTerminateStopsWorker(t *testing.T) {
 	}
 	if !strings.Contains(strings.Join(fake.Calls(), "\n"), "worker-stop --dispatch "+fake.LastDispatch(t)) {
 		t.Fatalf("worker-stop not called: %v", fake.Calls())
+	}
+}
+
+// A worker that settled before Terminate ran, but that the poll has not
+// seen yet, keeps its real outcome instead of being recorded as killed.
+func TestOrcaSessionTerminateKeepsOutcomeOfWorkerThatAlreadySettled(t *testing.T) {
+	fake := fakeorca.New(t)
+	dir := t.TempDir()
+	d := NewOrcaDispatcher(OrcaDispatcherConfig{
+		ProjectDir:   dir,
+		RuntimeDir:   dir + "/.noodle",
+		Bin:          fake.Bin,
+		PollInterval: time.Hour, // the poll cannot get there first
+	})
+	s, err := d.Dispatch(context.Background(), orcaTestRequest(dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	fake.Settle(t, fake.LastDispatch(t), "succeeded")
+	if err := s.Terminate(); err != nil {
+		t.Fatalf("terminate: %v", err)
+	}
+	if out := waitDone(t, s); out.Status != StatusCompleted {
+		t.Fatalf("outcome = %+v, want completed", out)
+	}
+	if strings.Contains(strings.Join(fake.Calls(), "\n"), "worker-stop") {
+		t.Fatalf("worker-stop called for a settled worker: %v", fake.Calls())
+	}
+}
+
+func TestOrcaSessionTerminateReturnsStopErrorAndStillFinishes(t *testing.T) {
+	fake := fakeorca.New(t)
+	d, dir := orcaTestDispatcher(t, fake)
+	s, err := d.Dispatch(context.Background(), orcaTestRequest(dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	fake.FailStop(t)
+	if err := s.Terminate(); err == nil {
+		t.Fatal("terminate returned nil, want the worker-stop error")
+	}
+	if out := waitDone(t, s); out.Status != StatusKilled {
+		t.Fatalf("outcome = %+v, want killed", out)
 	}
 }
 

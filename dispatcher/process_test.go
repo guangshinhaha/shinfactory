@@ -138,3 +138,29 @@ func TestProcessHandleReadEndsCloseAfterGraceWhenGrandchildHoldsPipe(t *testing.
 		t.Fatal("stdout reader still blocked after the child exited")
 	}
 }
+
+// A reader that is slow to start still gets everything the child wrote, even
+// when the child has exited and the drain grace has long passed.
+func TestProcessHandleDeliversFullOutputToSlowReaderAfterExit(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("needs a POSIX shell")
+	}
+	h, err := startProcess(exec.Command("sh", "-c", "echo head; echo tail"), 20*time.Millisecond)
+	if err != nil {
+		t.Fatalf("StartProcess: %v", err)
+	}
+	select {
+	case <-h.Done():
+	case <-time.After(5 * time.Second):
+		t.Fatal("child did not exit")
+	}
+	time.Sleep(300 * time.Millisecond) // many grace periods
+
+	got, err := io.ReadAll(h.Stdout())
+	if err != nil {
+		t.Fatalf("read stdout: %v", err)
+	}
+	if string(got) != "head\ntail\n" {
+		t.Fatalf("stdout = %q, want %q", got, "head\ntail\n")
+	}
+}
