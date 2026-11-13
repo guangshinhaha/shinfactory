@@ -299,3 +299,16 @@ func TestRateLimitResumeUsesTheFailedWindowAndCapsRetryAfter(t *testing.T) {
 		t.Fatalf("retry-after 86400 waits until %s, want it capped at one hour", got)
 	}
 }
+
+// A backlog stop or done the loop makes itself must drop the cached sync, or the
+// scheduler can re-propose a stopped or finished issue from a stale backlog
+// (the #175 failure).
+func TestBacklogStopInvalidatesTheCachedSync(t *testing.T) {
+	f := newNetworkWaitFixture(t)
+	im := &invalidatingMise{}
+	f.l.deps.Mise = im
+	f.l.stopForPerson(t.Context(), "42", "needs a person", "")
+	if im.invalidated != 1 {
+		t.Fatalf("stop invalidated the cached sync %d times, want 1", im.invalidated)
+	}
+}

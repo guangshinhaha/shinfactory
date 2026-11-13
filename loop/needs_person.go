@@ -43,6 +43,9 @@ func (l *Loop) stopForPerson(ctx context.Context, orderID, summary, detail strin
 		Args:  []string{orderID},
 		Stdin: []byte(message),
 	})
+	// The issue left the ready list: a cached backlog would still offer it to
+	// the scheduler, which could replace the stopped order.
+	l.requestSync()
 	switch {
 	case err == nil:
 		l.markStopped(orderID)
