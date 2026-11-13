@@ -131,29 +131,20 @@ func TestFirstLaunchDiscardsAClosedPRsBranch(t *testing.T) {
 	}
 }
 
-func TestVerdictMissingNeedsARedVerdictCheckAndNoVerdictCommentAtHead(t *testing.T) {
-	red := []rollupCheck{{Name: "verdict-check / verdict-check", Status: "COMPLETED", Conclusion: "FAILURE"}}
-	comment := func(body string) []struct {
-		Body string `json:"body"`
-	} {
-		return []struct {
-			Body string `json:"body"`
-		}{{Body: body}}
-	}
+func TestHasVerdictForNeedsAVerdictJSONNamingTheHead(t *testing.T) {
 	cases := []struct {
-		name string
-		st   prState
-		want bool
+		name   string
+		bodies []string
+		want   bool
 	}{
-		{"red, no comments", prState{HeadRefOid: "aaa", StatusCheckRollup: red}, true},
-		{"red, verdict for an older head", prState{HeadRefOid: "bbb", StatusCheckRollup: red, Comments: comment(`{"head_sha": "aaa", "verdict": "PASS"}`)}, true},
-		{"red, verdict at head (stale check)", prState{HeadRefOid: "aaa", StatusCheckRollup: red, Comments: comment(`{"head_sha": "aaa", "verdict": "PASS"}`)}, false},
-		{"another check red", prState{HeadRefOid: "aaa", StatusCheckRollup: []rollupCheck{{Name: "build", Status: "COMPLETED", Conclusion: "FAILURE"}}}, false},
-		{"verdict-check green", prState{HeadRefOid: "aaa", StatusCheckRollup: []rollupCheck{{Name: "verdict-check", Status: "COMPLETED", Conclusion: "SUCCESS"}}}, false},
+		{"no comments", nil, false},
+		{"verdict for an older head", []string{`{"head_sha": "aaa", "verdict": "PASS"}`}, false},
+		{"verdict at head", []string{"Verify verdict at head bbb:\n```json\n{\"head_sha\": \"bbb\", \"verdict\": \"PASS\"}\n```"}, true},
+		{"remark quoting the sha and the word verdict", []string{`my verdict on bbb: looks fine`}, false},
 	}
 	for _, tc := range cases {
-		if got := tc.st.verdictMissing(); got != tc.want {
-			t.Errorf("%s: verdictMissing = %v, want %v", tc.name, got, tc.want)
+		if got := hasVerdictFor("bbb", tc.bodies); got != tc.want {
+			t.Errorf("%s: hasVerdictFor = %v, want %v", tc.name, got, tc.want)
 		}
 	}
 }

@@ -245,30 +245,51 @@ type prState struct {
 	MergeStateStatus  string        `json:"mergeStateStatus"`
 	Mergeable         string        `json:"mergeable"` // MERGEABLE, CONFLICTING, UNKNOWN
 	StatusCheckRollup []rollupCheck `json:"statusCheckRollup"`
-	Comments          []struct {
-		Body string `json:"body"`
-	} `json:"comments"`
 }
 
-// verdictMissing reports a verdict-check that is red while no comment carries
-// a verdict for the PR's head: waiting cannot turn it green, only a verifier
-// running at this head can.
-func (p prState) verdictMissing() bool {
-	red := false
+// verdictCheckRed reports a finished, failing verdict-check.
+func (p prState) verdictCheckRed() bool {
 	for _, c := range p.StatusCheckRollup {
 		if c.failing() && strings.Contains(c.label(), "verdict-check") {
-			red = true
+			return true
 		}
 	}
-	if !red || p.HeadRefOid == "" {
-		return false
-	}
-	for _, c := range p.Comments {
-		if strings.Contains(c.Body, p.HeadRefOid) && strings.Contains(c.Body, `"verdict"`) {
-			return false
+	return false
+}
+
+// hasVerdictFor reports whether a comment body carries a verdict JSON for head:
+// a head_sha field naming it next to a verdict field. A remark that merely
+// quotes the sha does not count.
+func hasVerdictFor(head string, bodies []string) bool {
+	re := regexp.MustCompile(`"head_sha"\s*:\s*"` + regexp.QuoteMeta(head) + `"`)
+	for _, b := range bodies {
+		if re.MatchString(b) && strings.Contains(b, `"verdict"`) {
+			return true
 		}
 	}
-	return true
+	return false
+}
+
+// commentBodies lists the PR's comment bodies. It is read only when a
+// verdict-check is red, not on every view.
+func (g ghLander) commentBodies(ctx context.Context, dir string, pr PullRequest) ([]string, error) {
+	out, err := g.run(ctx, dir, "gh", "pr", "view", pr.URL, "--json", "comments")
+	if err != nil {
+		return nil, err
+	}
+	var v struct {
+		Comments []struct {
+			Body string `json:"body"`
+		} `json:"comments"`
+	}
+	if err := json.Unmarshal([]byte(out), &v); err != nil {
+		return nil, fmt.Errorf("parse gh pr view output %q: %w", out, err)
+	}
+	bodies := make([]string, len(v.Comments))
+	for i, c := range v.Comments {
+		bodies[i] = c.Body
+	}
+	return bodies, nil
 }
 
 // unknownMergeabilityDetail is what a PR waits on while GitHub has not
@@ -356,7 +377,7 @@ func (e pendingError) Error() string {
 func (e pendingError) Is(target error) bool { return target == ErrChecksPending }
 
 func (g ghLander) view(ctx context.Context, dir string, pr PullRequest) (prState, error) {
-	out, err := g.run(ctx, dir, "gh", "pr", "view", pr.URL, "--json", "headRefName,headRefOid,state,isDraft,isCrossRepository,mergeStateStatus,mergeable,statusCheckRollup,comments")
+	out, err := g.run(ctx, dir, "gh", "pr", "view", pr.URL, "--json", "headRefName,headRefOid,state,isDraft,isCrossRepository,mergeStateStatus,mergeable,statusCheckRollup")
 	if err != nil {
 		return prState{}, err
 	}
@@ -402,7 +423,16 @@ func (g ghLander) MarkReadyAndMerge(ctx context.Context, dir string, pr PullRequ
 		}
 	}
 	if detail := st.checksPending(); detail != "" {
-		return pendingError{url: pr.URL, detail: detail, noVerdict: strings.HasPrefix(detail, redCheckPrefix) && st.verdictMissing()}
+		pe := pendingError{url: pr.URL, detail: detail}
+		// Only at the head this worktree holds: GitHub can still show the
+		// previous head right after a push, and its verdicts say nothing then.
+		if strings.HasPrefix(detail, redCheckPrefix) && st.verdictCheckRed() && st.HeadRefOid == head {
+			// A failed read just leaves the wait as it was.
+			if bodies, cerr := g.commentBodies(ctx, dir, pr); cerr == nil && !hasVerdictFor(head, bodies) {
+				pe.noVerdict = true
+			}
+		}
+		return pe
 	}
 	if st.HeadRefOid != head {
 		return pendingError{url: pr.URL, detail: fmt.Sprintf("GitHub shows head %.12s, not the pushed %.12s", st.HeadRefOid, head)}
@@ -650,8 +680,8 @@ func (l *Loop) completeWithPR(ctx context.Context, cook *cookHandle, hasCommits 
 		}
 		if err != nil {
 			if errors.Is(err, ErrChecksPending) {
-				if rerun, rerr := l.rerunVerifyForMissingVerdict(cook, err); rerun || rerr != nil {
-					return rerr
+				if l.tryVerifyRerun(cook, err) {
+					return nil
 				}
 				// Gantry's checks run on the final push. Wait for them: the
 				// order stays parked and each cycle retries the merge.
@@ -818,9 +848,9 @@ func (l *Loop) retryAwaitingChecks(ctx context.Context) error {
 			if !errors.As(err, &pe) {
 				break
 			}
-			if rerun, rerr := l.rerunVerifyForMissingVerdict(cook, err); rerr != nil {
-				return rerr
-			} else if rerun {
+			// A PR a human approved parks again if its stage reruns, and the
+			// human approves only once; it waits as before.
+			if !strings.HasPrefix(pending.reason, approvedAwaitingChecksPrefix) && l.tryVerifyRerun(cook, err) {
 				break
 			}
 			if stuck := l.noteCheckWait(cook.orderID, pe.detail, now); stuck {
@@ -973,7 +1003,29 @@ func (l *Loop) prepareOrderBranch(ctx context.Context, name string) error {
 		return fmt.Errorf("discard stale branch %s: %w", name, err)
 	}
 	// A closed PR leaves its branch on the remote, and a push of the new
-	// branch would be refused as a non-fast-forward. Best effort: it may be gone.
-	_ = exec.CommandContext(ctx, "git", "-C", l.projectDir, "push", "origin", "--delete", name).Run()
+	// branch would be refused as a non-fast-forward.
+	if err := deleteRemoteBranch(ctx, l.projectDir, name); err != nil {
+		return fmt.Errorf("delete stale remote branch %s: %w", name, err)
+	}
+	return nil
+}
+
+// deleteRemoteBranch removes branch from origin when it is there.
+func deleteRemoteBranch(ctx context.Context, projectDir, branch string) error {
+	ctx, cancel := context.WithTimeout(ctx, shipTimeout)
+	defer cancel()
+	if exec.CommandContext(ctx, "git", "-C", projectDir, "remote", "get-url", "origin").Run() != nil {
+		return nil // no origin, so no remote branch to clear
+	}
+	out, err := exec.CommandContext(ctx, "git", "-C", projectDir, "ls-remote", "--heads", "origin", branch).Output()
+	if err != nil {
+		return fmt.Errorf("list remote branches: %w", err)
+	}
+	if strings.TrimSpace(string(out)) == "" {
+		return nil
+	}
+	if msg, err := exec.CommandContext(ctx, "git", "-C", projectDir, "push", "origin", "--delete", branch).CombinedOutput(); err != nil {
+		return fmt.Errorf("git push origin --delete %s: %w: %s", branch, err, strings.TrimSpace(string(msg)))
+	}
 	return nil
 }

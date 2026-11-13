@@ -368,6 +368,16 @@ const verifyRerunFile = "verify-rerun"
 // and reports true. A FAIL from the rerun takes the normal rework path. When
 // the rerun was already spent for this head it reports false and the usual red
 // check wait, then stop, applies.
+func (l *Loop) tryVerifyRerun(cook *cookHandle, shipErr error) bool {
+	rerun, err := l.rerunVerifyForMissingVerdict(cook, shipErr)
+	if err != nil {
+		// Not worth losing the wait: the order parks as it did before.
+		l.logger.Warn("verify rerun for a missing verdict failed", "order", cook.orderID, "error", err)
+		return false
+	}
+	return rerun
+}
+
 func (l *Loop) rerunVerifyForMissingVerdict(cook *cookHandle, shipErr error) (bool, error) {
 	var pe pendingError
 	if !l.config.Landing.PR() || !errors.As(shipErr, &pe) || !pe.noVerdict {
@@ -401,9 +411,6 @@ func (l *Loop) rerunVerifyForMissingVerdict(cook *cookHandle, shipErr error) (bo
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return false, fmt.Errorf("record verify rerun: %w", err)
 	}
-	if err := os.WriteFile(marker, []byte(head), 0o644); err != nil {
-		return false, fmt.Errorf("record verify rerun: %w", err)
-	}
 	// The earlier post is not on the PR; a rerun must be allowed to post again.
 	if err := os.Remove(filepath.Join(dir, verdictPostedFile)); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return false, fmt.Errorf("clear posted-verdict record: %w", err)
@@ -416,6 +423,10 @@ func (l *Loop) rerunVerifyForMissingVerdict(cook *cookHandle, shipErr error) (bo
 	}
 	if err := l.syncPendingReviewProjection(); err != nil {
 		return false, err
+	}
+	// Last: a failure above leaves the rerun unspent for the next attempt.
+	if err := os.WriteFile(marker, []byte(head), 0o644); err != nil {
+		return false, fmt.Errorf("record verify rerun: %w", err)
 	}
 	l.logger.Warn("no verdict at the PR head; rerunning verify",
 		"order", cook.orderID, "stage", verifyIdx, "head", head, "waiting_on", pe.detail)
