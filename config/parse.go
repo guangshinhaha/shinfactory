@@ -301,6 +301,13 @@ func normalizeParsedValues(config *Config, metadata toml.MetaData, diagnostics *
 		config.Spend.MaxCostUSD = defaultMaxOrderCostUSD
 	}
 
+	if config.Backlog.SyncIntervalSeconds < 0 {
+		appendNormalizedValueDiagnostic(diagnostics, "backlog.sync_interval_seconds",
+			fmt.Sprintf("sync_interval_seconds=%d is invalid; using %s", config.Backlog.SyncIntervalSeconds, defaultBacklogSyncInterval),
+		)
+		config.Backlog.SyncIntervalSeconds = 0
+	}
+
 	if strings.TrimSpace(config.Runtime.Default) == "" {
 		config.Runtime.Default = defaultRuntimeName
 	} else {

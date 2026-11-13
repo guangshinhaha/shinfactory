@@ -145,14 +145,88 @@ func TestIdleLoopSyncsBacklogLessOften(t *testing.T) {
 	}
 }
 
-func TestBusyLoopKeepsSyncingEveryCycle(t *testing.T) {
+func TestBusyLoopSyncsBacklogOncePerMinute(t *testing.T) {
 	f := newNetworkWaitFixture(t) // order 42 is active
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 60; i++ {     // one busy minute of one-second cycles
 		f.cycle(t)
 		f.clock.now = f.clock.now.Add(time.Second)
 	}
-	if f.mise.calls < 10 {
-		t.Fatalf("loop with an order synced %d times in 10 cycles, want every cycle", f.mise.calls)
+	if f.mise.calls > 1 {
+		t.Fatalf("busy loop synced the backlog %d times in a minute, want at most 1", f.mise.calls)
+	}
+	f.cycle(t) // the minute is up
+	if f.mise.calls != 2 {
+		t.Fatalf("busy loop synced %d times after a minute, want a second sync", f.mise.calls)
+	}
+}
+
+func TestBusySyncIntervalIsConfigurable(t *testing.T) {
+	f := newNetworkWaitFixture(t)
+	f.l.config.Backlog.SyncIntervalSeconds = 10
+	for i := 0; i < 30; i++ {
+		f.cycle(t)
+		f.clock.now = f.clock.now.Add(time.Second)
+	}
+	if f.mise.calls != 3 {
+		t.Fatalf("busy loop with a 10s sync interval synced %d times in 30s, want 3", f.mise.calls)
+	}
+}
+
+func TestBusySkipStillRunsTheCycle(t *testing.T) {
+	f := newNetworkWaitFixture(t)
+	f.cycle(t)
+	f.clock.now = f.clock.now.Add(time.Second)
+	f.cycle(t) // skips the sync but must keep driving the active order
+	if f.mise.calls != 1 {
+		t.Fatalf("synced %d times, want the second cycle to skip", f.mise.calls)
+	}
+	if f.loopState(t) != string(StateRunning) {
+		t.Fatalf("loop state %q after a skipped sync, want running", f.loopState(t))
+	}
+}
+
+func TestControlActionsSyncRightAway(t *testing.T) {
+	f := newNetworkWaitFixture(t)
+	f.cycle(t)
+	f.clock.now = f.clock.now.Add(time.Second)
+	if err := f.l.controlEnqueue(ControlCommand{OrderID: "43", Prompt: "do it"}); err != nil {
+		t.Fatalf("enqueue: %v", err)
+	}
+	f.cycle(t)
+	if f.mise.calls != 2 {
+		t.Fatalf("synced %d times after enqueue, want a sync on the next cycle", f.mise.calls)
+	}
+	f.clock.now = f.clock.now.Add(time.Second)
+	f.cycle(t)
+	if f.mise.calls != 2 {
+		t.Fatalf("synced %d times, want the forced sync to happen once", f.mise.calls)
+	}
+
+	if err := f.l.mutateOrdersState(func(o *OrdersFile) (bool, error) {
+		o.Orders[0].Status = OrderStatusFailed
+		return true, nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.l.controlRequeue("42"); err != nil {
+		t.Fatalf("requeue: %v", err)
+	}
+	f.clock.now = f.clock.now.Add(time.Second)
+	f.cycle(t)
+	if f.mise.calls != 3 {
+		t.Fatalf("synced %d times after requeue, want a sync on the next cycle", f.mise.calls)
+	}
+}
+
+func TestRateLimitResumeBacksOffWhenResetAlreadyPassed(t *testing.T) {
+	f := newNetworkWaitFixture(t)
+	now := f.clock.now
+	stale := now.Add(-time.Minute)
+	installFakeGh(t, "cat <<'EOF'\n"+rateLimitJSON(stale, stale, 0)+"\nEOF")
+	for _, c := range rateLimitErrors {
+		if got := f.l.rateLimitResume(t.Context(), c.err); got.Before(now.Add(30 * time.Second)) {
+			t.Fatalf("stale reset resumes at +%s, want at least 30s", got.Sub(now))
+		}
 	}
 }
 
