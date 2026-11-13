@@ -13,8 +13,14 @@ set -eu
 
 done_label="${NOODLE_GH_DONE_LABEL:-shinfactory-done}"
 
+# gh issue list --label goes through GitHub's search API, whose rate limit is much smaller
+# than the normal one and blocked the loops for over a day (#175). List open issues and
+# filter by label here.
+ready_label="${NOODLE_GH_LABEL:-ready}"
+
 filter='.[]
   | [.labels[].name] as $tags
+  | select($tags | any(. == "'"$ready_label"'"))
   | ([(.body // "") | capture("(?m)^Plan:[ \t]*(?<p>[^ \t\r\n]+)") | .p] | first) as $plan
   | {id: (.number | tostring),
      title: .title,
@@ -24,5 +30,5 @@ filter='.[]
   + (if ($tags | length) > 0 then {tags: $tags} else {} end)
   + (if $plan then {plan: $plan} else {} end)'
 
-gh issue list --state open --limit "${NOODLE_GH_LIMIT:-200}" --label "${NOODLE_GH_LABEL:-ready}" \
+gh issue list --state open --limit "${NOODLE_GH_LIMIT:-200}" \
   --json number,title,labels,body,url --jq "$filter"

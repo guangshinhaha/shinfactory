@@ -227,9 +227,13 @@ func TestFailedReopenOfAParkedOrderRestoresItsPendingReviewAndStages(t *testing.
 
 // repropose has the scheduler propose order 42 again while the backlog still lists it
 // as ready, as it does when the stop could not remove the label.
-func (h *gateHarness) repropose(t *testing.T) {
+func (h *gateHarness) repropose(t *testing.T, ready bool) {
 	t.Helper()
-	h.l.deps.Mise.(*fakeMise).brief.Backlog = []adapter.BacklogItem{{ID: "42", Title: "t", Status: "open"}}
+	backlog := []adapter.BacklogItem{}
+	if ready {
+		backlog = append(backlog, adapter.BacklogItem{ID: "42", Title: "t", Status: "open"})
+	}
+	h.l.deps.Mise.(*fakeMise).brief.Backlog = backlog
 	writeCompactOrders(t, h.l.deps.OrdersNextFile, orderx.CompactOrdersFile{
 		Orders: []orderx.CompactOrder{{ID: "42", Stages: []orderx.CompactStage{{Do: "execute"}}}},
 	})
@@ -261,7 +265,7 @@ func TestConflictedOrderIsNotReplannedWhileItsStopIsUnsent(t *testing.T) {
 
 	// The stop failed, so the issue is still ready and the scheduler keeps proposing it.
 	for i := 0; i < 5; i++ {
-		h.repropose(t)
+		h.repropose(t, true)
 	}
 	if h.ln.rebases != 1 || len(h.rt.sessions) != sessions {
 		t.Fatalf("conflicted order re-ran: rebases=%d (want 1), new sessions=%d (want 0)", h.ln.rebases, len(h.rt.sessions)-sessions)
@@ -273,11 +277,15 @@ func TestConflictedOrderIsNotReplannedWhileItsStopIsUnsent(t *testing.T) {
 		t.Fatalf("order.failed events = %d, want 1", got)
 	}
 
-	// The stop lands once gh recovers, and the order stays put.
+	// The stop lands once gh recovers: the issue loses ready, and the order stays put.
 	h.ar.stopErr = nil
 	h.l.lastStopRetry = time.Time{}
-	h.repropose(t)
-	h.repropose(t)
+	tries := len(h.ar.stopCalls)
+	h.repropose(t, false)
+	h.repropose(t, false)
+	if landed := len(h.ar.stopCalls) - tries; landed != 1 {
+		t.Fatalf("stop calls after gh recovered = %d, want exactly 1", landed)
+	}
 	if h.ln.rebases != 1 || len(h.rt.sessions) != sessions {
 		t.Fatalf("order ran after its stop landed: rebases=%d new sessions=%d", h.ln.rebases, len(h.rt.sessions)-sessions)
 	}
