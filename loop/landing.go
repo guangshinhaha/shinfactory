@@ -779,7 +779,7 @@ func (l *Loop) retryAwaitingChecks(ctx context.Context) error {
 		case isWaitableError(err):
 			// A network or 5xx blip is not a refusal: keep the waiting reason
 			// and retry after the outage backoff, with one warning per outage.
-			l.recordNetworkFailure(cook.orderID+": parked PR merge", err)
+			l.recordNetworkFailure(ctx, cook.orderID+": parked PR merge", err)
 		default:
 			l.logger.Warn("parked PR could not merge", "order", cook.orderID, "error", err)
 			pending.reason = "merge refused: " + err.Error()

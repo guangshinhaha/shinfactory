@@ -180,3 +180,61 @@ func TestBacklogSyncSkipsCostLookupOutsideDebug(t *testing.T) {
 		t.Fatal("gh ran during a normal info-level sync, want the cost lookup only in debug")
 	}
 }
+
+func TestIdleSkipDoesNotHideDueNetworkRetry(t *testing.T) {
+	f := idleFixture(t)
+	f.cycle(t) // an empty sync succeeds: the loop is idle
+	f.clock.now = f.clock.now.Add(10 * time.Second)
+	f.mise.err = networkErrorClasses[0].err
+	f.l.lastSyncAt = time.Time{} // the next look is due, and it fails on the network
+	f.cycle(t)
+	if f.l.outage == nil {
+		t.Fatal("network failure opened no outage")
+	}
+	f.l.lastSyncAt = f.clock.now // a stale idle marker must not mask the due retry
+	f.l.lastSyncEmpty = true
+	f.mise.err = nil
+	calls := f.mise.calls
+	f.clock.now = f.clock.now.Add(2 * time.Second)
+	f.cycle(t)
+	if f.mise.calls == calls {
+		t.Fatal("idle skip swallowed the due retry; outage never re-probed")
+	}
+	if f.l.outage != nil {
+		t.Fatal("outage still open after the retry succeeded")
+	}
+}
+
+func TestRateLimitDuringNetworkBackoffExtendsTheWait(t *testing.T) {
+	f := newNetworkWaitFixture(t)
+	reset := f.clock.now.Add(10 * time.Minute)
+	installFakeGh(t, "cat <<'EOF'\n"+rateLimitJSON(reset.Add(time.Hour), reset, 0)+"\nEOF")
+	f.mise.err = networkErrorClasses[0].err
+	f.cycle(t) // network outage, 1s backoff
+	f.mise.err = rateLimitErrors[0].err
+	f.clock.now = f.clock.now.Add(time.Second)
+	f.cycle(t) // the retry hits the limit
+	f.clock.now = f.clock.now.Add(5 * time.Minute)
+	f.cycle(t)
+	if f.mise.calls != 2 {
+		t.Fatalf("backlog synced %d times while rate limited, want 2 (none until the reset)", f.mise.calls)
+	}
+}
+
+func TestRateLimitResumeUsesTheFailedWindowAndCapsRetryAfter(t *testing.T) {
+	f := newNetworkWaitFixture(t)
+	now := f.clock.now
+	gqlReset, coreReset := now.Add(10*time.Minute), now.Add(55*time.Minute)
+	installFakeGh(t, "cat <<'EOF'\n"+fmt.Sprintf(`{"resources":{"core":{"used":5000,"remaining":0,"reset":%d},"graphql":{"used":5000,"remaining":0,"reset":%d}}}`, coreReset.Unix(), gqlReset.Unix())+"\nEOF")
+
+	if got := f.l.rateLimitResume(t.Context(), rateLimitErrors[0].err); got.After(gqlReset.Add(2 * time.Second)) {
+		t.Fatalf("GraphQL limit waits until %s, want the GraphQL reset %s, not the later REST one", got, gqlReset)
+	}
+	if got := f.l.rateLimitResume(t.Context(), rateLimitErrors[2].err); got.Before(coreReset) {
+		t.Fatalf("REST limit waits until %s, want the REST reset %s", got, coreReset)
+	}
+	huge := errors.New("gh: HTTP 429: Too Many Requests\nretry-after: 86400")
+	if got := f.l.rateLimitResume(t.Context(), huge); got.After(now.Add(time.Hour + 2*time.Second)) {
+		t.Fatalf("retry-after 86400 waits until %s, want it capped at one hour", got)
+	}
+}

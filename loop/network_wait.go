@@ -98,7 +98,7 @@ func (l *Loop) outageDue() bool {
 // delay each time; a rate limit waits until the reset. It logs one warning per
 // outage and returns the status warning to show; ok is false for any other
 // error.
-func (l *Loop) recordNetworkFailure(step string, err error) (warning string, ok bool) {
+func (l *Loop) recordNetworkFailure(ctx context.Context, step string, err error) (warning string, ok bool) {
 	limited := isRateLimitError(err)
 	if !limited && !isNetworkError(err) {
 		return "", false
@@ -108,24 +108,30 @@ func (l *Loop) recordNetworkFailure(step string, err error) (warning string, ok 
 	if o == nil {
 		o = &networkOutage{since: now, backoff: initialNetworkBackoff}
 		l.outage = o
-		if l.logger != nil {
+		if l.logger != nil && !limited {
 			l.logger.Warn("network error; waiting for the network and retrying with backoff",
 				"step", step, "cause", err)
 		}
 	}
-	if o.attempts == 0 || !now.Before(o.nextAttempt) {
-		o.attempts++
-		o.rateLimited = limited
-		if limited {
-			o.nextAttempt = l.rateLimitResume(err)
-			if l.logger != nil {
-				l.logger.Warn("GitHub rate limit; waiting for the reset",
-					"step", step, "retry_at", o.nextAttempt.UTC().Format(time.RFC3339))
-			}
-		} else {
-			o.nextAttempt = now.Add(o.backoff)
-			o.backoff = min(o.backoff*2, maxNetworkBackoff)
+	due := o.attempts == 0 || !now.Before(o.nextAttempt)
+	switch {
+	case limited && (due || !o.rateLimited):
+		// A rate limit seen mid-backoff still extends the wait: retrying after
+		// a second would hit the limit again.
+		if due {
+			o.attempts++
 		}
+		o.rateLimited = true
+		o.nextAttempt = maxTime(o.nextAttempt, l.rateLimitResume(ctx, err))
+		if l.logger != nil {
+			l.logger.Warn("GitHub rate limit; waiting for the reset",
+				"step", step, "retry_at", o.nextAttempt.UTC().Format(time.RFC3339))
+		}
+	case !limited && due:
+		o.attempts++
+		o.rateLimited = false
+		o.nextAttempt = now.Add(o.backoff)
+		o.backoff = min(o.backoff*2, maxNetworkBackoff)
 	}
 	return o.warning(now), true
 }
@@ -139,7 +145,7 @@ const awaitingNetworkPrefix = "waiting for the network"
 // stage parks (the order, its worktree and its session are kept) and the loop
 // retries its completion after the outage backoff. reason names the failed step.
 func (l *Loop) failStageOrWaitNetwork(ctx context.Context, cook *cookHandle, reason string, err error) error {
-	if _, ok := l.recordNetworkFailure(cook.orderID+": "+reason, err); !ok {
+	if _, ok := l.recordNetworkFailure(ctx, cook.orderID+": "+reason, err); !ok {
 		return l.failStage(ctx, cook, reason+": "+err.Error())
 	}
 	if l.networkReparked == nil {

@@ -20,6 +20,8 @@ const (
 	rateLimitSlack = time.Second
 	// rateLimitLookupTimeout bounds one `gh api rate_limit` call.
 	rateLimitLookupTimeout = 15 * time.Second
+	// maxRateLimitWait caps a retry-after: rate-limit windows last an hour.
+	maxRateLimitWait = time.Hour
 	// idleSyncInterval spaces backlog syncs while there is nothing to do: no
 	// ready issues, no orders and no active cooks. Every sync costs GraphQL
 	// points from a limit that all loops, workers and the coordinator share.
@@ -31,7 +33,7 @@ const (
 // limits, and 429.
 var rateLimitMarkers = []string{
 	"api rate limit", "secondary rate limit", "abuse detection",
-	"http 429", "(http 429)", "too many requests",
+	"http 429", "too many requests",
 }
 
 var retryAfterPattern = regexp.MustCompile(`(?i)retry[- ]after:?\s*(\d+)`)
@@ -101,24 +103,29 @@ func fetchRateLimits(ctx context.Context, dir string) (rateLimits, error) {
 // rateLimitResume is when to retry after a rate-limit error: the error's
 // retry-after, else the reset of the exhausted window from `gh api
 // rate_limit`, else a fixed minute.
-func (l *Loop) rateLimitResume(err error) time.Time {
+func (l *Loop) rateLimitResume(ctx context.Context, err error) time.Time {
 	now := l.deps.Now()
 	if d, ok := retryAfter(err); ok {
-		return now.Add(d + rateLimitSlack)
+		return now.Add(min(d, maxRateLimitWait) + rateLimitSlack)
 	}
-	rl, lookupErr := fetchRateLimits(context.Background(), l.projectDir)
+	rl, lookupErr := fetchRateLimits(ctx, l.projectDir)
 	if lookupErr != nil {
 		if l.logger != nil {
 			l.logger.Warn("rate limit reset unknown; waiting a minute", "error", lookupErr)
 		}
 		return now.Add(rateLimitFallbackWait)
 	}
+	// The window that failed: GraphQL when the error says so, else REST. When
+	// that one is not empty, the other if it is.
+	windows := []rateWindow{rl.Resources.Core, rl.Resources.GraphQL}
+	if strings.Contains(strings.ToLower(err.Error()), "graphql") {
+		windows = []rateWindow{rl.Resources.GraphQL, rl.Resources.Core}
+	}
 	var reset time.Time
-	for _, w := range []rateWindow{rl.Resources.GraphQL, rl.Resources.Core} {
+	for _, w := range windows {
 		if w.Remaining == 0 && w.Reset > 0 {
-			if at := time.Unix(w.Reset, 0); at.After(reset) {
-				reset = at
-			}
+			reset = time.Unix(w.Reset, 0)
+			break
 		}
 	}
 	if reset.IsZero() { // no window is empty: a secondary limit with no header
@@ -137,7 +144,7 @@ func maxTime(a, b time.Time) time.Time {
 // syncIdle reports whether the backlog sync may be skipped: the last sync found
 // no ready issues and nothing is running, queued or waiting to be promoted.
 func (l *Loop) syncIdle() bool {
-	if l.lastSyncAt.IsZero() || !l.lastSyncEmpty ||
+	if l.outage != nil || l.lastSyncAt.IsZero() || !l.lastSyncEmpty ||
 		l.deps.Now().Sub(l.lastSyncAt) >= idleSyncInterval ||
 		l.activeSummary.Total > 0 || len(l.cooks.pendingReview) > 0 {
 		return false
