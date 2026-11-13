@@ -3,6 +3,7 @@ package loop
 import (
 	"errors"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -194,7 +195,24 @@ func TestStopConflictedStillStopsThePersonWhenTheFlagWriteFails(t *testing.T) {
 	}
 }
 
-func TestFailedReopenOfAParkedOrderRestoresItsPendingReviewAndStages(t *testing.T) {
+// failReopenOnly makes the next rebase turn orders.json into a directory. The
+// approve save that follows writes only the canonical snapshot and still works;
+// reopenStages writes the projection and fails.
+func failReopenOnly(t *testing.T, h *gateHarness) {
+	t.Helper()
+	path := filepath.Join(h.l.runtimeDir, "orders.json")
+	h.ln.afterRebase = func() {
+		if err := os.Remove(path); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Mkdir(path, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func parkedAfterReview(t *testing.T) (*gateHarness, *cookHandle) {
+	t.Helper()
 	h := newGateHarness(t, "medium", "execute", "quality")
 	h.next(t)
 	h.review(t, 0, "none")
@@ -204,18 +222,63 @@ func TestFailedReopenOfAParkedOrderRestoresItsPendingReviewAndStages(t *testing.
 	if !ok {
 		t.Fatal("order did not park")
 	}
-	cook := &cookHandle{cookIdentity: pending.cookIdentity}
+	return h, &cookHandle{cookIdentity: pending.cookIdentity, worktreeName: pending.worktreeName, worktreePath: pending.worktreePath}
+}
+
+func TestFailedReopenOfAParkedOrderRestoresItsPendingReviewAndStages(t *testing.T) {
+	h, cook := parkedAfterReview(t)
 	before := h.l.canonical.Orders["42"].Stages[0].Status
-	readOnlyRuntimeDir(t, h)
+	failReopenOnly(t, h)
 
 	stopped, err := h.l.onShipConflict(t.Context(), cook, PullRequest{URL: "u"}, true)
-	if !stopped || err == nil {
-		t.Fatalf("stopped=%v err=%v, want a stop with the reopen error", stopped, err)
+	if !stopped || err == nil || !strings.Contains(err.Error(), "projected orders file") {
+		t.Fatalf("stopped=%v err=%v, want a stop with the reopenStages error", stopped, err)
+	}
+	if h.ln.rebases != 1 {
+		t.Fatalf("rebases = %d, want 1: the failure must come after the rebase", h.ln.rebases)
 	}
 	if _, ok := h.l.canonical.PendingReviews["42"]; !ok {
 		t.Fatal("parked entry lost after the failed reopen")
 	}
 	if got := h.l.canonical.Orders["42"].Stages[0].Status; got != before {
 		t.Fatalf("stage 0 status = %s after the failed reopen, want %s", got, before)
+	}
+}
+
+// The rebase moved the head and the reopen failed, so the order is parked on a
+// head no review saw. A later ship must refuse it.
+func TestFailedReopenNeverLetsTheUnreviewedHeadShip(t *testing.T) {
+	h, cook := parkedAfterReview(t)
+	failReopenOnly(t, h)
+	moveHead := h.ln.afterRebase
+	h.ln.afterRebase = func() {
+		moveHead()
+		headSHA = func(string) (string, error) { return "rebased-head", nil }
+	}
+	if _, err := h.l.onShipConflict(t.Context(), cook, PullRequest{URL: "u"}, true); err == nil {
+		t.Fatal("want the reopen error")
+	}
+	h.ln.pending = 0
+	err := h.l.shipParkedPR(t.Context(), cook, "required checks passed")
+	if err == nil || !strings.Contains(err.Error(), "not reviewed") {
+		t.Fatalf("shipParkedPR err = %v, want a refusal naming the unreviewed head", err)
+	}
+	if len(h.ln.merged) != 0 {
+		t.Fatalf("merged %d PRs on an unreviewed head", len(h.ln.merged))
+	}
+}
+
+func TestRequeueClearsTheRebaseCount(t *testing.T) {
+	h := newGateHarness(t, "none", "execute")
+	h.ln.mergeErr = errors.New("boom")
+	h.next(t) // the ship fails the stage
+	if err := h.l.bumpRebased("42"); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.l.controlRequeue("42"); err != nil {
+		t.Fatal(err)
+	}
+	if n := h.l.rebaseCount("42"); n != 0 {
+		t.Fatalf("rebase count = %d after requeue, want 0: a fresh start gets its rebase", n)
 	}
 }
