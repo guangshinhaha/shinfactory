@@ -3,8 +3,9 @@
 # the ready label and adds needs-shin in one edit. backlog-sync reads only ready, so the
 # scheduler leaves the issue alone until a person fixes it and puts ready back.
 #
-# Already labelled means the person was told; it does nothing then, so a rerun after a crash
-# or a second failed round never comments twice. A crash between the comment and the label
+# Labelled needs-shin with ready gone means the person was told; it does nothing then, so a
+# rerun after a crash or a second failed round never comments twice. needs-shin with ready
+# back up means a person re-readied the issue and it failed again: stop it again (#175). A crash between the comment and the label
 # costs one duplicate comment, never a silent stop.
 #
 # Env: NOODLE_GH_STOP_LABEL renames needs-shin; NOODLE_GH_LABEL renames ready (as in backlog-sync).
@@ -18,7 +19,7 @@ message=$(cat)
 [ -n "$message" ] || { echo "message required" >&2; exit 1; }
 
 labels=$(gh issue view "$id" --json labels --jq '.labels[].name')
-if printf '%s\n' "$labels" | grep -Fxq -- "$label"; then exit 0; fi
+if printf '%s\n' "$labels" | grep -Fxq -- "$label" && ! printf '%s\n' "$labels" | grep -Fxq -- "${NOODLE_GH_LABEL:-ready}"; then exit 0; fi
 
 gh label create "$label" --color D93F0B --description "shinfactory stopped and needs a person's decision" --force >/dev/null
 gh issue comment "$id" --body "shinfactory: stopped. $message" >/dev/null

@@ -366,6 +366,22 @@ func TestGitHubBacklogStopCommentsOnceLabelsAndPausesTheIssue(t *testing.T) {
 	}
 }
 
+// A person who puts ready back and leaves needs-shin up must be told again when it fails
+// again; a silent stop would let the order run in a loop (#175).
+func TestGitHubBacklogStopStopsAgainWhenReadyIsBackNextToNeedsShin(t *testing.T) {
+	env, logPath := fakeGH(t, `[
+  {"number": 7, "title": "Back", "url": "u7", "labels": [{"name": "ready"}, {"name": "needs-shin"}], "body": "x"}
+]`)
+	runGitHubAdapter(t, env, "backlog-stop", "Failed again.", "7")
+	log := readLog(t, logPath)
+	if !strings.Contains(log, "issue comment 7") || !strings.Contains(log, "issue edit 7 --remove-label ready --add-label needs-shin") {
+		t.Fatalf("issue with ready and needs-shin was not stopped again:\n%s", log)
+	}
+	if got := backlogIDs(t, env); got != "" {
+		t.Fatalf("backlog = %q, want empty after the stop", got)
+	}
+}
+
 func TestGitHubBacklogStopRefusesAnEmptyMessage(t *testing.T) {
 	env, _ := fakeGH(t, stopIssues)
 	cmd := exec.Command(filepath.Join("defaults", "adapters", "github", "backlog-stop"), "7")
