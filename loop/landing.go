@@ -831,6 +831,13 @@ func (l *Loop) shipParkedPR(ctx context.Context, cook *cookHandle, reason string
 		return l.syncPendingReviewProjection()
 	}
 	order, _ := l.orderByID(cook.orderID)
+	// A rebase moves the head; if the reopen that sends it back to review
+	// failed, the order parks again on a head no review saw. Never ship that.
+	if needReview, _ := gateNeeds(order.Tier); needReview && (order.Tier != "" || hasBuildStage(order)) && !isScheduleOrder(order) {
+		if err := l.checkReviewedHead(order, cook); err != nil {
+			return fmt.Errorf("parked head not reviewed, not shipping: %w", err)
+		}
+	}
 	// The deadline bounds the push, lookup and merge only. Marking the issue
 	// done afterwards gets the caller's full context.
 	pr, err := l.pushAndShip(ctx, cook, order)

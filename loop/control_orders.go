@@ -213,7 +213,9 @@ func (l *Loop) controlRequeue(orderID string) error {
 		}
 		break
 	}
-	// A requeue is a fresh start: a stale ledger would stop it at the old cap.
+	// A requeue is a fresh start: a stale ledger would stop it at the old cap,
+	// and a stale rebase count would stop it at its first conflict.
+	l.clearRebased(orderID)
 	l.clearOrderSpend(orderID)
 	_ = l.events.Emit(LoopEventOrderRequeued, OrderRequeuedPayload{
 		OrderID: orderID,

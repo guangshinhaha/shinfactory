@@ -124,12 +124,44 @@ func clashWith(held []writeHold, p, orderID string) (writeHold, bool) {
 	return writeHold{}, false
 }
 
+// parkedHoldMarker is the middle of every parked-hold action_needed line, so
+// clearEndedParkedHolds can tell them from other lines.
+const parkedHoldMarker = ", which is parked in pending review: approve, reject or skip order "
+
+func parkedHoldLine(waiter string, h writeHold) string {
+	return fmt.Sprintf("order %s waits for %s, held by order %s%s%s", waiter, h.path, h.orderID, parkedHoldMarker, h.orderID)
+}
+
+// clearEndedParkedHolds removes the parked-hold lines whose hold is gone: the
+// parked order left review, or the waiter no longer wants the file. live holds
+// the lines still true this cycle.
+func (l *Loop) clearEndedParkedHolds(live map[string]bool) {
+	orders, err := l.currentOrders()
+	if err != nil {
+		l.logger.Warn("could not read action_needed to clear ended holds", "error", err)
+		return
+	}
+	if !slices.ContainsFunc(orders.ActionNeeded, func(s string) bool { return strings.Contains(s, parkedHoldMarker) && !live[s] }) {
+		return
+	}
+	err = l.mutateOrdersState(func(o *OrdersFile) (bool, error) {
+		o.ActionNeeded = slices.DeleteFunc(o.ActionNeeded, func(s string) bool { return strings.Contains(s, parkedHoldMarker) && !live[s] })
+		return true, nil
+	})
+	if err == nil {
+		err = l.persistCanonicalCheckpoint()
+	}
+	if err != nil {
+		l.logger.Warn("could not clear ended parked-hold lines", "error", err)
+	}
+}
+
 // flagParkedHold tells a person that a parked order is holding up another
 // stage. A parked order waits on a human and holds its files until then; the
 // hold has no timeout, because releasing it early brings back the conflict at
 // ship that the hold prevents. One line per pair, however many cycles it waits.
 func (l *Loop) flagParkedHold(waiter string, h writeHold) {
-	line := fmt.Sprintf("order %s waits for %s, held by order %s, which is parked in pending review: approve, reject or skip order %s", waiter, h.path, h.orderID, h.orderID)
+	line := parkedHoldLine(waiter, h)
 	orders, err := l.currentOrders()
 	if err == nil && slices.Contains(orders.ActionNeeded, line) {
 		return
@@ -144,6 +176,8 @@ func (l *Loop) flagParkedHold(waiter string, h writeHold) {
 func (l *Loop) withoutWriteClashes(candidates []dispatchCandidate) []dispatchCandidate {
 	held := l.sharedWriteHolders()
 	kept := candidates[:0:0]
+	live := map[string]bool{}
+	defer func() { l.clearEndedParkedHolds(live) }()
 	for _, c := range candidates {
 		writes := stageWrites(c.Stage)
 		var clash writeHold
@@ -156,6 +190,7 @@ func (l *Loop) withoutWriteClashes(candidates []dispatchCandidate) []dispatchCan
 		if clashed {
 			l.logger.Info("stage waits for a shared file", "order", c.OrderID, "stage", c.StageIndex, "file", clash.path, "held_by", clash.orderID)
 			if clash.parked {
+				live[parkedHoldLine(c.OrderID, clash)] = true
 				l.flagParkedHold(c.OrderID, clash)
 			}
 			continue
