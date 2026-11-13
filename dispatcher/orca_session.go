@@ -50,9 +50,6 @@ type orcaSession struct {
 	// terminating is set before Terminate stops the worker, so the poll loop
 	// does not report the stop it caused as a failed worker.
 	terminating atomic.Bool
-	// pollDone closes when the poll loop returns. It stays open if start
-	// was never called.
-	pollDone chan struct{}
 }
 
 func newOrcaSession(cfg orcaSessionConfig) *orcaSession {
@@ -70,7 +67,6 @@ func newOrcaSession(cfg orcaSessionConfig) *orcaSession {
 		bin:          cfg.bin,
 		run:          cfg.run,
 		pollInterval: cfg.pollInterval,
-		pollDone:     make(chan struct{}),
 	}
 }
 
@@ -79,11 +75,12 @@ func (s *orcaSession) start(ctx context.Context) {
 	s.publish(SessionEvent{Type: "init", Message: "orca worker " + s.dispatchID, Timestamp: nowUTC()})
 	s.appendCanonical(parse.EventInit, "orca worker "+s.dispatchID)
 	go s.closeEventsWhenDone()
+	s.wg.Add(1)
 	go s.poll(ctx)
 }
 
 func (s *orcaSession) poll(ctx context.Context) {
-	defer close(s.pollDone)
+	defer s.wg.Done()
 	ticker := time.NewTicker(s.pollInterval)
 	defer ticker.Stop()
 	failures := 0
@@ -294,6 +291,15 @@ func (s *orcaSession) appendCanonical(kind parse.EventType, message string) {
 
 func (s *orcaSession) Terminate() error {
 	s.terminating.Store(true)
+	// A worker that settled before this call keeps its real outcome; stopping
+	// it would record a finished worker as killed.
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	w, fetchErr := s.fetchWorker(ctx)
+	cancel()
+	if fetchErr == nil && w.settled() {
+		s.finish(s.outcomeFor(context.Background(), w))
+		return nil
+	}
 	err := stopOrcaWorker(s.run, s.bin, s.dispatchID)
 	s.finish(SessionOutcome{Status: StatusKilled, Reason: "orca worker stopped"})
 	return err
