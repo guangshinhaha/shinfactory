@@ -228,6 +228,9 @@ type Loop struct {
 	stoppedForPerson map[string]struct{}
 	lastStopRetry    time.Time // last retry of hand-offs that did not reach a person
 	lastMiseWarnings []string
+	lastSyncAt       time.Time // when the backlog last synced successfully
+	lastSyncEmpty    bool      // that sync found no ready issues
+	lastSyncWarnings []string
 	outage           *networkOutage  // open network outage; nil while the network works
 	networkReparked  map[string]bool // orders re-parked for the network during the current retry
 	lastChecksPoll   time.Time       // last time parked PRs were re-checked for merge

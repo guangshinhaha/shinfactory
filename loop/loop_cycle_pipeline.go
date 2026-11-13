@@ -3,6 +3,7 @@ package loop
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 	"time"
@@ -466,19 +467,38 @@ func (l *Loop) spawnPlannedCandidates(ctx context.Context, candidates []dispatch
 	return nil
 }
 
-// buildBriefWithRetry builds the brief. A network failure opens (or extends) an
-// outage that spans cycles, with capped exponential backoff, and never ends the
-// loop. While the backoff runs it returns waiting=true with a warning and no
-// brief. Other failures return the error.
+// buildBriefWithRetry builds the brief. A network failure or GitHub rate limit
+// opens (or extends) an outage that spans cycles (capped exponential backoff, or
+// until the rate-limit reset) and never ends the loop. While the outage runs, or
+// while an idle loop skips its slow backlog sync, it returns waiting=true and no
+// brief; the idle skip returns the last sync's warnings and leaves
+// clearNetworkOutage alone (syncIdle is false during an outage). Other failures
+// return the error.
 func (l *Loop) buildBriefWithRetry(ctx context.Context) (brief mise.Brief, warnings []string, changed, waiting bool, err error) {
 	if !l.outageDue() {
 		return mise.Brief{}, []string{l.outage.warning(l.deps.Now())}, false, true, nil
 	}
+	if l.syncIdle() {
+		return mise.Brief{}, l.lastSyncWarnings, false, true, nil
+	}
+	var costBefore rateWindow
+	measure := l.logger.Enabled(ctx, slog.LevelDebug)
+	if measure {
+		costBefore, measure = l.graphQLUsed(ctx)
+	}
 	brief, warnings, changed, err = l.deps.Mise.Build(ctx, l.snapshotActiveSummary(), l.snapshotRecentHistory())
+	if measure {
+		if costAfter, ok := l.graphQLUsed(ctx); ok && costAfter.Used >= costBefore.Used {
+			l.logSyncCost(costBefore, costAfter)
+		}
+	}
+	if err == nil {
+		l.lastSyncAt, l.lastSyncEmpty, l.lastSyncWarnings = l.deps.Now(), len(brief.Backlog) == 0, warnings
+	}
 	if ctx.Err() != nil || err == nil {
 		return brief, warnings, changed, false, err
 	}
-	warning, ok := l.recordNetworkFailure("backlog.sync", err)
+	warning, ok := l.recordNetworkFailure(ctx, "backlog.sync", err)
 	if !ok {
 		return brief, warnings, changed, false, err
 	}

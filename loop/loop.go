@@ -548,7 +548,7 @@ func (l *Loop) Cycle(ctx context.Context) error {
 		)
 	}
 	if err := l.spawnPlannedCandidates(ctx, candidates, orders); err != nil {
-		warning, ok := l.recordNetworkFailure("cycle.spawn", err)
+		warning, ok := l.recordNetworkFailure(ctx, "cycle.spawn", err)
 		if !ok {
 			return l.classifySystemHard(
 				"cycle.spawn",

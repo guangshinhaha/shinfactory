@@ -145,7 +145,7 @@ func (l *Loop) onShipConflict(ctx context.Context, cook *cookHandle, pr PullRequ
 		if errors.As(err, &ce) {
 			return true, l.stopConflicted(ctx, cook, ce.Files, "the rebase onto the base branch conflicts")
 		}
-		if isNetworkError(err) {
+		if isWaitableError(err) {
 			l.unbumpRebased(cook.orderID) // it never ran: the retry gets its one rebase
 		}
 		return true, l.failStageOrWaitNetwork(ctx, cook, "rebase onto the base branch", err)

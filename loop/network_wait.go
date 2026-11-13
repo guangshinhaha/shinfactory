@@ -75,9 +75,14 @@ type networkOutage struct {
 	nextAttempt time.Time
 	attempts    int
 	backoff     time.Duration
+	rateLimited bool // waiting for a GitHub rate-limit reset, not a network backoff
 }
 
 func (o *networkOutage) warning(now time.Time) string {
+	if o.rateLimited {
+		return fmt.Sprintf("GitHub rate limit reached (attempt %d); retrying in %s",
+			o.attempts, o.nextAttempt.Sub(now).Round(time.Second))
+	}
 	return fmt.Sprintf("network unreachable (attempt %d); retrying in %s",
 		o.attempts, o.nextAttempt.Sub(now).Round(time.Second))
 }
@@ -88,11 +93,14 @@ func (l *Loop) outageDue() bool {
 	return l.outage == nil || !l.deps.Now().Before(l.outage.nextAttempt)
 }
 
-// recordNetworkFailure opens an outage, or extends the open one with a longer
-// backoff, when err is network-class. It logs one warning per outage and
-// returns the status warning to show; ok is false for any other error.
-func (l *Loop) recordNetworkFailure(step string, err error) (warning string, ok bool) {
-	if !isNetworkError(err) {
+// recordNetworkFailure opens an outage, or extends the open one, when err is
+// network-class or a GitHub rate limit. A network error backs off with a longer
+// delay each time; a rate limit waits until the reset. It logs one warning per
+// outage and returns the status warning to show; ok is false for any other
+// error.
+func (l *Loop) recordNetworkFailure(ctx context.Context, step string, err error) (warning string, ok bool) {
+	limited := isRateLimitError(err)
+	if !limited && !isNetworkError(err) {
 		return "", false
 	}
 	now := l.deps.Now()
@@ -100,13 +108,28 @@ func (l *Loop) recordNetworkFailure(step string, err error) (warning string, ok 
 	if o == nil {
 		o = &networkOutage{since: now, backoff: initialNetworkBackoff}
 		l.outage = o
-		if l.logger != nil {
+		if l.logger != nil && !limited {
 			l.logger.Warn("network error; waiting for the network and retrying with backoff",
 				"step", step, "cause", err)
 		}
 	}
-	if o.attempts == 0 || !now.Before(o.nextAttempt) {
+	due := o.attempts == 0 || !now.Before(o.nextAttempt)
+	switch {
+	case limited && (due || !o.rateLimited):
+		// A rate limit seen mid-backoff still extends the wait: retrying after
+		// a second would hit the limit again.
+		if due {
+			o.attempts++
+		}
+		o.rateLimited = true
+		o.nextAttempt = maxTime(o.nextAttempt, l.rateLimitResume(ctx, err))
+		if l.logger != nil {
+			l.logger.Warn("GitHub rate limit; waiting for the reset",
+				"step", step, "retry_at", o.nextAttempt.UTC().Format(time.RFC3339))
+		}
+	case !limited && due:
 		o.attempts++
+		o.rateLimited = false
 		o.nextAttempt = now.Add(o.backoff)
 		o.backoff = min(o.backoff*2, maxNetworkBackoff)
 	}
@@ -122,7 +145,7 @@ const awaitingNetworkPrefix = "waiting for the network"
 // stage parks (the order, its worktree and its session are kept) and the loop
 // retries its completion after the outage backoff. reason names the failed step.
 func (l *Loop) failStageOrWaitNetwork(ctx context.Context, cook *cookHandle, reason string, err error) error {
-	if _, ok := l.recordNetworkFailure(cook.orderID+": "+reason, err); !ok {
+	if _, ok := l.recordNetworkFailure(ctx, cook.orderID+": "+reason, err); !ok {
 		return l.failStage(ctx, cook, reason+": "+err.Error())
 	}
 	if l.networkReparked == nil {
