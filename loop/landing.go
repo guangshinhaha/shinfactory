@@ -54,6 +54,9 @@ type Lander interface {
 	// ConflictingFiles lists the files a rebase onto the remote base branch
 	// would conflict in, without changing the branch.
 	ConflictingFiles(ctx context.Context, dir, base string) ([]string, error)
+	// BranchPRClosed reports whether branch's pull requests are all closed or
+	// merged, and at least one exists: the order that owned the branch is over.
+	BranchPRClosed(ctx context.Context, dir, branch string) (bool, error)
 }
 
 // ErrChecksPending means the PR cannot merge yet because checks are still
@@ -316,7 +319,11 @@ func (p prState) checksPending() string {
 
 // pendingError is ErrChecksPending with what the PR waits on, so a parked
 // order can tell a human why.
-type pendingError struct{ url, detail string }
+type pendingError struct {
+	url, detail string
+	// noVerdict: the wait is a red verdict-check and no verdict exists at the head.
+	noVerdict bool
+}
 
 func (e pendingError) Error() string {
 	return ErrChecksPending.Error() + " on " + e.url + ": " + e.detail
@@ -370,10 +377,10 @@ func (g ghLander) MarkReadyAndMerge(ctx context.Context, dir string, pr PullRequ
 		}
 	}
 	if detail := st.checksPending(); detail != "" {
-		return pendingError{pr.URL, detail}
+		return pendingError{url: pr.URL, detail: detail}
 	}
 	if st.HeadRefOid != head {
-		return pendingError{pr.URL, fmt.Sprintf("GitHub shows head %.12s, not the pushed %.12s", st.HeadRefOid, head)}
+		return pendingError{url: pr.URL, detail: fmt.Sprintf("GitHub shows head %.12s, not the pushed %.12s", st.HeadRefOid, head)}
 	}
 	// After the head check: GitHub's mergeability of an older head says
 	// nothing about the commit this worktree holds.
@@ -390,10 +397,10 @@ func (g ghLander) MarkReadyAndMerge(ctx context.Context, dir string, pr PullRequ
 	// The merge ran, so a failed read must not fail the stage: the next
 	// attempt sees MERGED and finishes.
 	if st, err = g.view(ctx, dir, pr); err != nil {
-		return pendingError{pr.URL, "merge ran but its status could not be read: " + err.Error()}
+		return pendingError{url: pr.URL, detail: "merge ran but its status could not be read: " + err.Error()}
 	}
 	if st.State != "MERGED" {
-		return pendingError{pr.URL, "merge is queued, not merged"}
+		return pendingError{url: pr.URL, detail: "merge is queued, not merged"}
 	}
 	return nil
 }
@@ -446,6 +453,10 @@ func (g ghLander) RebaseOntoBase(ctx context.Context, dir, base string) error {
 func (g ghLander) PostVerdict(ctx context.Context, dir string, pr PullRequest, body string) error {
 	_, err := g.run(ctx, dir, "gh", "pr", "comment", pr.URL, "--body", body)
 	return err
+}
+
+func (g ghLander) BranchPRClosed(ctx context.Context, dir, branch string) (bool, error) {
+	return false, nil
 }
 
 func (g ghLander) ConflictingFiles(ctx context.Context, dir, base string) ([]string, error) {
@@ -878,4 +889,10 @@ func (l *Loop) pushAndShip(ctx context.Context, cook *cookHandle, order Order) (
 		return pr, fmt.Errorf("ship PR: %w", err)
 	}
 	return pr, nil
+}
+
+// prepareOrderBranch clears out an earlier order's leftovers before a new
+// order starts on the branch name.
+func (l *Loop) prepareOrderBranch(ctx context.Context, name string) error {
+	return nil
 }

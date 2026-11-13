@@ -37,6 +37,19 @@ type fakeLander struct {
 	verdictTries int
 	// probeFiles is what ConflictingFiles reports.
 	probeFiles []string
+	// closedPR is what BranchPRClosed reports; closedPRChecks counts the calls.
+	closedPR       bool
+	closedPRChecks int
+	// lostVerdicts makes that many PostVerdict calls vanish: they succeed, but
+	// no verdict is on the PR afterwards. missingVerdict is true until a
+	// verdict lands, and makes MarkReadyAndMerge wait on verdict-check.
+	lostVerdicts   int
+	missingVerdict bool
+}
+
+func (f *fakeLander) BranchPRClosed(context.Context, string, string) (bool, error) {
+	f.closedPRChecks++
+	return f.closedPR, nil
 }
 
 func (f *fakeLander) RebaseOntoBase(context.Context, string, string) error {
@@ -49,6 +62,11 @@ func (f *fakeLander) PostVerdict(_ context.Context, _ string, _ PullRequest, bod
 	if f.verdictErr != nil {
 		return f.verdictErr
 	}
+	if f.lostVerdicts > 0 {
+		f.lostVerdicts--
+		return nil
+	}
+	f.missingVerdict = false
 	f.verdicts = append(f.verdicts, body)
 	return nil
 }
@@ -75,9 +93,12 @@ func (f *fakeLander) MarkReadyAndMerge(ctx context.Context, _ string, pr PullReq
 	if f.pending > 0 {
 		f.pending--
 		if f.pendingDetail != "" {
-			return pendingError{pr.URL, f.pendingDetail}
+			return pendingError{url: pr.URL, detail: f.pendingDetail}
 		}
 		return ErrChecksPending
+	}
+	if f.missingVerdict {
+		return pendingError{url: pr.URL, detail: redCheckDetail("verdict-check / verdict-check"), noVerdict: true}
 	}
 	if f.mergeErr != nil {
 		return f.mergeErr
