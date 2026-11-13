@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/guangshinhaha/shinfactory/adapter"
 	"github.com/guangshinhaha/shinfactory/internal/dispatch"
 	"github.com/guangshinhaha/shinfactory/mise"
 )
@@ -23,6 +24,8 @@ func (l *Loop) buildCycleBrief(ctx context.Context) (mise.Brief, []string, bool,
 	if waiting {
 		return mise.Brief{}, warnings, false, false, nil
 	}
+	// The scheduler, ensureScheduleIfNeeded and the promotion all read this list.
+	brief.Backlog = l.withoutUnsentStops(brief.Backlog)
 	if l.state != StateRunning && l.state != StateIdle {
 		return brief, warnings, false, miseChanged, nil
 	}
@@ -39,6 +42,27 @@ func (l *Loop) mergeOrdersNext(brief mise.Brief) (mergeResult, error) {
 		return mergeResult{}, err
 	}
 	return consumeOrdersNext(l.deps.OrdersNextFile, orders, brief.Backlog)
+}
+
+// withoutUnsentStops drops the issues of failed orders whose hand-off to a person has not
+// landed. Their label is still ready, so the backlog lists them; proposing one again would
+// replace the failed order and run it again, with its rebase count cleared (#175). They
+// come back once the stop lands and a person puts ready back.
+func (l *Loop) withoutUnsentStops(backlog []adapter.BacklogItem) []adapter.BacklogItem {
+	stopDebtMu.Lock()
+	debts := l.readStopDebts()
+	stopDebtMu.Unlock()
+	if len(debts) == 0 {
+		return backlog
+	}
+	kept := make([]adapter.BacklogItem, 0, len(backlog))
+	for _, item := range backlog {
+		if _, owed := debts[strings.TrimSpace(item.ID)]; owed {
+			continue
+		}
+		kept = append(kept, item)
+	}
+	return kept
 }
 
 func appendUnique(dst, src []string) []string {

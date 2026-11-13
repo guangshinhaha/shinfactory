@@ -6,15 +6,21 @@
 #   NOODLE_GH_LABEL       the label that marks an issue ready (default: ready)
 #   NOODLE_GH_DONE_LABEL  label that backlog-done adds (default: shinfactory-done);
 #                         open issues carrying it sync as status "done"
-#   NOODLE_GH_LIMIT       max issues to read (default: 200)
+#   NOODLE_GH_LIMIT       max open issues to read, ready or not (default: 1000)
 #
 # A plan is linked by a line in the issue body: "Plan: brain/plans/NN-slug/overview.md".
 set -eu
 
 done_label="${NOODLE_GH_DONE_LABEL:-shinfactory-done}"
 
+# gh issue list --label goes through GitHub's search API, whose rate limit is much smaller
+# than the normal one and blocked the loops for over a day (#175). List open issues and
+# filter by label here.
+ready_label="${NOODLE_GH_LABEL:-ready}"
+
 filter='.[]
   | [.labels[].name] as $tags
+  | select($tags | any(. == "'"$ready_label"'"))
   | ([(.body // "") | capture("(?m)^Plan:[ \t]*(?<p>[^ \t\r\n]+)") | .p] | first) as $plan
   | {id: (.number | tostring),
      title: .title,
@@ -24,5 +30,5 @@ filter='.[]
   + (if ($tags | length) > 0 then {tags: $tags} else {} end)
   + (if $plan then {plan: $plan} else {} end)'
 
-gh issue list --state open --limit "${NOODLE_GH_LIMIT:-200}" --label "${NOODLE_GH_LABEL:-ready}" \
+gh issue list --state open --limit "${NOODLE_GH_LIMIT:-1000}" \
   --json number,title,labels,body,url --jq "$filter"

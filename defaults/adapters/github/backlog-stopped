@@ -3,8 +3,10 @@
 # object per line ({"id", "title", "url"}). `shinfactory status --json` reads it, so an issue
 # labelled needs-shin counts however it got the label.
 #
-# Env: NOODLE_GH_STOP_LABEL renames needs-shin; NOODLE_GH_LIMIT caps the issues read (default 200).
+# Env: NOODLE_GH_STOP_LABEL renames needs-shin; NOODLE_GH_LIMIT caps the issues read (default 1000).
 set -eu
 
-gh issue list --state open --limit "${NOODLE_GH_LIMIT:-200}" --label "${NOODLE_GH_STOP_LABEL:-needs-shin}" \
-  --json number,title,url --jq '.[] | {id: (.number | tostring), title: .title, url: .url}'
+# No --label: it goes through GitHub's search API and its small rate limit (#175).
+gh issue list --state open --limit "${NOODLE_GH_LIMIT:-1000}" \
+  --json number,title,url,labels \
+  --jq '.[] | select(any(.labels[]; .name == "'"${NOODLE_GH_STOP_LABEL:-needs-shin}"'")) | {id: (.number | tostring), title: .title, url: .url}'

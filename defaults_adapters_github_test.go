@@ -10,8 +10,9 @@ import (
 )
 
 // fakeGH puts a stub `gh` first on PATH. It appends its arguments to a log file and,
-// for `issue list --label <label> --jq <filter>`, evaluates the filter with jq over the
-// canned issues carrying that label, so the adapter's real label and filter are exercised.
+// for `issue list --jq <filter>`, evaluates the filter with jq over the canned issues, so the
+// adapter's real label filter is exercised. A `--label` or `--search` flag fails like GitHub's
+// search rate limit did (#175).
 // `api ... --input -` calls save stdin to api-input.json beside the log and print issue number 42.
 func fakeGH(t *testing.T, issuesJSON string) (env []string, logPath string) {
 	t.Helper()
@@ -24,10 +25,9 @@ func fakeGH(t *testing.T, issuesJSON string) (env []string, logPath string) {
 	stub := `#!/bin/sh
 printf '%s\n' "$*" >> "` + logPath + `"
 if [ "$1 $2" = "issue list" ]; then
-  select_label='.'
   while [ $# -gt 0 ]; do
-    if [ "$1" = "--label" ]; then select_label="map(select(any(.labels[]; .name == \"$2\")))"; fi
-    if [ "$1" = "--jq" ]; then jq -c "$select_label | $2" "` + issuesPath + `"; exit $?; fi
+    if [ "$1" = "--label" ] || [ "$1" = "--search" ]; then echo "GraphQL: API rate limit already exceeded for user ID 1 (search)" >&2; exit 1; fi
+    if [ "$1" = "--jq" ]; then jq -c "$2" "` + issuesPath + `"; exit $?; fi
     shift
   done
 fi
@@ -366,11 +366,66 @@ func TestGitHubBacklogStopCommentsOnceLabelsAndPausesTheIssue(t *testing.T) {
 	}
 }
 
+// A person who puts ready back and leaves needs-shin up must be told again when it fails
+// again; a silent stop would let the order run in a loop (#175).
+func TestGitHubBacklogStopStopsAgainWhenReadyIsBackNextToNeedsShin(t *testing.T) {
+	env, logPath := fakeGH(t, `[
+  {"number": 7, "title": "Back", "url": "u7", "labels": [{"name": "ready"}, {"name": "needs-shin"}], "body": "x"}
+]`)
+	runGitHubAdapter(t, env, "backlog-stop", "Failed again.", "7")
+	log := readLog(t, logPath)
+	if !strings.Contains(log, "issue comment 7") || !strings.Contains(log, "issue edit 7 --remove-label ready --add-label needs-shin") {
+		t.Fatalf("issue with ready and needs-shin was not stopped again:\n%s", log)
+	}
+	if got := backlogIDs(t, env); got != "" {
+		t.Fatalf("backlog = %q, want empty after the stop", got)
+	}
+}
+
 func TestGitHubBacklogStopRefusesAnEmptyMessage(t *testing.T) {
 	env, _ := fakeGH(t, stopIssues)
 	cmd := exec.Command(filepath.Join("defaults", "adapters", "github", "backlog-stop"), "7")
 	cmd.Env = env
 	if out, err := cmd.CombinedOutput(); err == nil {
 		t.Fatalf("stop with no message succeeded:\n%s", out)
+	}
+}
+
+// gh issue list --label and --search both go through GitHub's search API, which has a
+// much smaller rate limit and blocked every loop for over a day (#175).
+func TestGitHubAdaptersNeverPassASearchFlagToGh(t *testing.T) {
+	scripts, err := filepath.Glob("defaults/adapters/github/*")
+	if err != nil || len(scripts) == 0 {
+		t.Fatalf("no adapter scripts found: %v", err)
+	}
+	for _, script := range scripts {
+		data, err := os.ReadFile(script)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i, line := range strings.Split(string(data), "\n") {
+			if strings.HasPrefix(strings.TrimSpace(line), "#") {
+				continue
+			}
+			for _, flag := range strings.Fields(line) {
+				if flag == "--label" || flag == "--search" || flag == "-l" || flag == "-S" {
+					t.Errorf("%s:%d passes %s to gh, which uses the rate-limited search API: %s", script, i+1, flag, line)
+				}
+			}
+		}
+	}
+}
+
+func TestGitHubBacklogStoppedListsNeedsShinIssuesWithoutSearch(t *testing.T) {
+	if _, err := exec.LookPath("jq"); err != nil {
+		t.Skip("jq not installed")
+	}
+	env, _ := fakeGH(t, `[
+  {"number": 1, "title": "Ready", "url": "u1", "labels": [{"name": "ready"}]},
+  {"number": 2, "title": "Stopped", "url": "u2", "labels": [{"name": "needs-shin"}]}
+]`)
+	ids := syncedIDs(t, runGitHubAdapter(t, env, "backlog-stopped", ""))
+	if len(ids) != 1 || ids[0] != "2" {
+		t.Fatalf("stopped issues = %v, want [2]", ids)
 	}
 }
