@@ -519,6 +519,14 @@ func (l *Loop) Cycle(ctx context.Context) error {
 		return nil
 	}
 
+	if err := l.retryFailedScheduleOrder(ctx); err != nil {
+		return l.classifySystemHard(
+			"build.retry_schedule",
+			formatCycleFailureMessage("build.retry_schedule", "retry failed schedule order"),
+			err,
+		)
+	}
+
 	orders, shouldContinue, err := l.prepareOrdersForCycle(brief, warnings, miseChanged)
 	if err != nil {
 		return l.classifySystemHard(

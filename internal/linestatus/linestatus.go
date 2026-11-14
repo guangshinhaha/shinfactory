@@ -27,6 +27,7 @@ type Report struct {
 	Running     []Order     `json:"running"`
 	Queued      []Order     `json:"queued"`
 	Parked      []Order     `json:"parked"`
+	Failed      []Order     `json:"failed"`
 	NeedsShin   []NeedsShin `json:"needs_shin"`
 }
 
@@ -35,7 +36,7 @@ type Order struct {
 	ID     string  `json:"id"`
 	Title  string  `json:"title,omitempty"`
 	Tier   string  `json:"tier,omitempty"`
-	Reason string  `json:"reason,omitempty"` // why a parked order waits
+	Reason string  `json:"reason,omitempty"` // why a parked order waits, or a failed order failed
 	Stages []Stage `json:"stages"`
 }
 
@@ -134,6 +135,7 @@ func Read(runtimeDir string) (Report, error) {
 		Running:     []Order{},
 		Queued:      []Order{},
 		Parked:      []Order{},
+		Failed:      []Order{},
 		NeedsShin:   []NeedsShin{},
 	}
 	if rep.Mode == "" {
@@ -144,12 +146,22 @@ func Read(runtimeDir string) (Report, error) {
 	}
 
 	nodes := make([]state.OrderNode, 0, len(canonical.Orders))
+	var failed []state.OrderNode
 	for _, node := range canonical.Orders {
-		if !node.Status.IsTerminal() {
+		switch {
+		case node.Status == state.OrderFailed:
+			failed = append(failed, node)
+		case !node.Status.IsTerminal():
 			nodes = append(nodes, node)
 		}
 	}
 	sort.Slice(nodes, func(i, j int) bool { return nodes[i].Sequence < nodes[j].Sequence })
+	sort.Slice(failed, func(i, j int) bool { return failed[i].Sequence < failed[j].Sequence })
+	for _, node := range failed {
+		order := toOrder(runtimeDir, node)
+		order.Reason = failureReason(node)
+		rep.Failed = append(rep.Failed, order)
+	}
 
 	live := map[string]bool{}
 	for _, node := range nodes {
@@ -189,6 +201,19 @@ func readCanonical(path string) (state.State, error) {
 		return state.State{}, err
 	}
 	return snap.State, nil
+}
+
+// failureReason is the error of the latest failed attempt of a failed order.
+func failureReason(node state.OrderNode) string {
+	for i := len(node.Stages) - 1; i >= 0; i-- {
+		attempts := node.Stages[i].Attempts
+		for j := len(attempts) - 1; j >= 0; j-- {
+			if attempts[j].Error != "" {
+				return attempts[j].Error
+			}
+		}
+	}
+	return ""
 }
 
 func hasParked(s state.State, node state.OrderNode) bool {

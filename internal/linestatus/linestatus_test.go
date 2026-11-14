@@ -142,3 +142,24 @@ func TestMergeNeedsShinBacklogIsAuthoritative(t *testing.T) {
 		t.Fatalf("backlog-only entry = %+v", got)
 	}
 }
+
+// A failed order is inert, so the report must name it and why it failed.
+func TestReadListsFailedOrdersWithReason(t *testing.T) {
+	dir := t.TempDir()
+	st := state.State{Orders: map[string]state.OrderNode{
+		"schedule": {OrderID: "schedule", Sequence: 1, Status: state.OrderFailed, Stages: []state.StageNode{
+			{TaskKey: "schedule", Status: state.StageFailed,
+				Attempts: []state.AttemptNode{{Status: state.AttemptFailed, Error: "cook cancelled with status cancelled"}}},
+		}},
+	}}
+	if err := reducer.WriteSnapshotAtomic(filepath.Join(dir, "state.snapshot.json"), reducer.BuildSnapshot(st, nil, time.Now())); err != nil {
+		t.Fatal(err)
+	}
+	rep, err := Read(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rep.Failed) != 1 || rep.Failed[0].ID != "schedule" || rep.Failed[0].Reason != "cook cancelled with status cancelled" {
+		t.Fatalf("Failed = %+v", rep.Failed)
+	}
+}

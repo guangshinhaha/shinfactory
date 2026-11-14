@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -528,4 +529,53 @@ func (l *Loop) buildBriefWithRetry(ctx context.Context) (brief mise.Brief, warni
 		return brief, warnings, changed, false, err
 	}
 	return mise.Brief{}, []string{warning}, false, true, nil
+}
+
+const (
+	scheduleRetryBase = 30 * time.Second
+	scheduleRetryMax  = 10 * time.Minute
+)
+
+// scheduleRetryDelay is the wait before the nth retry of a failed schedule
+// order: 30s, 1m, 2m, ... capped at 10m.
+func scheduleRetryDelay(retries int) time.Duration {
+	delay := scheduleRetryBase
+	for i := 1; i < retries && delay < scheduleRetryMax; i++ {
+		delay *= 2
+	}
+	return min(delay, scheduleRetryMax)
+}
+
+// retryFailedScheduleOrder requeues a failed schedule order. A failed order is
+// inert, and the schedule order is the only way new work starts, so leaving it
+// failed idles the whole loop. The first retry is immediate (a restart finds
+// the failure left by the last run); later ones back off. The counter clears
+// once the schedule order is gone, which means a run finished.
+func (l *Loop) retryFailedScheduleOrder(ctx context.Context) error {
+	if ctx.Err() != nil {
+		return nil // shutting down: a new session would outlive the drain
+	}
+	orders, err := l.currentOrders()
+	if err != nil {
+		return err
+	}
+	idx := slices.IndexFunc(orders.Orders, isScheduleOrder)
+	if idx < 0 {
+		l.scheduleRetries, l.scheduleRetryAt = 0, time.Time{}
+		return nil
+	}
+	if orders.Orders[idx].Status != OrderStatusFailed {
+		return nil
+	}
+	now := l.deps.Now()
+	if now.Before(l.scheduleRetryAt) {
+		return nil
+	}
+	if err := l.controlRequeue(scheduleOrderID); err != nil {
+		return fmt.Errorf("retrying failed schedule order: %w", err)
+	}
+	l.scheduleRetries++
+	l.scheduleRetryAt = now.Add(scheduleRetryDelay(l.scheduleRetries))
+	l.logger.Warn("schedule order failed, retrying", "retries", l.scheduleRetries, "next_retry_after", l.scheduleRetryAt)
+	return nil
 }

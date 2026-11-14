@@ -116,16 +116,26 @@ func runStatus(app *App) error {
 			summary.OrdersDepth,
 			summary.LoopState,
 		)
-		return nil
+	} else {
+		fmt.Fprintf(
+			os.Stdout,
+			"active cooks=%d | orders=%d | loop=%s\n",
+			summary.ActiveCooks,
+			summary.OrdersDepth,
+			summary.LoopState,
+		)
 	}
-
-	fmt.Fprintf(
-		os.Stdout,
-		"active cooks=%d | orders=%d | loop=%s\n",
-		summary.ActiveCooks,
-		summary.OrdersDepth,
-		summary.LoopState,
-	)
+	report, err := linestatus.Read(runtimeDir)
+	if err != nil {
+		return err
+	}
+	for _, order := range report.Failed {
+		reason := order.Reason
+		if reason == "" {
+			reason = "no reason recorded"
+		}
+		fmt.Fprintf(os.Stdout, "failed: %s | %s\n", order.ID, reason)
+	}
 	return nil
 }
 
