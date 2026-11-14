@@ -8,8 +8,11 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/guangshinhaha/shinfactory/config"
+	"github.com/guangshinhaha/shinfactory/internal/reducer"
+	"github.com/guangshinhaha/shinfactory/internal/state"
 )
 
 func TestRunStatusNoActiveCooks(t *testing.T) {
@@ -116,7 +119,7 @@ func TestRunStatusJSONPrintsTheLine(t *testing.T) {
 	if got["mode"] != "supervised" || got["concurrency"] != float64(2) || got["loop_state"] != "paused" {
 		t.Fatalf("header = %v", got)
 	}
-	for _, key := range []string{"running", "queued", "parked", "needs_shin"} {
+	for _, key := range []string{"running", "queued", "parked", "failed", "needs_shin"} {
 		if list, ok := got[key].([]any); !ok || len(list) != 0 {
 			t.Fatalf("%s = %v, want []", key, got[key])
 		}
@@ -182,5 +185,42 @@ func TestRunStatusJSONKeepsRecordedStopsWithoutStoppedScript(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), `"order": "7"`) {
 		t.Fatalf("recorded stop dropped:\n%s", out.String())
+	}
+}
+
+// `status` once printed only counts, so a failed schedule order read as
+// "orders=1, no active cooks". It must name the order and why it failed.
+func TestRunStatusShowsFailedOrderAndReason(t *testing.T) {
+	projectDir := t.TempDir()
+	runtimeDir := filepath.Join(projectDir, ".noodle")
+	if err := os.MkdirAll(runtimeDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	st := state.State{Orders: map[string]state.OrderNode{
+		"schedule": {OrderID: "schedule", Status: state.OrderFailed, Stages: []state.StageNode{
+			{TaskKey: "schedule", Status: state.StageFailed,
+				Attempts: []state.AttemptNode{{Status: state.AttemptFailed, Error: "cook cancelled with status cancelled"}}},
+		}},
+	}}
+	if err := reducer.WriteSnapshotAtomic(filepath.Join(runtimeDir, "state.snapshot.json"), reducer.BuildSnapshot(st, nil, time.Now())); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(runtimeDir, "orders.json"),
+		[]byte(`{"orders":[{"id":"schedule","stages":[{"status":"failed","provider":"c","model":"m"}],"status":"failed"}]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	originalDir, _ := os.Getwd()
+	if err := os.Chdir(projectDir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(originalDir) })
+
+	output := captureStdout(t, func() {
+		if err := runStatus(&App{}); err != nil {
+			t.Fatalf("runStatus: %v", err)
+		}
+	})
+	if !strings.Contains(output, "failed: schedule | cook cancelled with status cancelled") {
+		t.Fatalf("status output = %q, want the failed schedule order and its reason", output)
 	}
 }

@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/guangshinhaha/shinfactory/adapter"
+	"github.com/guangshinhaha/shinfactory/mise"
 	loopruntime "github.com/guangshinhaha/shinfactory/runtime"
 )
 
@@ -347,4 +349,80 @@ func TestBuildSchedulePromptCapsWarningsAt20(t *testing.T) {
 	if !strings.Contains(prompt, `"backlog sync line 20: missing required field id"`) {
 		t.Fatal("prompt should contain the 20th warning")
 	}
+}
+
+func newFailedScheduleLoop(t *testing.T, now func() time.Time) (*Loop, *mockRuntime, string) {
+	t.Helper()
+	projectDir := t.TempDir()
+	runtimeDir := filepath.Join(projectDir, ".noodle")
+	if err := os.MkdirAll(runtimeDir, 0o755); err != nil {
+		t.Fatalf("mkdir runtime: %v", err)
+	}
+	ordersPath := filepath.Join(runtimeDir, "orders.json")
+	failed := scheduleOrder("")
+	failed.Status = OrderStatusFailed
+	failed.Stages[0].Status = StageStatusFailed
+	if err := writeOrdersAtomic(ordersPath, OrdersFile{Orders: []Order{failed}}); err != nil {
+		t.Fatalf("write orders: %v", err)
+	}
+	rt := newMockRuntime()
+	brief := mise.Brief{Backlog: []adapter.BacklogItem{{ID: "121", Title: "ready", Status: "open"}}}
+	l := New(projectDir, "noodle", localLandingConfig(), Dependencies{
+		Runtimes:   map[string]loopruntime.Runtime{"process": rt},
+		Worktree:   &fakeWorktree{},
+		Adapter:    &fakeAdapterRunner{},
+		Mise:       &fakeMise{brief: brief},
+		Monitor:    fakeMonitor{},
+		Registry:   testLoopRegistry(),
+		Now:        now,
+		OrdersFile: ordersPath,
+	})
+	return l, rt, ordersPath
+}
+
+// A failed schedule order at start (a restart over a cancelled run) must not
+// leave the loop idle with ready issues.
+func TestCycleRetriesFailedScheduleOrderAtStart(t *testing.T) {
+	l, rt, _ := newFailedScheduleLoop(t, time.Now)
+	if err := l.Cycle(context.Background()); err != nil {
+		t.Fatalf("cycle: %v", err)
+	}
+	if len(rt.calls) != 1 || rt.calls[0].Skill != "schedule" {
+		t.Fatalf("dispatch calls = %+v, want one schedule dispatch", rt.calls)
+	}
+}
+
+// A schedule order that fails again waits out a backoff before the next retry.
+func TestCycleBacksOffRepeatedScheduleFailures(t *testing.T) {
+	clock := time.Now()
+	l, rt, ordersPath := newFailedScheduleLoop(t, func() time.Time { return clock })
+	if err := l.Cycle(context.Background()); err != nil {
+		t.Fatalf("cycle: %v", err)
+	}
+	if len(rt.calls) != 1 {
+		t.Fatalf("dispatch calls = %d, want 1", len(rt.calls))
+	}
+	// The retried run fails again.
+	if err := l.mutateOrdersState(func(o *OrdersFile) (bool, error) {
+		o.Orders[0].Status = OrderStatusFailed
+		o.Orders[0].Stages[0].Status = StageStatusFailed
+		return true, nil
+	}); err != nil {
+		t.Fatalf("fail again: %v", err)
+	}
+	l.cooks.activeCooksByOrder = map[string]*cookHandle{}
+	if err := l.Cycle(context.Background()); err != nil {
+		t.Fatalf("cycle: %v", err)
+	}
+	if len(rt.calls) != 1 {
+		t.Fatalf("dispatch calls = %d inside backoff, want 1", len(rt.calls))
+	}
+	clock = clock.Add(time.Hour)
+	if err := l.Cycle(context.Background()); err != nil {
+		t.Fatalf("cycle: %v", err)
+	}
+	if len(rt.calls) != 2 {
+		t.Fatalf("dispatch calls = %d after backoff, want 2", len(rt.calls))
+	}
+	_ = ordersPath
 }
