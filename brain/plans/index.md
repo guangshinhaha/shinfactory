@@ -19,3 +19,4 @@
 - [x] [[archive/plans/95-orders-json-ownership/overview]]
 - [ ] [[plans/119-brainmaxxing-autoresearch/overview]]
 - [ ] [[plans/146-ready-page/overview]]
+- [ ] [[plans/206-orca-default-for-new-repos/overview]]
