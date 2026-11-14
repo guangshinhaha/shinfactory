@@ -9,8 +9,8 @@
 # costs one duplicate comment, never a silent stop.
 #
 # A second argument "retry" marks a retried stop whose debt outlived the process that owed it. If
-# needs-shin is up then, the earlier stop landed (the process died before it was paid) and any
-# ready next to it was put back by a person: leave the issue alone (#213).
+# needs-shin or ready is up then, a person has acted since (the earlier stop landed, or they put
+# ready back, with or without clearing needs-shin): leave the issue alone (#213).
 #
 # Env: NOODLE_GH_STOP_LABEL renames needs-shin; NOODLE_GH_LABEL renames ready (as in backlog-sync).
 set -eu
@@ -24,7 +24,9 @@ message=$(cat)
 [ -n "$message" ] || { echo "message required" >&2; exit 1; }
 
 labels=$(gh issue view "$id" --json labels --jq '.labels[].name')
-if [ "$retry" = retry ] && printf '%s\n' "$labels" | grep -Fxq -- "$label"; then exit 0; fi
+if [ "$retry" = retry ]; then
+  if printf '%s\n' "$labels" | grep -Fxq -- "$label" || printf '%s\n' "$labels" | grep -Fxq -- "${NOODLE_GH_LABEL:-ready}"; then exit 0; fi
+fi
 if printf '%s\n' "$labels" | grep -Fxq -- "$label" && ! printf '%s\n' "$labels" | grep -Fxq -- "${NOODLE_GH_LABEL:-ready}"; then exit 0; fi
 
 gh label create "$label" --color D93F0B --description "shinfactory stopped and needs a person's decision" --force >/dev/null
