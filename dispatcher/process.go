@@ -12,8 +12,81 @@ import (
 	"time"
 )
 
-// pipeDrainGrace is how long after exit the read ends stay open.
+// pipeDrainGrace is how long a reader may sit blocked on an empty pipe after
+// the child exits before the read end is closed.
 const pipeDrainGrace = 10 * time.Second
+
+// drainReader is a pipe read end that closes itself at EOF and, once the
+// child has exited, when a Read has been blocked on an empty pipe for the
+// grace period. A reader that is busy elsewhere is never cut off, so a slow
+// reader keeps the tail of the output; the idle close releases the fds when a
+// grandchild inherited the pipe and outlived the child.
+type drainReader struct {
+	f *os.File
+
+	mu           sync.Mutex
+	blockedSince time.Time // zero while no Read is in flight
+	closed       chan struct{}
+	closeOnce    sync.Once
+}
+
+func newDrainReader(f *os.File) *drainReader {
+	return &drainReader{f: f, closed: make(chan struct{})}
+}
+
+func (r *drainReader) Read(p []byte) (int, error) {
+	r.mu.Lock()
+	r.blockedSince = time.Now()
+	r.mu.Unlock()
+	n, err := r.f.Read(p)
+	r.mu.Lock()
+	r.blockedSince = time.Time{}
+	r.mu.Unlock()
+	if err == io.EOF {
+		_ = r.Close()
+	}
+	return n, err
+}
+
+func (r *drainReader) Close() error {
+	var err error
+	r.closeOnce.Do(func() {
+		close(r.closed)
+		err = r.f.Close()
+	})
+	return err
+}
+
+// closeWhenIdle closes the pipe once a Read has been blocked for grace after
+// exitedAt. It returns when the pipe is closed.
+func (r *drainReader) closeWhenIdle(exitedAt time.Time, grace time.Duration) {
+	tick := grace / 4
+	if tick < time.Millisecond {
+		tick = time.Millisecond
+	}
+	t := time.NewTicker(tick)
+	defer t.Stop()
+	for {
+		select {
+		case <-r.closed:
+			return
+		case <-t.C:
+		}
+		r.mu.Lock()
+		since := r.blockedSince
+		r.mu.Unlock()
+		if since.IsZero() {
+			continue
+		}
+		if since.Before(exitedAt) {
+			since = exitedAt
+		}
+		if time.Since(since) >= grace {
+			_ = r.Close()
+			return
+		}
+	}
+}
 
 // ProcessHandle wraps an os/exec.Cmd with lifecycle primitives for child
 // process management. It replaces what the tmux dispatcher provided: process isolation,
@@ -22,8 +95,8 @@ type ProcessHandle struct {
 	cmd *exec.Cmd
 
 	stdin  io.WriteCloser
-	stdout io.ReadCloser
-	stderr io.ReadCloser
+	stdout *drainReader
+	stderr *drainReader
 
 	done       chan struct{}
 	drainGrace time.Duration
@@ -84,8 +157,8 @@ func startProcess(cmd *exec.Cmd, drainGrace time.Duration) (*ProcessHandle, erro
 	h := &ProcessHandle{
 		cmd:        cmd,
 		stdin:      stdin,
-		stdout:     stdout,
-		stderr:     stderr,
+		stdout:     newDrainReader(stdout),
+		stderr:     newDrainReader(stderr),
 		done:       make(chan struct{}),
 		drainGrace: drainGrace,
 	}
@@ -144,13 +217,19 @@ func (h *ProcessHandle) wait() {
 	}
 	h.mu.Unlock()
 	h.doneOnce.Do(func() { close(h.done) })
-	// Readers get a grace period to drain what the child wrote. After that,
-	// closing the read ends releases the fds and unblocks a reader stuck on a
-	// grandchild that inherited the pipe and outlived the child.
-	time.AfterFunc(h.drainGrace, func() {
-		_ = h.stdout.Close()
-		_ = h.stderr.Close()
-	})
+	// The read ends close at EOF. If a grandchild inherited a pipe and outlived
+	// the child, EOF never comes, so a reader left blocked on the empty pipe
+	// for the grace period is cut loose.
+	exitedAt := time.Now()
+	go h.stdout.closeWhenIdle(exitedAt, h.drainGrace)
+	go h.stderr.closeWhenIdle(exitedAt, h.drainGrace)
+}
+
+// Close closes both read ends. Use it when the handle is dropped without its
+// output being read to EOF.
+func (h *ProcessHandle) Close() {
+	_ = h.stdout.Close()
+	_ = h.stderr.Close()
 }
 
 // WriteProcessMetadata writes process.json to the session directory.

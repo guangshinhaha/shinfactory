@@ -136,6 +136,10 @@ worker-stop)
     [ "$prev" = "--dispatch" ] && id="$a"
     prev="$a"
   done
+  if [ -f "$D/stopfail" ]; then
+    echo "worker-stop refused" >&2
+    exit 1
+  fi
   [ -f "$D/w-$id" ] && echo "failed" > "$D/w-$id"
   echo '{"ok":true,"result":{}}'
   ;;
@@ -203,6 +207,14 @@ func (f *Fake) FenceConsumer(t *testing.T, n int) {
 	t.Helper()
 	if err := os.WriteFile(filepath.Join(f.Dir, "fenced"), []byte(strconv.Itoa(n)), 0o644); err != nil {
 		t.Fatalf("fence consumer: %v", err)
+	}
+}
+
+// FailStop makes worker-stop fail, leaving the worker as it was.
+func (f *Fake) FailStop(t *testing.T) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(f.Dir, "stopfail"), nil, 0o644); err != nil {
+		t.Fatalf("fail stop: %v", err)
 	}
 }
 
