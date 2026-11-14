@@ -47,6 +47,7 @@ func TestRebuiltOrderStartsFromCurrentMainNotTheClosedPRsBranch(t *testing.T) {
 	gitIn(t, old, "push", "origin", branch)
 	oldHead := gitIn(t, old, "rev-parse", "HEAD")
 	ln.closedPR = true
+	ln.closedHeads = []string{oldHead}
 
 	// Main moves on while the issue waits.
 	gh := t.TempDir()
@@ -146,5 +147,54 @@ func TestHasVerdictForNeedsAVerdictJSONNamingTheHead(t *testing.T) {
 		if got := hasVerdictFor("bbb", tc.bodies); got != tc.want {
 			t.Errorf("%s: hasVerdictFor = %v, want %v", tc.name, got, tc.want)
 		}
+	}
+}
+
+// A retry of the rebuilt order's first stage runs before its own PR exists, so
+// the old closed PR still counts. The new order's commits must survive it.
+func TestPrepareOrderBranchKeepsNewWorkOnRetryWhileOldPRIsClosed(t *testing.T) {
+	fetchBase = func(string, string) (string, error) { return "main", nil }
+	t.Cleanup(func() { fetchBase = func(string, string) (string, error) { return "origin/main", nil } })
+	project := t.TempDir()
+	gitIn(t, project, "init", "-b", "main")
+	writeFile(t, filepath.Join(project, "a.txt"), "a\n")
+	gitIn(t, project, "add", ".")
+	gitIn(t, project, "commit", "-m", "base")
+	wt := &worktree.App{Root: project}
+	cfg := config.DefaultConfig()
+	cfg.Landing.Mode = config.LandingModePR
+	ln := &fakeLander{}
+	l := New(project, "noodle", cfg, Dependencies{Worktree: wt, Lander: ln})
+	l.config.Landing.Mode = config.LandingModePR
+
+	const branch = "131-0-task"
+	if err := wt.Create(branch); err != nil {
+		t.Fatal(err)
+	}
+	dir := l.worktreePath(branch)
+	writeFile(t, filepath.Join(dir, "old.txt"), "old\n")
+	gitIn(t, dir, "add", ".")
+	gitIn(t, dir, "commit", "-m", "old order work")
+	ln.closedPR = true
+	ln.closedHeads = []string{gitIn(t, dir, "rev-parse", "HEAD")}
+
+	// The rebuilt order starts fresh, commits, and its stage is retried.
+	if err := l.prepareOrderBranch(context.Background(), branch); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := l.ensureWorktree(branch); err != nil {
+		t.Fatal(err)
+	}
+	dir = l.worktreePath(branch)
+	writeFile(t, filepath.Join(dir, "new.txt"), "new\n")
+	gitIn(t, dir, "add", ".")
+	gitIn(t, dir, "commit", "-m", "new order work")
+	newHead := gitIn(t, dir, "rev-parse", "HEAD")
+
+	if err := l.prepareOrderBranch(context.Background(), branch); err != nil {
+		t.Fatal(err)
+	}
+	if got := gitIn(t, dir, "rev-parse", "HEAD"); got != newHead {
+		t.Fatalf("retry discarded the rebuilt order's work: head %s, want %s", got, newHead)
 	}
 }

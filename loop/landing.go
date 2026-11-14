@@ -54,9 +54,10 @@ type Lander interface {
 	// ConflictingFiles lists the files a rebase onto the remote base branch
 	// would conflict in, without changing the branch.
 	ConflictingFiles(ctx context.Context, dir, base string) ([]string, error)
-	// BranchPRClosed reports whether branch's pull requests are all closed or
-	// merged, and at least one exists: the order that owned the branch is over.
-	BranchPRClosed(ctx context.Context, dir, branch string) (bool, error)
+	// BranchPRClosed returns the head commits of branch's pull requests when
+	// all are closed or merged and at least one exists: the order that owned
+	// the branch is over. It returns nothing while any is open or none exists.
+	BranchPRClosed(ctx context.Context, dir, branch string) ([]string, error)
 }
 
 // ErrChecksPending means the PR cannot merge yet because checks are still

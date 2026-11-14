@@ -3,6 +3,7 @@ package loop
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -14,29 +15,54 @@ import (
 
 // Stale order branches (#186) and verdict lookups for ship's red verdict-check.
 
-func (g ghLander) BranchPRClosed(ctx context.Context, dir, branch string) (bool, error) {
-	out, err := g.run(ctx, dir, "gh", "pr", "list", "--head", branch, "--state", "all", "--json", "state,isCrossRepository", "--limit", "30")
+func (g ghLander) BranchPRClosed(ctx context.Context, dir, branch string) ([]string, error) {
+	out, err := g.run(ctx, dir, "gh", "pr", "list", "--head", branch, "--state", "all", "--json", "state,headRefOid,isCrossRepository", "--limit", "30")
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 	var prs []struct {
 		State             string `json:"state"`
+		HeadRefOid        string `json:"headRefOid"`
 		IsCrossRepository bool   `json:"isCrossRepository"`
 	}
 	if err := json.Unmarshal([]byte(out), &prs); err != nil {
-		return false, fmt.Errorf("parse gh pr list output %q: %w", out, err)
+		return nil, fmt.Errorf("parse gh pr list output %q: %w", out, err)
 	}
-	closed := false
+	var heads []string
 	for _, pr := range prs {
 		if pr.IsCrossRepository {
 			continue // a fork's branch of the same name is not this order's
 		}
 		if pr.State == "OPEN" {
-			return false, nil
+			return nil, nil
 		}
-		closed = true
+		heads = append(heads, pr.HeadRefOid)
 	}
-	return closed, nil
+	return heads, nil
+}
+
+// branchHoldsNewWork reports whether the local branch has a tip that is not
+// inside the history of any closed PR head: commits the closed order never had.
+// A retry of a rebuilt order's first stage lands here before its own PR exists,
+// and must not wipe that order's work. A branch ref that is missing, or a git
+// error, reads as no new work only for a missing ref; an error keeps the branch.
+func branchHoldsNewWork(projectDir, branch string, closedHeads []string) bool {
+	tip, err := exec.Command("git", "-C", projectDir, "rev-parse", "--verify", "-q", "refs/heads/"+branch).Output()
+	if err != nil {
+		return false // no local branch: nothing to lose
+	}
+	for _, head := range closedHeads {
+		cmd := exec.Command("git", "-C", projectDir, "merge-base", "--is-ancestor", strings.TrimSpace(string(tip)), head)
+		runErr := cmd.Run()
+		if runErr == nil {
+			return false // the tip is the closed order's own history
+		}
+		var ee *exec.ExitError
+		if !errors.As(runErr, &ee) || ee.ExitCode() != 1 {
+			return true // cannot tell (head not fetched?): keep the branch
+		}
+	}
+	return true
 }
 
 // verdictCheckRed reports a finished, failing verdict-check.
@@ -91,7 +117,7 @@ func (g ghLander) commentBodies(ctx context.Context, dir string, pr PullRequest)
 // conflicts, into the new order (#186). The branch, the worktree and the
 // remote branch go; ensureWorktree then cuts a fresh one off the remote's
 // default branch. A branch with an open PR, or none, is the order's own and
-// stays. GitHub is asked only when a branch or worktree already exists.
+// stays, and so is one whose tip holds commits the closed PR never had. GitHub is asked only when a branch or worktree already exists.
 func (l *Loop) prepareOrderBranch(ctx context.Context, name string) error {
 	if !l.config.Landing.PR() {
 		return nil
@@ -100,12 +126,15 @@ func (l *Loop) prepareOrderBranch(ctx context.Context, name string) error {
 	if statErr != nil && !branchExists(l.projectDir, name) {
 		return nil
 	}
-	closed, err := l.lander().BranchPRClosed(ctx, l.projectDir, name)
+	closedHeads, err := l.lander().BranchPRClosed(ctx, l.projectDir, name)
 	if err != nil {
 		return fmt.Errorf("check for an earlier PR on branch %s: %w", name, err)
 	}
-	if !closed {
+	if len(closedHeads) == 0 {
 		return nil
+	}
+	if branchHoldsNewWork(l.projectDir, name, closedHeads) {
+		return nil // a retry of the rebuilt order: its own commits stay
 	}
 	l.logger.Warn("discarding the branch of an earlier order whose PR is closed", "branch", name)
 	if err := l.deps.Worktree.Cleanup(name, worktree.CleanupOpts{Force: true}); err != nil {

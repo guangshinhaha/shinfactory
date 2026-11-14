@@ -40,6 +40,7 @@ type fakeLander struct {
 	// closedPR is what BranchPRClosed reports; closedPRChecks counts the calls.
 	closedPR       bool
 	closedPRChecks int
+	closedHeads    []string // the closed PRs' heads; a placeholder when nil
 	// lostVerdicts makes that many PostVerdict calls vanish: they succeed, but
 	// no verdict is on the PR afterwards. missingVerdict is true until a
 	// verdict lands, and makes MarkReadyAndMerge wait on verdict-check.
@@ -47,9 +48,15 @@ type fakeLander struct {
 	missingVerdict bool
 }
 
-func (f *fakeLander) BranchPRClosed(context.Context, string, string) (bool, error) {
+func (f *fakeLander) BranchPRClosed(context.Context, string, string) ([]string, error) {
 	f.closedPRChecks++
-	return f.closedPR, nil
+	if !f.closedPR {
+		return nil, nil
+	}
+	if f.closedHeads != nil {
+		return f.closedHeads, nil
+	}
+	return []string{"0000000000000000000000000000000000000000"}, nil
 }
 
 func (f *fakeLander) RebaseOntoBase(context.Context, string, string) error {
