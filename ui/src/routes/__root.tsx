@@ -5,6 +5,7 @@ import { ActiveChannelProvider } from "~/client";
 import { connectWS } from "~/client/ws";
 import type { ChannelId } from "~/client";
 import { Sidebar } from "~/components/Sidebar";
+import { RepoIdentity, TopBar } from "~/components/TopBar";
 import "~/app.css";
 
 const queryClient = new QueryClient({
@@ -39,16 +40,25 @@ function RootComponent() {
   );
 
   if (pathname === "/onboarding") {
-    return <Outlet />;
+    return (
+      <>
+        <RepoIdentity />
+        <Outlet />
+      </>
+    );
   }
 
   return (
     <ActiveChannelProvider channel={activeChannel} onChannelChange={setActiveChannel}>
       <WSConnectionBridge />
+      <RepoIdentity />
       <Suspense fallback={<div className="h-screen bg-bg-depth" />}>
-        <div className="app-layout h-screen">
-          <Sidebar />
-          <Outlet />
+        <div className="flex flex-col h-screen">
+          <TopBar />
+          <div className="app-layout flex-1 min-h-0" style={{ height: "auto" }}>
+            <Sidebar />
+            <Outlet />
+          </div>
         </div>
       </Suspense>
     </ActiveChannelProvider>

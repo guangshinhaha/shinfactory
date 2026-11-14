@@ -100,6 +100,9 @@ export interface ConfigDefaults {
   model: string;
   mode: string;
   task_types: string[];
+  repo: string;
+  port: string;
+  build_sha: string;
 }
 
 export type ChannelId = { type: "scheduler" } | { type: "agent"; sessionId: string };
