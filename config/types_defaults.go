@@ -26,6 +26,37 @@ type Config struct {
 	Landing     LandingConfig            `toml:"landing"`
 	Spend       SpendConfig              `toml:"spend"`
 	Backlog     BacklogConfig            `toml:"backlog"`
+	Review      ReviewConfig             `toml:"review"`
+}
+
+const defaultReviewMaxRounds = 2
+
+// reviewTiers are the tier names [review.tiers] may override.
+var reviewTiers = []string{"none", "low", "medium", "high"}
+
+// ReviewConfig sets how many review/verify rounds an order gets before the
+// loop sends it to a person.
+type ReviewConfig struct {
+	// MaxRounds counts every review/verify round of one order, the first
+	// included: 1 sends the first rejection to a person, 2 allows one rework.
+	// Unset means 2; 0 or a negative value is a fatal config error.
+	MaxRounds int `toml:"max_rounds"`
+	// Tiers overrides MaxRounds per order tier (none, low, medium, high).
+	Tiers map[string]int `toml:"tiers"`
+}
+
+// Limit is the round limit for an order of the given tier; empty means medium.
+func (c ReviewConfig) Limit(tier string) int {
+	if tier == "" {
+		tier = "medium"
+	}
+	if n, ok := c.Tiers[tier]; ok {
+		return n
+	}
+	if c.MaxRounds <= 0 {
+		return defaultReviewMaxRounds
+	}
+	return c.MaxRounds
 }
 
 const (
@@ -243,6 +274,7 @@ const (
 	DiagnosticCodeAdapterScriptMissing   = "adapter_script_missing"
 	DiagnosticCodeProviderUnknown        = "provider_unknown"
 	DiagnosticCodeSensitiveProvider      = "routing_sensitive_provider"
+	DiagnosticCodeReviewRoundsInvalid    = "review_rounds_invalid"
 	DiagnosticCodeRuntimeDefaultUnknown  = "runtime_default_unknown"
 	DiagnosticCodeNoBacklogAdapter       = "no_backlog_adapter"
 	DiagnosticCodeConfigFieldRemoved     = "config_field_removed"
@@ -308,6 +340,7 @@ func DefaultConfig() Config {
 		Server: ServerConfig{
 			Port: 3000,
 		},
+		Review: ReviewConfig{MaxRounds: defaultReviewMaxRounds},
 		Spend: SpendConfig{
 			MaxAttempts: defaultMaxStageAttempts,
 			MaxCostUSD:  defaultMaxOrderCostUSD,

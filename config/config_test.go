@@ -763,3 +763,48 @@ func TestBacklogSyncIntervalDefaultAndOverride(t *testing.T) {
 		t.Fatalf("negative sync interval = %s, %v, want the 1m default", cfg.Backlog.SyncInterval(), err)
 	}
 }
+
+func TestReviewMaxRoundsConfig(t *testing.T) {
+	cfg, err := Parse([]byte("[review]\nmax_rounds = 3\n[review.tiers]\nhigh = 1\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := cfg.Review.Limit("medium"); got != 3 {
+		t.Errorf("medium limit = %d, want 3", got)
+	}
+	if got := cfg.Review.Limit(""); got != 3 {
+		t.Errorf("untiered limit = %d, want 3 (medium)", got)
+	}
+	if got := cfg.Review.Limit("high"); got != 1 {
+		t.Errorf("high limit = %d, want the tier override 1", got)
+	}
+	if hasCode(Validate(cfg), DiagnosticCodeReviewRoundsInvalid) {
+		t.Error("valid review config reported invalid")
+	}
+
+	unset, err := Parse([]byte(""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := unset.Review.Limit("high"); got != 2 {
+		t.Errorf("default limit = %d, want 2", got)
+	}
+}
+
+func TestReviewRoundsRejectsZeroNegativeAndUnknownTier(t *testing.T) {
+	for _, body := range []string{
+		"[review]\nmax_rounds = 0\n",
+		"[review]\nmax_rounds = -1\n",
+		"[review.tiers]\nhigh = 0\n",
+		"[review.tiers]\nhigh = -2\n",
+		"[review.tiers]\nurgent = 3\n",
+	} {
+		cfg, err := Parse([]byte(body))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !hasCode(Validate(cfg), DiagnosticCodeReviewRoundsInvalid) {
+			t.Errorf("%q: no fatal review diagnostic", body)
+		}
+	}
+}
