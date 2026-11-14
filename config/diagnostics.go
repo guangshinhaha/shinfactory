@@ -19,7 +19,7 @@ func Validate(config Config) ValidationResult {
 		Diagnostics: make([]ConfigDiagnostic, 0),
 	}
 
-	if config.Routing.Defaults.Provider == "" || config.Routing.Defaults.Model == "" {
+	if config.Routing.Defaults.Provider == "" || (config.Routing.Defaults.Model == "" && ProviderTakesModel(config.Routing.Defaults.Provider)) {
 		result.Diagnostics = append(result.Diagnostics, ConfigDiagnostic{
 			FieldPath: "routing.defaults",
 			Message:   "provider and model must both be configured",
@@ -30,9 +30,9 @@ func Validate(config Config) ValidationResult {
 	} else if !isKnownProvider(config.Routing.Defaults.Provider) {
 		result.Diagnostics = append(result.Diagnostics, ConfigDiagnostic{
 			FieldPath: "routing.defaults.provider",
-			Message:   fmt.Sprintf("unknown provider %q (valid: claude, codex)", config.Routing.Defaults.Provider),
+			Message:   fmt.Sprintf("unknown provider %q (valid: claude, codex, zcode)", config.Routing.Defaults.Provider),
 			Severity:  DiagnosticSeverityFatal,
-			Fix:       "Set routing.defaults.provider to \"claude\" or \"codex\" in .noodle.toml.",
+			Fix:       "Set routing.defaults.provider to \"claude\", \"codex\" or \"zcode\" in .noodle.toml.",
 			Code:      DiagnosticCodeProviderUnknown,
 		})
 	}
@@ -46,7 +46,7 @@ func Validate(config Config) ValidationResult {
 		policy := config.Routing.Roles[name]
 		field := "routing.roles." + name + ".provider"
 		switch {
-		case strings.TrimSpace(policy.Model) == "" && strings.TrimSpace(config.Routing.Defaults.Model) != "":
+		case strings.TrimSpace(policy.Model) == "" && strings.TrimSpace(config.Routing.Defaults.Model) != "" && ProviderTakesModel(policy.Provider):
 			result.Diagnostics = append(result.Diagnostics, ConfigDiagnostic{
 				FieldPath: "routing.roles." + name + ".model",
 				Message:   fmt.Sprintf("role names provider %q but no model", policy.Provider),
@@ -57,9 +57,9 @@ func Validate(config Config) ValidationResult {
 		case !isKnownProvider(policy.Provider):
 			result.Diagnostics = append(result.Diagnostics, ConfigDiagnostic{
 				FieldPath: field,
-				Message:   fmt.Sprintf("unknown provider %q (valid: claude, codex)", policy.Provider),
+				Message:   fmt.Sprintf("unknown provider %q (valid: claude, codex, zcode)", policy.Provider),
 				Severity:  DiagnosticSeverityFatal,
-				Fix:       "Set the role's provider to \"claude\" or \"codex\" in .noodle.toml.",
+				Fix:       "Set the role's provider to \"claude\", \"codex\" or \"zcode\" in .noodle.toml.",
 				Code:      DiagnosticCodeProviderUnknown,
 			})
 		case config.Routing.Sensitive && stringx.Normalize(policy.Provider) != stringx.Normalize(config.Routing.Defaults.Provider):
@@ -195,7 +195,7 @@ func commandLooksPath(token string) bool {
 
 func isKnownProvider(provider string) bool {
 	switch stringx.Normalize(provider) {
-	case "claude", "codex":
+	case "claude", "codex", "zcode":
 		return true
 	}
 	return false

@@ -209,14 +209,79 @@ func TestValidateStageProviderOnSensitiveRepo(t *testing.T) {
 
 func TestForeignProvidersOnlyOnSensitiveRepo(t *testing.T) {
 	cfg := parseRouting(t, "[routing]\nsensitive = true\n")
-	if got := cfg.ForeignProviders("claude"); len(got) != 1 || got[0] != "codex" {
-		t.Errorf("sensitive claude repo: foreign = %v, want [codex]", got)
+	if got := cfg.ForeignProviders("claude"); len(got) != 2 || got[0] != "codex" || got[1] != "zcode" {
+		t.Errorf("sensitive claude repo: foreign = %v, want [codex zcode]", got)
 	}
-	if got := cfg.ForeignProviders("codex"); len(got) != 1 || got[0] != "claude" {
-		t.Errorf("sensitive codex stage: foreign = %v, want [claude]", got)
+	if got := cfg.ForeignProviders("zcode"); len(got) != 2 || got[0] != "claude" || got[1] != "codex" {
+		t.Errorf("sensitive zcode stage: foreign = %v, want [claude codex]", got)
+	}
+	if got := cfg.ForeignProviders("codex"); len(got) != 2 || got[0] != "claude" || got[1] != "zcode" {
+		t.Errorf("sensitive codex stage: foreign = %v, want [claude zcode]", got)
 	}
 	cfg.Routing.Sensitive = false
 	if got := cfg.ForeignProviders("claude"); got != nil {
 		t.Errorf("non-sensitive repo: foreign = %v, want none", got)
+	}
+}
+
+// hasRoutingProblem ignores diagnostics unrelated to routing (no backlog adapter).
+func hasRoutingProblem(r ValidationResult) bool {
+	return hasCode(r, DiagnosticCodeRoutingDefaultsMissing) || hasCode(r, DiagnosticCodeProviderUnknown) || hasCode(r, DiagnosticCodeSensitiveProvider)
+}
+
+func TestZcodeAcceptedInDefaultsAndRolesWithoutModel(t *testing.T) {
+	roles := parseRouting(t, "[routing.roles]\nbuilder = { provider = \"zcode\" }\n")
+	if got := Validate(roles); hasRoutingProblem(got) {
+		t.Errorf("zcode role without model rejected: %+v", got.Diagnostics)
+	}
+	if p := roles.PolicyForRole(RoleBuilder); p.Provider != "zcode" || p.Model != "" {
+		t.Errorf("builder = %+v, want zcode with no model", p)
+	}
+	if p := roles.PolicyForRole(RolePlanner); p.Provider != "claude" {
+		t.Errorf("planner = %+v, want claude", p)
+	}
+
+	defaults := parseRouting(t, "[routing.defaults]\nprovider = \"zcode\"\n")
+	if defaults.Routing.Defaults.Provider != "zcode" {
+		t.Errorf("defaults provider = %q, want zcode", defaults.Routing.Defaults.Provider)
+	}
+	if got := Validate(defaults); hasRoutingProblem(got) {
+		t.Errorf("zcode defaults without model rejected: %+v", got.Diagnostics)
+	}
+
+	// Other providers still need a model.
+	codex := parseRouting(t, "[routing.roles]\nbuilder = { provider = \"codex\" }\n")
+	if got := Validate(codex); !hasCode(got, DiagnosticCodeRoutingDefaultsMissing) {
+		t.Errorf("codex role without model passed: %+v", got.Diagnostics)
+	}
+	if err := roles.ValidateStageRouting("zcode", ""); err != nil {
+		t.Errorf("zcode stage without model: %v", err)
+	}
+	if err := roles.ValidateStageRouting("codex", ""); err == nil {
+		t.Error("codex stage without model should be rejected")
+	}
+}
+
+func TestSensitiveRepoRefusesZcodeUnlessLocked(t *testing.T) {
+	claudeLocked := parseRouting(t, "[routing]\nsensitive = true\n[routing.roles]\nbuilder = { provider = \"zcode\" }\n")
+	if got := Validate(claudeLocked); !hasCode(got, DiagnosticCodeSensitiveProvider) {
+		t.Errorf("zcode role on a claude-locked repo passed: %+v", got.Diagnostics)
+	}
+	if err := claudeLocked.ValidateStageProvider("zcode"); err == nil {
+		t.Error("zcode stage on a claude-locked repo should be rejected")
+	}
+	if p := claudeLocked.PolicyForRole(RoleBuilder); p.Provider != "claude" {
+		t.Errorf("claude-locked builder = %+v, want claude", p)
+	}
+
+	zcodeLocked := parseRouting(t, "[routing]\nsensitive = true\n[routing.defaults]\nprovider = \"zcode\"\n")
+	if got := Validate(zcodeLocked); hasRoutingProblem(got) {
+		t.Errorf("zcode-locked repo rejected: %+v", got.Diagnostics)
+	}
+	if err := zcodeLocked.ValidateStageProvider("zcode"); err != nil {
+		t.Errorf("zcode stage on a zcode-locked repo: %v", err)
+	}
+	if err := zcodeLocked.ValidateStageProvider("claude"); err == nil {
+		t.Error("claude stage on a zcode-locked repo should be rejected")
 	}
 }

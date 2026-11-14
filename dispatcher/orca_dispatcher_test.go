@@ -260,3 +260,34 @@ func TestOrcaDispatchGivesUpWhenConsumerStaysFenced(t *testing.T) {
 		t.Fatalf("dispatch error = %v, want consumer_fenced surfaced after one recovery", err)
 	}
 }
+
+// Orca refuses --model for zcode, so the launch names the agent and nothing else.
+func TestOrcaDispatchLaunchesZcodeWithoutModel(t *testing.T) {
+	fake := fakeorca.New(t)
+	d, dir := orcaTestDispatcher(t, fake)
+	req := orcaTestRequest(dir)
+	req.Provider, req.Model = "zcode", "GLM-5.3"
+
+	if _, err := d.Dispatch(context.Background(), req); err != nil {
+		t.Fatalf("dispatch: %v", err)
+	}
+	start := fake.Starts()
+	if len(start) != 1 {
+		t.Fatalf("worker-start calls = %v, want 1", start)
+	}
+	if !strings.Contains(start[0], "--agent zcode") {
+		t.Errorf("worker-start = %q, missing --agent zcode", start[0])
+	}
+	if strings.Contains(start[0], "--model") {
+		t.Errorf("worker-start = %q, zcode must launch without --model", start[0])
+	}
+}
+
+func TestOrcaAgentForZcode(t *testing.T) {
+	if agent, err := orcaAgentFor(" ZCode "); err != nil || agent != "zcode" {
+		t.Errorf("orcaAgentFor(zcode) = %q, %v", agent, err)
+	}
+	if _, err := orcaAgentFor("gemini"); err == nil {
+		t.Error("unknown provider should have no orca agent")
+	}
+}

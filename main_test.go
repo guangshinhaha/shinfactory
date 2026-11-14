@@ -399,8 +399,8 @@ func TestRepairRefusesSecondProviderOnSensitiveRepo(t *testing.T) {
 		t.Fatalf("default provider rejected: %v", err)
 	}
 	req := repairDispatchRequest(cfg, "r", "synthetic", "claude", "/w")
-	if len(req.DenyProviders) != 1 || req.DenyProviders[0] != "codex" {
-		t.Errorf("repair DenyProviders = %v, want [codex]", req.DenyProviders)
+	if len(req.DenyProviders) != 2 || req.DenyProviders[0] != "codex" || req.DenyProviders[1] != "zcode" {
+		t.Errorf("repair DenyProviders = %v, want [codex zcode]", req.DenyProviders)
 	}
 }
 
