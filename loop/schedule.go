@@ -75,6 +75,16 @@ func (l *Loop) hasActiveScheduleCook() bool {
 	return false
 }
 
+// hasInFlightStage reports whether a non-schedule stage has a live cook.
+func (l *Loop) hasInFlightStage() bool {
+	for _, cook := range l.cooks.activeCooksByOrder {
+		if !isScheduleStage(cook.stage) {
+			return true
+		}
+	}
+	return false
+}
+
 func bootstrapScheduleOrder() OrdersFile {
 	return OrdersFile{
 		Orders: []Order{
