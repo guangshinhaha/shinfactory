@@ -398,6 +398,21 @@ func TestGitHubBacklogStopRetryLeavesAnIssueAPersonRestored(t *testing.T) {
 	}
 }
 
+// A retried stop finding only ready means a person restored it (clearing needs-shin too): leave it (#213).
+func TestGitHubBacklogStopRetryLeavesAReadyIssue(t *testing.T) {
+	env, logPath := fakeGH(t, `[
+  {"number": 7, "title": "Back", "url": "u7", "labels": [{"name": "ready"}], "body": "x"}
+]`)
+	runGitHubAdapter(t, env, "backlog-stop", "Failed.", "7", "retry")
+	log := readLog(t, logPath)
+	if strings.Contains(log, "issue comment") || strings.Contains(log, "issue edit") {
+		t.Fatalf("retried stop touched a ready issue:\n%s", log)
+	}
+	if got := backlogIDs(t, env); got != "7" {
+		t.Fatalf("backlog = %q, want 7 still ready", got)
+	}
+}
+
 func TestGitHubBacklogStopRefusesAnEmptyMessage(t *testing.T) {
 	env, _ := fakeGH(t, stopIssues)
 	cmd := exec.Command(filepath.Join("defaults", "adapters", "github", "backlog-stop"), "7")
