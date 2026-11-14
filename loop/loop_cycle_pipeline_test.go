@@ -211,3 +211,74 @@ func TestProposalOfUnreadyAndScheduleEntersCooldown(t *testing.T) {
 		t.Fatalf("want empty-promotion cooldown after [unready, schedule], got %v", l.scheduleNothingUntil)
 	}
 }
+
+func readPromotionResult(t *testing.T, runtimeDir string) promotionResultFile {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(runtimeDir, "orders-next.result.json"))
+	if err != nil {
+		t.Fatalf("read orders-next.result.json: %v", err)
+	}
+	var got promotionResultFile
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatalf("parse orders-next.result.json: %v\n%s", err, data)
+	}
+	return got
+}
+
+func TestPromotionWritesResultFileForScheduleWorker(t *testing.T) {
+	t.Run("promoted", func(t *testing.T) {
+		l, runtimeDir := newPromotionTestLoop(t)
+		promoteProposal(t, l, []string{"7"}, []adapter.BacklogItem{{ID: "7"}})
+		got := readPromotionResult(t, runtimeDir)
+		if got.Status != "promoted" {
+			t.Fatalf("status = %q, want promoted", got.Status)
+		}
+	})
+	t.Run("amendment rejected while stage in flight", func(t *testing.T) {
+		l, runtimeDir := newPromotionTestLoop(t)
+		existing := OrdersFile{Orders: []Order{{ID: "352", Status: OrderStatusActive, Stages: []Stage{
+			{TaskKey: "execute", Status: StageStatusActive},
+			{TaskKey: "quality", Status: StageStatusPending},
+		}}}}
+		if err := writeOrdersAtomic(l.deps.OrdersFile, existing); err != nil {
+			t.Fatalf("write orders: %v", err)
+		}
+		writeCompactOrders(t, l.deps.OrdersNextFile, orderx.CompactOrdersFile{Orders: []orderx.CompactOrder{
+			{ID: "352", Stages: []orderx.CompactStage{{Do: "execute"}, {Do: "adversarial-review"}}},
+		}})
+		orders, err := l.currentOrders()
+		if err != nil {
+			t.Fatalf("currentOrders: %v", err)
+		}
+		result, err := consumeOrdersNext(l.deps.OrdersNextFile, orders, []adapter.BacklogItem{{ID: "352"}})
+		if err := l.handlePromotionResult(result, err); err != nil {
+			t.Fatalf("handlePromotionResult: %v", err)
+		}
+		got := readPromotionResult(t, runtimeDir)
+		if len(got.AmendRejected) != 1 || got.AmendRejected[0].Order != "352" ||
+			!strings.Contains(got.AmendRejected[0].Reason, "stage in flight") {
+			t.Fatalf("amend_rejected = %+v, want order 352 with stage-in-flight reason", got.AmendRejected)
+		}
+	})
+	t.Run("dropped orders name no ready issue", func(t *testing.T) {
+		l, runtimeDir := newPromotionTestLoop(t)
+		promoteProposal(t, l, []string{"chore-side-note"}, nil)
+		got := readPromotionResult(t, runtimeDir)
+		if len(got.Unbuildable) != 1 || got.Unbuildable[0] != "chore-side-note" {
+			t.Fatalf("unbuildable = %v, want [chore-side-note]", got.Unbuildable)
+		}
+	})
+	t.Run("invalid proposal rejected", func(t *testing.T) {
+		l, runtimeDir := newPromotionTestLoop(t)
+		if err := os.WriteFile(l.deps.OrdersNextFile, []byte("{not json"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		orders, _ := l.currentOrders()
+		result, err := consumeOrdersNext(l.deps.OrdersNextFile, orders, nil)
+		_ = l.handlePromotionResult(result, err)
+		got := readPromotionResult(t, runtimeDir)
+		if got.Status != "rejected" || !strings.Contains(got.Reason, "invalid orders-next.json") {
+			t.Fatalf("result = %+v, want rejected with the validation reason", got)
+		}
+	})
+}
