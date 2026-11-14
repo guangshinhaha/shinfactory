@@ -228,10 +228,14 @@ func TestCheckTestFirst(t *testing.T) {
 		{"docs-only branch has no fix", []commitFiles{c("a", "x_test.go"), c("b", "README.md")}, false},
 		{"tests plus docs first, then fix", []commitFiles{c("a", "x_test.go", "README.md"), c("b", "x.go")}, true},
 		{"testdata counts as test", []commitFiles{c("a", "pkg/testdata/in.json"), c("b", "x.go")}, true},
+		{"shell test script", []commitFiles{c("a", "scripts/supply-chain/test.sh"), c("b", "x.go")}, true},
+		{"shell test script by suffix", []commitFiles{c("a", "scripts/check_test.sh"), c("b", "x.go")}, true},
+		{"bats test", []commitFiles{c("a", "scripts/x.bats"), c("b", "x.go")}, true},
+		{"non-test shell script is code", []commitFiles{c("a", "scripts/build.sh"), c("b", "x.go")}, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if err := checkTestFirst(tc.commits); (err == nil) != tc.ok {
+			if err := checkTestFirst(tc.commits, nil); (err == nil) != tc.ok {
 				t.Fatalf("checkTestFirst err = %v, want ok=%v", err, tc.ok)
 			}
 		})
@@ -276,7 +280,7 @@ func TestBranchCommitsListsOnlyTheBranchsOwnCommitsOldestFirst(t *testing.T) {
 	if len(commits) != 2 || commits[0].Files[0] != "x_test.go" || commits[1].Files[0] != "x.go" {
 		t.Fatalf("commits = %+v, want the test commit then the fix commit", commits)
 	}
-	if err := checkTestFirst(commits); err != nil {
+	if err := checkTestFirst(commits, nil); err != nil {
 		t.Fatalf("real branch rejected: %v", err)
 	}
 }
@@ -458,5 +462,19 @@ func TestTailNeverSplitsARune(t *testing.T) {
 		if !utf8.ValidString(got) {
 			t.Fatalf("tail(%d) = %q, not valid UTF-8", n, got)
 		}
+	}
+}
+
+func TestCheckTestFirstDeclaredTestPaths(t *testing.T) {
+	commits := []commitFiles{{SHA: "a", Files: []string{"ci/verify-go-version.sh"}}, {SHA: "b", Files: []string{"x.go"}}}
+	if err := checkTestFirst(commits, nil); err == nil {
+		t.Fatal("undeclared script counted as a test")
+	}
+	if err := checkTestFirst(commits, []string{"ci/verify-*.sh"}); err != nil {
+		t.Fatalf("declared test path rejected: %v", err)
+	}
+	nested := []commitFiles{{SHA: "a", Files: []string{"scripts/a/b/test.sh"}}, {SHA: "b", Files: []string{"x.go"}}}
+	if err := checkTestFirst(nested, []string{"scripts/**/test*.sh"}); err != nil {
+		t.Fatalf("nested declared test path rejected: %v", err)
 	}
 }

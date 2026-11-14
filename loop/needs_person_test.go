@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/guangshinhaha/shinfactory/internal/linestatus"
 	"os"
 	"path/filepath"
@@ -161,7 +162,7 @@ func TestStopForPersonWhenAttemptsRunOut(t *testing.T) {
 	max := env.loop.config.Spend.MaxAttempts
 
 	for round := 1; round < max; round++ {
-		env.reject(t, round, "Rejected: Done when missed, ./greet printed nothing.")
+		env.reject(t, round, fmt.Sprintf("Rejected: Done when missed, ./greet printed nothing (try %d).", round))
 		if log := ghLog(t, env.log); strings.Contains(log, "issue comment") || strings.Contains(log, "needs-shin") {
 			t.Fatalf("rejection %d of %d must retry, not reach a person:\n%s", round, max, log)
 		}

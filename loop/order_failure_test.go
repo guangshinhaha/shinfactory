@@ -3,6 +3,7 @@ package loop
 import (
 	"context"
 	"errors"
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -94,12 +95,13 @@ func TestTestFirstRejectionSendsExecuteBackWithTheExactReason(t *testing.T) {
 
 func TestEvidenceFailureStopsForAPersonWhenAttemptsRunOut(t *testing.T) {
 	h := evidenceHarness(t, "bug", "")
-	branchCommits = nonTestFirstCommit("116a36c1")
 	max := h.l.config.Spend.MaxAttempts
 	for i := 1; i < max; i++ {
+		branchCommits = nonTestFirstCommit(fmt.Sprintf("116a36c%d", i)) // a different rejection each time
 		h.next(t)
 		h.retrying(t, "execute", i)
 	}
+	branchCommits = nonTestFirstCommit("116a36cf")
 	h.next(t) // attempt max: the cap is spent
 	h.failedWith(t, "attempts exhausted")
 	if n := h.stops(); n != 1 {
@@ -372,5 +374,19 @@ func TestFailedStopIsRetriedUntilItLands(t *testing.T) {
 	}
 	if log := ghLog(t, env.log); strings.Count(log, "issue comment 7") != 1 || !strings.Contains(log, "needs-shin") {
 		t.Fatalf("want one comment and needs-shin after the retry, got gh log:\n%s", log)
+	}
+}
+
+// The same rejection twice in a row cannot be fixed by a third cook: the
+// order goes to a person after the second, with attempts still left.
+func TestIdenticalRejectionStopsAfterTwoRounds(t *testing.T) {
+	h := evidenceHarness(t, "bug", "")
+	h.l.config.Spend.MaxAttempts = 10
+	h.l.config.Spend.MaxCostUSD = 0
+	branchCommits = nonTestFirstCommit("116a36c1")
+	h.nextUntilFailed(t)
+	h.failedWith(t, "repeated identical rejection")
+	if got := len(h.rt.sessions); got != 2 {
+		t.Fatalf("execute launched %d times, want 2", got)
 	}
 }

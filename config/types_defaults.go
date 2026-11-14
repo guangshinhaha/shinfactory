@@ -27,6 +27,16 @@ type Config struct {
 	Spend       SpendConfig              `toml:"spend"`
 	Backlog     BacklogConfig            `toml:"backlog"`
 	Review      ReviewConfig             `toml:"review"`
+	Gate        GateConfig               `toml:"gate"`
+}
+
+// GateConfig tunes the evidence gate that checks a bug fix before its execute
+// stage is accepted.
+type GateConfig struct {
+	// TestPaths are glob patterns (`*` stays inside one path segment, `**`
+	// crosses segments) for files that count as tests, on top of the names the
+	// gate already recognises (`_test.go`, `test.sh`, `tests/` and so on).
+	TestPaths []string `toml:"test_paths"`
 }
 
 const defaultReviewMaxRounds = 2
@@ -275,6 +285,7 @@ const (
 	DiagnosticCodeProviderUnknown        = "provider_unknown"
 	DiagnosticCodeSensitiveProvider      = "routing_sensitive_provider"
 	DiagnosticCodeReviewRoundsInvalid    = "review_rounds_invalid"
+	DiagnosticCodeGateTestPathInvalid    = "gate_test_path_invalid"
 	DiagnosticCodeRuntimeDefaultUnknown  = "runtime_default_unknown"
 	DiagnosticCodeNoBacklogAdapter       = "no_backlog_adapter"
 	DiagnosticCodeConfigFieldRemoved     = "config_field_removed"

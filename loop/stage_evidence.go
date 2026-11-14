@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/gobwas/glob"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -239,7 +240,7 @@ func isTestPath(p string) bool {
 	switch {
 	case strings.HasSuffix(base, "_test.go"), strings.HasSuffix(base, "_test.py"),
 		strings.HasPrefix(base, "test_"), strings.Contains(base, ".test."),
-		strings.Contains(base, ".spec."):
+		strings.Contains(base, ".spec."), isShellTestScript(base):
 		return true
 	}
 	for _, seg := range strings.Split(p[:max(strings.LastIndex(p, "/"), 0)], "/") {
@@ -251,10 +252,37 @@ func isTestPath(p string) bool {
 	return false
 }
 
+// isShellTestScript recognises the usual names of shell test scripts: test.sh,
+// test-*.sh, test_*.sh, *-test.sh, *_test.sh and *.bats.
+func isShellTestScript(base string) bool {
+	if strings.HasSuffix(base, ".bats") {
+		return true
+	}
+	name, ok := strings.CutSuffix(base, ".sh")
+	if !ok {
+		return false
+	}
+	return name == "test" || strings.HasPrefix(name, "test-") || strings.HasPrefix(name, "test_") ||
+		strings.HasSuffix(name, "-test") || strings.HasSuffix(name, "_test")
+}
+
+// declaredTestPath reports whether p matches a repo-declared [gate] test_paths
+// glob. Patterns were validated at config load; one that fails to compile
+// matches nothing.
+func declaredTestPath(p string, patterns []string) bool {
+	p = filepath.ToSlash(p)
+	for _, pattern := range patterns {
+		if g, err := glob.Compile(pattern, '/'); err == nil && g.Match(p) {
+			return true
+		}
+	}
+	return false
+}
+
 // checkTestFirst requires a commit that touches only tests before the first
 // commit that touches code, and at least one fix commit after it. Commits that
 // touch only Markdown (notes, docs) are neither: they can sit anywhere.
-func checkTestFirst(commits []commitFiles) error {
+func checkTestFirst(commits []commitFiles, testPaths []string) error {
 	sawTestOnly := false
 	for _, c := range commits {
 		// Markdown files never make a commit "code", so a commit of tests plus
@@ -263,7 +291,7 @@ func checkTestFirst(commits []commitFiles) error {
 		for _, f := range c.Files {
 			switch {
 			case strings.HasSuffix(strings.ToLower(f), ".md"):
-			case isTestPath(f):
+			case isTestPath(f), declaredTestPath(f, testPaths):
 				sawTest = true
 			default:
 				sawOther = true
@@ -309,7 +337,7 @@ func (l *Loop) checkExecuteEvidence(ctx context.Context, order Order, cook *cook
 		if err != nil {
 			return err
 		}
-		return checkTestFirst(commits)
+		return checkTestFirst(commits, l.config.Gate.TestPaths)
 	}
 	return nil
 }
