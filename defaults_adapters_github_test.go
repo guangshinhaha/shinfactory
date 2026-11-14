@@ -382,6 +382,37 @@ func TestGitHubBacklogStopStopsAgainWhenReadyIsBackNextToNeedsShin(t *testing.T)
 	}
 }
 
+// A retried stop (an unpaid debt from an earlier run) finding ready next to needs-shin means
+// the stop landed and a person has since put ready back: it must leave the issue alone (#213).
+func TestGitHubBacklogStopRetryLeavesAnIssueAPersonRestored(t *testing.T) {
+	env, logPath := fakeGH(t, `[
+  {"number": 7, "title": "Back", "url": "u7", "labels": [{"name": "ready"}, {"name": "needs-shin"}], "body": "x"}
+]`)
+	runGitHubAdapter(t, env, "backlog-stop", "Failed.", "7", "retry")
+	log := readLog(t, logPath)
+	if strings.Contains(log, "issue comment") || strings.Contains(log, "issue edit") {
+		t.Fatalf("retried stop touched an issue a person restored:\n%s", log)
+	}
+	if got := backlogIDs(t, env); got != "7" {
+		t.Fatalf("backlog = %q, want 7 still ready", got)
+	}
+}
+
+// A retried stop finding only ready means a person restored it (clearing needs-shin too): leave it (#213).
+func TestGitHubBacklogStopRetryLeavesAReadyIssue(t *testing.T) {
+	env, logPath := fakeGH(t, `[
+  {"number": 7, "title": "Back", "url": "u7", "labels": [{"name": "ready"}], "body": "x"}
+]`)
+	runGitHubAdapter(t, env, "backlog-stop", "Failed.", "7", "retry")
+	log := readLog(t, logPath)
+	if strings.Contains(log, "issue comment") || strings.Contains(log, "issue edit") {
+		t.Fatalf("retried stop touched a ready issue:\n%s", log)
+	}
+	if got := backlogIDs(t, env); got != "7" {
+		t.Fatalf("backlog = %q, want 7 still ready", got)
+	}
+}
+
 func TestGitHubBacklogStopRefusesAnEmptyMessage(t *testing.T) {
 	env, _ := fakeGH(t, stopIssues)
 	cmd := exec.Command(filepath.Join("defaults", "adapters", "github", "backlog-stop"), "7")
