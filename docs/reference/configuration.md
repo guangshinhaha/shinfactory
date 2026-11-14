@@ -126,6 +126,19 @@ max_rounds = 2
 high = 3
 ```
 
+### `[gate]`
+
+Tunes the evidence gate a `bug` order's execute stage passes. A bug fix needs a commit that touches only tests before the first commit that touches code. The gate already recognises `_test.go`, `test_*`, `*.spec.*`, `test/`, `tests/`, `testdata/` and shell test scripts (`test.sh`, `test-*.sh`, `*_test.sh`, `*.bats`). The same rejection twice in a row stops the order for a person (`needs-shin`) with the commit and rule named, instead of retrying.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `test_paths` | list of globs | none | Extra files that count as tests. `*` stays inside one path segment, `**` crosses segments (`scripts/**/test*.sh` matches `scripts/a/test.sh`, not `scripts/test.sh`). An invalid glob is a fatal config error |
+
+```toml
+[gate]
+test_paths = ["ci/verify-*.sh"]
+```
+
 ## `[backlog]`
 
 Spaces the loop's backlog syncs, each a GitHub API call that shares one user's rate limit across every loop. A loop with no work syncs every 5 minutes. A loop with work syncs at most once per interval and reuses the last result in between. `enqueue` and `requeue` sync on the next cycle regardless.

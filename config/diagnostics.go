@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"github.com/gobwas/glob"
 	"os"
 	"path/filepath"
 	"slices"
@@ -82,6 +83,17 @@ func Validate(config Config) ValidationResult {
 			Fix:       "Set review.max_rounds to 1 (no automatic rework) or higher in .noodle.toml.",
 			Code:      DiagnosticCodeReviewRoundsInvalid,
 		})
+	}
+	for i, pattern := range config.Gate.TestPaths {
+		if _, err := glob.Compile(pattern, '/'); err != nil {
+			result.Diagnostics = append(result.Diagnostics, ConfigDiagnostic{
+				FieldPath: fmt.Sprintf("gate.test_paths[%d]", i),
+				Message:   fmt.Sprintf("test path %q is not a valid glob: %v", pattern, err),
+				Severity:  DiagnosticSeverityFatal,
+				Fix:       "Write a glob such as \"scripts/**/test*.sh\" in gate.test_paths in .noodle.toml.",
+				Code:      DiagnosticCodeGateTestPathInvalid,
+			})
+		}
 	}
 	tierNames := make([]string, 0, len(config.Review.Tiers))
 	for name := range config.Review.Tiers {

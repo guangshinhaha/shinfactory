@@ -36,7 +36,29 @@ func (l *Loop) rejectStage(ctx context.Context, cook *cookHandle, reason string)
 	default:
 		return l.failStage(ctx, cook, reason)
 	}
+	if l.rejectedTwiceAlike(cook.orderID, reason) {
+		return l.failStage(ctx, cook, "Rejected twice for the same reason, so another attempt would fail the same way: "+reason)
+	}
 	return l.rejectStageUpTo(ctx, cook, reason, 0)
+}
+
+func (l *Loop) lastRejectionFile(orderID string) string {
+	return filepath.Join(l.runtimeDir, "last-rejection", orderID+".txt")
+}
+
+// rejectedTwiceAlike records reason as the order's latest build rejection and
+// reports whether the one before it was word for word the same. The retry note
+// cannot serve: the next launch consumes it.
+func (l *Loop) rejectedTwiceAlike(orderID, reason string) bool {
+	path := l.lastRejectionFile(orderID)
+	prev, _ := os.ReadFile(path)
+	if string(prev) == reason {
+		return true
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err == nil {
+		_ = os.WriteFile(path, []byte(reason), 0o644)
+	}
+	return false
 }
 
 // rejectStageUpTo retries any stage kind up to limit launches (0 = the spend

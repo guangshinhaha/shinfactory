@@ -3,6 +3,7 @@ package loop
 import (
 	"context"
 	"errors"
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -94,12 +95,13 @@ func TestTestFirstRejectionSendsExecuteBackWithTheExactReason(t *testing.T) {
 
 func TestEvidenceFailureStopsForAPersonWhenAttemptsRunOut(t *testing.T) {
 	h := evidenceHarness(t, "bug", "")
-	branchCommits = nonTestFirstCommit("116a36c1")
 	max := h.l.config.Spend.MaxAttempts
 	for i := 1; i < max; i++ {
+		branchCommits = nonTestFirstCommit(fmt.Sprintf("116a36c%d", i)) // a different rejection each time
 		h.next(t)
 		h.retrying(t, "execute", i)
 	}
+	branchCommits = nonTestFirstCommit("116a36cf")
 	h.next(t) // attempt max: the cap is spent
 	h.failedWith(t, "attempts exhausted")
 	if n := h.stops(); n != 1 {

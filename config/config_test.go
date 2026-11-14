@@ -808,3 +808,17 @@ func TestReviewRoundsRejectsZeroNegativeAndUnknownTier(t *testing.T) {
 		}
 	}
 }
+
+func TestGateTestPathsConfig(t *testing.T) {
+	cfg, err := Parse([]byte("[gate]\ntest_paths = [\"scripts/**/test*.sh\"]\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Gate.TestPaths) != 1 || hasCode(Validate(cfg), DiagnosticCodeGateTestPathInvalid) {
+		t.Fatalf("valid glob misread: %+v", cfg.Gate)
+	}
+	cfg.Gate.TestPaths = []string{"scripts/[test.sh"}
+	if !hasCode(Validate(cfg), DiagnosticCodeGateTestPathInvalid) {
+		t.Fatal("invalid glob accepted")
+	}
+}
