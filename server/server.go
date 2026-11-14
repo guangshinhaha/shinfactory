@@ -32,6 +32,8 @@ type Options struct {
 	LoopStateProvider LoopStateProvider
 	Warnings          []string
 	Broker            *SessionEventBroker
+	Repo              string // repo name shown on every dashboard page
+	Build             string // build SHA shown in the top bar
 }
 
 type LoopStateProvider interface {
@@ -50,6 +52,8 @@ type Server struct {
 	warnings   []string
 	ready      chan struct{}
 	runOrca    orcaRunner
+	repo       string
+	build      string
 }
 
 // New creates a Server but does not start it.
@@ -86,6 +90,8 @@ func New(opts Options) *Server {
 		warnings:   opts.Warnings,
 		ready:      make(chan struct{}),
 		runOrca:    runOrcaCLI,
+		repo:       strings.TrimSpace(opts.Repo),
+		build:      strings.TrimSpace(opts.Build),
 	}
 
 	mux := http.NewServeMux()
@@ -286,8 +292,25 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 		"model":      s.config.Routing.Defaults.Model,
 		"mode":       s.config.Mode,
 		"task_types": names,
+		"repo":       s.repo,
+		"port":       s.port(r),
+		"build_sha":  s.build,
 	}
 	writeJSON(w, http.StatusOK, resp)
+}
+
+// port is the port this dashboard listens on. The listener wins over the
+// request's Host so a dev proxy in front of the server does not change it.
+func (s *Server) port(r *http.Request) string {
+	addr := r.Host
+	if s.listener != nil {
+		addr = s.listener.Addr().String()
+	}
+	_, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return ""
+	}
+	return port
 }
 
 func (s *Server) handleReviewDiff(w http.ResponseWriter, r *http.Request) {

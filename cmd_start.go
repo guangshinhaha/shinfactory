@@ -118,7 +118,7 @@ func runStart(ctx context.Context, app *App, opts startOptions) error {
 
 	if startServer {
 		go func() {
-			if err := runWebServer(ctx, runtimeDir, app.Config, runtimeLoop, warnings, broker, apiLogger.With("component", "server")); err != nil {
+			if err := runWebServer(ctx, cwd, runtimeDir, app.Config, runtimeLoop, warnings, broker, apiLogger.With("component", "server")); err != nil {
 				apiLogger.Error("web server exited", "error", err)
 			}
 		}()
@@ -139,6 +139,7 @@ func shouldStartServer(cfg config.ServerConfig) bool {
 
 func runWebServer(
 	ctx context.Context,
+	projectDir string,
 	runtimeDir string,
 	cfg config.Config,
 	provider server.LoopStateProvider,
@@ -162,6 +163,8 @@ func runWebServer(
 		LoopStateProvider: provider,
 		Warnings:          warnings,
 		Broker:            broker,
+		Repo:              repoName(projectDir),
+		Build:             buildSHA(),
 	})
 
 	errCh := make(chan error, 1)
