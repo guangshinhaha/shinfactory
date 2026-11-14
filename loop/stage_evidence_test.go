@@ -228,6 +228,10 @@ func TestCheckTestFirst(t *testing.T) {
 		{"docs-only branch has no fix", []commitFiles{c("a", "x_test.go"), c("b", "README.md")}, false},
 		{"tests plus docs first, then fix", []commitFiles{c("a", "x_test.go", "README.md"), c("b", "x.go")}, true},
 		{"testdata counts as test", []commitFiles{c("a", "pkg/testdata/in.json"), c("b", "x.go")}, true},
+		{"shell test script", []commitFiles{c("a", "scripts/supply-chain/test.sh"), c("b", "x.go")}, true},
+		{"shell test script by suffix", []commitFiles{c("a", "scripts/check_test.sh"), c("b", "x.go")}, true},
+		{"bats test", []commitFiles{c("a", "scripts/x.bats"), c("b", "x.go")}, true},
+		{"non-test shell script is code", []commitFiles{c("a", "scripts/build.sh"), c("b", "x.go")}, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

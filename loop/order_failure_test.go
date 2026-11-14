@@ -374,3 +374,17 @@ func TestFailedStopIsRetriedUntilItLands(t *testing.T) {
 		t.Fatalf("want one comment and needs-shin after the retry, got gh log:\n%s", log)
 	}
 }
+
+// The same rejection twice in a row cannot be fixed by a third cook: the
+// order goes to a person after the second, with attempts still left.
+func TestIdenticalRejectionStopsAfterTwoRounds(t *testing.T) {
+	h := evidenceHarness(t, "bug", "")
+	h.l.config.Spend.MaxAttempts = 10
+	h.l.config.Spend.MaxCostUSD = 0
+	branchCommits = nonTestFirstCommit("116a36c1")
+	h.nextUntilFailed(t)
+	h.failedWith(t, "repeated identical rejection")
+	if got := len(h.rt.sessions); got != 2 {
+		t.Fatalf("execute launched %d times, want 2", got)
+	}
+}
