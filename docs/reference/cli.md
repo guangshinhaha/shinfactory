@@ -36,6 +36,16 @@ shinfactory status
 
 ---
 
+## `shinfactory ps`
+
+List every loop registered on this machine, from any directory. Each running loop writes `~/.local/state/shinfactory/loops/<repo>.json` (repo, project dir, port, pid, loop state, mode, slots busy/max, needs-you count, version, updated_at) on start and on each state change, and deletes it on clean exit. A file whose pid is dead is shown as `stale`. Each dashboard serves the same list at `GET /api/loops`.
+
+```
+shinfactory ps [--json]
+```
+
+---
+
 ## `shinfactory skills`
 
 List resolved skills.

@@ -11,6 +11,7 @@ import (
 	"github.com/guangshinhaha/shinfactory/config"
 	"github.com/guangshinhaha/shinfactory/dispatcher"
 	"github.com/guangshinhaha/shinfactory/event"
+	"github.com/guangshinhaha/shinfactory/internal/loopreg"
 	"github.com/guangshinhaha/shinfactory/internal/orderx"
 	"github.com/guangshinhaha/shinfactory/internal/reducer"
 	"github.com/guangshinhaha/shinfactory/internal/state"
@@ -216,6 +217,9 @@ type Loop struct {
 	publishedState atomic.Pointer[LoopState]
 
 	lastStatus statusfile.Status
+
+	announceVersion string
+	announcer       *loopreg.Registrar // nil until Announce; the machine-wide registry entry
 
 	// V2 canonical state — event-sourced pipeline.
 	canonical       state.State

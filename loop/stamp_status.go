@@ -4,6 +4,8 @@ import (
 	"slices"
 	"sort"
 
+	"github.com/guangshinhaha/shinfactory/internal/linestatus"
+	"github.com/guangshinhaha/shinfactory/internal/loopreg"
 	"github.com/guangshinhaha/shinfactory/internal/statusfile"
 )
 
@@ -31,6 +33,8 @@ func (l *Loop) stampStatus() error {
 		Warnings:       l.lastMiseWarnings,
 	}
 
+	l.announceState(status)
+
 	// Skip write if nothing changed.
 	if slices.Equal(l.lastStatus.Active, status.Active) &&
 		l.lastStatus.LoopState == status.LoopState &&
@@ -47,4 +51,46 @@ func (l *Loop) stampStatus() error {
 	l.lastStatus = status
 	l.publishState()
 	return nil
+}
+
+// Announce registers this loop in the machine-wide registry at dir, so
+// `shinfactory ps` and other dashboards can find it. The file is written on the
+// next status stamp and removed by Shutdown. Call it before Run.
+func (l *Loop) Announce(dir, version string) {
+	l.announcer = loopreg.NewRegistrar(dir, l.projectDir, l.deps.Now)
+	l.announceVersion = version
+}
+
+// SetPort tells the registry which port the dashboard listens on.
+func (l *Loop) SetPort(port int) {
+	if l.announcer == nil {
+		return
+	}
+	if err := l.announcer.SetPort(port); err != nil {
+		l.logger.Warn("could not update loop registry port", "error", err)
+	}
+}
+
+// announceState publishes the loop's current state to the registry. A failed
+// write is logged: the registry is a convenience and must not stop the loop.
+func (l *Loop) announceState(status statusfile.Status) {
+	if l.announcer == nil {
+		return
+	}
+	needsYou, err := linestatus.NeedsShinCount(l.runtimeDir)
+	if err != nil {
+		l.logger.Warn("could not count needs-shin for loop registry", "error", err)
+	}
+	err = l.announcer.Publish(loopreg.Entry{
+		ProjectDir: l.projectDir,
+		LoopState:  status.LoopState,
+		Mode:       status.Mode,
+		SlotsBusy:  len(status.Active),
+		SlotsMax:   status.MaxConcurrency,
+		NeedsYou:   needsYou,
+		Version:    l.announceVersion,
+	})
+	if err != nil {
+		l.logger.Warn("could not write loop registry entry", "error", err)
+	}
 }

@@ -111,6 +111,15 @@ func readNeedsShin(runtimeDir string) ([]NeedsShin, error) {
 	return jsonx.ReadJSON[[]NeedsShin](filepath.Join(runtimeDir, needsShinFile))
 }
 
+// NeedsShinCount is how many orders the loop has recorded as waiting on a person.
+func NeedsShinCount(runtimeDir string) (int, error) {
+	items, err := readNeedsShin(runtimeDir)
+	if err != nil {
+		return 0, fmt.Errorf("read %s: %w", needsShinFile, err)
+	}
+	return len(items), nil
+}
+
 // Read builds the report from runtimeDir. A directory the loop never wrote to
 // reads as an idle line, not an error.
 func Read(runtimeDir string) (Report, error) {

@@ -28,6 +28,9 @@ func Commands() []Command {
 		}},
 		{Name: "version", Short: "Print shinfactory version"},
 		{Name: "status", Short: "Show compact runtime status"},
+		{Name: "ps", Short: "List every loop registered on this machine", Flags: []Flag{
+			{Name: "json", Type: "bool", Desc: "print the registered loops as JSON"},
+		}},
 		{Name: "control", Short: "Send a control to the running loop and print its result"},
 		{Name: "skills", Short: "List resolved skills", Subcommands: []Command{
 			{Name: "list", Short: "List all resolved skills"},
