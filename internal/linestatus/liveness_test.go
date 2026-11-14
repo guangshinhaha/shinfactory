@@ -31,8 +31,8 @@ func writeLock(t *testing.T, dir string, pid int) {
 func ageWrites(t *testing.T, dir string, age time.Duration) {
 	t.Helper()
 	old := time.Now().Add(-age)
-	for _, name := range []string{"status.json", "state.snapshot.json"} {
-		if err := os.Chtimes(filepath.Join(dir, name), old, old); err != nil {
+	for _, name := range []string{"status.json", "state.snapshot.json", "state.json"} {
+		if err := os.Chtimes(filepath.Join(dir, name), old, old); err != nil && !os.IsNotExist(err) {
 			t.Fatal(err)
 		}
 	}
@@ -97,6 +97,21 @@ func TestQuietLiveLoopWithNoRunningOrderIsNotStale(t *testing.T) {
 	writeLock(t, dir, os.Getpid())
 	ageWrites(t, dir, time.Hour)
 	if got, _ := ResolveLoopState(dir, "running", false, time.Now()); got != "running" {
+		t.Fatalf("loop_state = %q, want running", got)
+	}
+}
+
+func TestLongCookWithFreshStateJSONIsRunning(t *testing.T) {
+	dir := writeRuntime(t)
+	setLoopState(t, dir, "running")
+	writeLock(t, dir, os.Getpid())
+	ageWrites(t, dir, time.Hour)
+	// The loop rewrites state.json every cycle even when status.json and
+	// state.snapshot.json stay put during a long cook.
+	if err := os.WriteFile(filepath.Join(dir, "state.json"), []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := ResolveLoopState(dir, "running", true, time.Now()); got != "running" {
 		t.Fatalf("loop_state = %q, want running", got)
 	}
 }

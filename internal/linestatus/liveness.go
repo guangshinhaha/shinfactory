@@ -30,10 +30,11 @@ func ResolveLoopState(runtimeDir, raw string, ordersRunning bool, now time.Time)
 }
 
 // lastStateWrite is the newest modification time among the files the loop
-// writes as it works. Zero when it has written none.
+// writes as it works. state.json is the one written every cycle; status.json
+// and state.snapshot.json change only on a transition. Zero when it has written none.
 func lastStateWrite(runtimeDir string) time.Time {
 	var newest time.Time
-	for _, name := range []string{"status.json", "state.snapshot.json"} {
+	for _, name := range []string{"status.json", "state.snapshot.json", "state.json"} {
 		if info, err := os.Stat(filepath.Join(runtimeDir, name)); err == nil && info.ModTime().After(newest) {
 			newest = info.ModTime()
 		}

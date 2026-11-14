@@ -24,7 +24,7 @@ type Report struct {
 	Mode        string      `json:"mode"`
 	Concurrency int         `json:"concurrency"`
 	LoopState   string      `json:"loop_state"`
-	StaleFor    string      `json:"stale_for,omitempty"` // how long since the loop last wrote state, when loop_state is stale
+	StaleFor    string      `json:"stale_for"` // how long since the loop last wrote state, when loop_state is stale
 	Running     []Order     `json:"running"`
 	Queued      []Order     `json:"queued"`
 	Parked      []Order     `json:"parked"`
