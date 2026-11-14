@@ -206,6 +206,7 @@ type Loop struct {
 	orders               OrdersFile
 	ordersLoaded         bool
 	schedulePromoted     bool      // set when consumeOrdersNext promotes after a schedule dispatch
+	scheduleBacklogKey   string    // backlog the last mise-change schedule run saw; see ensureScheduleIfNeeded
 	scheduleNothingUntil time.Time // cooldown: suppress schedule re-spawn until this time
 	lastPromotionError   string    // latest scheduler-output validation issue to inject into next schedule prompt
 	droppedOrderIDs      []string  // unready order ids dropped since the last schedule prompt; survives clean promotions

@@ -265,6 +265,14 @@ func (l *Loop) ensureScheduleIfNeeded(brief mise.Brief, orders *OrdersFile, mise
 		}
 	}
 	if miseChanged && !l.hasActiveScheduleCook() && !hasScheduleOrder(*orders) {
+		backlogKey := backlogFingerprint(brief.Backlog)
+		if l.hasInFlightStage() && backlogKey == l.scheduleBacklogKey {
+			// The brief moved (history, tickets) but the backlog did not, so the only
+			// amendment the scheduler could make is rejected (#106). Wait for a stage to
+			// finish or the backlog to change.
+			return false, nil
+		}
+		l.scheduleBacklogKey = backlogKey
 		orders.Orders = append(orders.Orders, scheduleOrder(""))
 		if err := l.writeOrdersState(*orders); err != nil {
 			return false, err
@@ -528,4 +536,13 @@ func (l *Loop) buildBriefWithRetry(ctx context.Context) (brief mise.Brief, warni
 		return brief, warnings, changed, false, err
 	}
 	return mise.Brief{}, []string{warning}, false, true, nil
+}
+
+// backlogFingerprint identifies a backlog by the fields the scheduler reads.
+func backlogFingerprint(backlog []adapter.BacklogItem) string {
+	var b strings.Builder
+	for _, item := range backlog {
+		fmt.Fprintf(&b, "%q|%q|%q|%q\n", item.ID, item.Title, item.Status, item.Plan)
+	}
+	return b.String()
 }
