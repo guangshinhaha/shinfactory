@@ -42,9 +42,9 @@ Without that line, a stage asking for `codex` runs on its role's Claude model.
 sensitive = true
 ```
 
-Every stage stays on `routing.defaults.provider`. A role that names another provider is a fatal config error. An order or control command whose stage names another provider is rejected when it is read, instead of being rerouted silently.
+Every stage stays on `routing.defaults.provider`. A role that names another provider, `zcode` included, is a fatal config error. Z.ai receives the code of any stage that runs on `zcode`, so lock a repo to it only when that is acceptable. An order or control command whose stage names another provider is rejected when it is read, instead of being rerouted silently.
 
-The loop also keeps a running stage from handing work to the other provider. Every launch on a sensitive repo sets `NOODLE_SENSITIVE=1` and `NOODLE_DENY_PROVIDERS`. A claude stage starts with a Bash deny rule for the `codex` CLI. Every stage, claude or codex, also gets a stub for the other provider's CLI ahead of `PATH` that exits non-zero, so `sh -c` and names built from variables are caught too. The sprites runtime writes the same stubs on the sprite. So the `codex` and `adversarial-review` skills cannot delegate mid-stage. `shinfactory start` refuses to run its repair session on another provider.
+The loop also keeps a running stage from handing work to the other provider. Every launch on a sensitive repo sets `NOODLE_SENSITIVE=1` and `NOODLE_DENY_PROVIDERS`. A claude stage starts with Bash deny rules for the `codex` and `zcode` CLIs. Every stage, claude or codex, also gets a stub for the other provider's CLI ahead of `PATH` that exits non-zero, so `sh -c` and names built from variables are caught too. The sprites runtime writes the same stubs on the sprite. So the `codex` and `adversarial-review` skills cannot delegate mid-stage. `shinfactory start` refuses to run its repair session on another provider.
 
 Orca starts its own agent, so the factory cannot give it a deny rule or a `PATH`. A sensitive repo runs on the `process` runtime instead of `orca`; if only `orca` is wired, the launch is refused. A custom `runtimeDefault` template runs as a child process and inherits the `PATH` stubs.
 

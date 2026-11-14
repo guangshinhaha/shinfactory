@@ -136,8 +136,8 @@ func TestIntegrationSensitiveRepoStaysOnOneProvider(t *testing.T) {
 		if call.Provider != "claude" {
 			t.Errorf("%s dispatched on %s, want claude", call.Skill, call.Provider)
 		}
-		if len(call.DenyProviders) != 1 || call.DenyProviders[0] != "codex" {
-			t.Errorf("%s DenyProviders = %v, want [codex]", call.Skill, call.DenyProviders)
+		if len(call.DenyProviders) != 2 || call.DenyProviders[0] != "codex" || call.DenyProviders[1] != "zcode" {
+			t.Errorf("%s DenyProviders = %v, want [codex zcode]", call.Skill, call.DenyProviders)
 		}
 	}
 }

@@ -206,11 +206,19 @@ func (d *OrcaDispatcher) Dispatch(ctx context.Context, req DispatchRequest) (Ses
 // orcaAgentFor maps a factory provider onto an Orca agent id.
 func orcaAgentFor(provider string) (string, error) {
 	switch p := stringx.Normalize(provider); p {
-	case "claude", "codex":
+	case "claude", "codex", "zcode":
 		return p, nil
 	default:
-		return "", fmt.Errorf("provider %q has no orca agent (valid: claude, codex)", provider)
+		return "", fmt.Errorf("provider %q has no orca agent (valid: claude, codex, zcode)", provider)
 	}
+}
+
+// orcaAgentAcceptsModel reports whether Orca lets worker-start pick this
+// agent's model with --model. zcode launches with the model its own config
+// names, and Orca refuses the flag for it ("does not support launch-time
+// model selection").
+func orcaAgentAcceptsModel(agent string) bool {
+	return agent != "zcode"
 }
 
 // buildSpec composes the worker's task. An Orca worker has no factory
@@ -245,9 +253,11 @@ func (d *OrcaDispatcher) startWorker(ctx context.Context, runID, sessionID, spec
 		"--spec-file", specPath,
 		"--worktree", "path:" + req.WorktreePath,
 		"--agent", agent,
-		"--model", strings.TrimSpace(req.Model),
 		"--comment", "shinfactory session " + sessionID,
 		"--json",
+	}
+	if orcaAgentAcceptsModel(agent) {
+		args = append(args, "--model", strings.TrimSpace(req.Model))
 	}
 	if title := strings.TrimSpace(req.Title); title != "" {
 		args = append(args, "--task-title", title)

@@ -41,8 +41,8 @@ Controls which Agent provider and model are used for skill execution.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `provider` | string | `"claude"` | Agent provider name (e.g. `"claude"`, `"codex"`) |
-| `model` | string | `"claude-sonnet-5-5"` | Model identifier passed to the provider |
+| `provider` | string | `"claude"` | Agent provider name: `"claude"`, `"codex"` or `"zcode"` |
+| `model` | string | `"claude-sonnet-5-5"` | Model identifier passed to the provider. Optional for `zcode` and never passed to it |
 
 ```toml
 [routing.defaults]
@@ -53,6 +53,8 @@ model = "claude-sonnet-5-5"
 #### `[routing.roles]`
 
 Maps a role (`scheduler`, `planner`, `builder`, `explorer`, `reviewer`, `adversary`, `verifier`, `debrief`) to a provider and model. Omitted roles use the defaults: `claude-haiku-5-5` for scheduler and debrief, `claude-sonnet-5-5` for builder, explorer, reviewer and adversary, `claude-opus-5-5` for planner and verifier. A provider is used only when a role or `routing.defaults` names it. `[routing] sensitive = true` keeps every stage on `routing.defaults.provider`. See [Model Routing](/cookbook/model-routing).
+
+`provider = "zcode"` runs a role on Z.ai's GLM models through the zcode CLI, for example `builder = { provider = "zcode" }`. zcode picks its own model from its own config, so the `model` field is optional and is never passed to it (Orca refuses `--model` for zcode). On the `orca` runtime the stage launches with `--agent zcode`; on `process` it runs `zcode -p <prompt> --mode yolo --json` headless. **Code sent to a zcode stage goes to Z.ai's servers.** A repo with `[routing] sensitive = true` refuses zcode unless `routing.defaults.provider` is `"zcode"`.
 
 ### `[skills]`
 

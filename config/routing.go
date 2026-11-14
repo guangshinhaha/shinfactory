@@ -150,14 +150,21 @@ func (c Config) ValidateStageRouting(provider, model string) error {
 	if err := c.ValidateStageProvider(provider); err != nil {
 		return err
 	}
-	if stringx.Normalize(provider) != "" && strings.TrimSpace(model) == "" {
+	if stringx.Normalize(provider) != "" && strings.TrimSpace(model) == "" && ProviderTakesModel(provider) {
 		return fmt.Errorf("stage provider %q has no model: a stage provider needs a model, otherwise the role's provider is used", strings.TrimSpace(provider))
 	}
 	return nil
 }
 
+// ProviderTakesModel reports whether a config names a model for provider.
+// zcode runs the model its own config picks and Orca refuses --model for it,
+// so a zcode policy may leave the model empty.
+func ProviderTakesModel(provider string) bool {
+	return stringx.Normalize(provider) != "zcode"
+}
+
 // knownProviders are the agent CLIs a stage could shell out to.
-var knownProviders = []string{"claude", "codex"}
+var knownProviders = []string{"claude", "codex", "zcode"}
 
 // ForeignProviders lists the provider CLIs a stage on provider must not run.
 // It is empty unless routing.sensitive is set. The dispatcher turns it into

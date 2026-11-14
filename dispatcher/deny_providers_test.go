@@ -93,7 +93,7 @@ func TestClaudeStageCannotReachCodexThroughShell(t *testing.T) {
 	}
 	d := &ProcessDispatcher{runtimeDir: t.TempDir(), runtimeDefault: `n=cod; n=${n}ex; "$n" exec synthetic`}
 	req := DispatchRequest{Provider: "claude", DenyProviders: []string{"codex"}}
-	cmd, err := d.buildCmd(req, "")
+	cmd, err := d.buildCmd(req, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
