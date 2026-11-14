@@ -42,3 +42,30 @@ func TestWriteFileAtomicReplacesExistingContents(t *testing.T) {
 		t.Fatalf("file contents mismatch: got %q", string(got))
 	}
 }
+
+func TestWriteFileAtomicIfChangedSkipsIdenticalContent(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "f.json")
+	if err := WriteFileAtomicIfChanged(path, []byte("a\n")); err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteFileAtomicIfChanged(path, []byte("a\n")); err != nil {
+		t.Fatal(err)
+	}
+	after, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !os.SameFile(before, after) {
+		t.Fatal("identical content replaced the file")
+	}
+	if err := WriteFileAtomicIfChanged(path, []byte("b\n")); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := os.ReadFile(path); string(got) != "b\n" {
+		t.Fatalf("content = %q, want b", got)
+	}
+}

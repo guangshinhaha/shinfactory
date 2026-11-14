@@ -1,6 +1,7 @@
 package filex
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -57,4 +58,14 @@ func WriteFileAtomic(path string, data []byte) error {
 		return fmt.Errorf("rename temp file: %w", err)
 	}
 	return nil
+}
+
+// WriteFileAtomicIfChanged is WriteFileAtomic, except it leaves the file alone
+// when it already holds data. A rewrite with the same bytes still wakes any
+// watcher on the directory.
+func WriteFileAtomicIfChanged(path string, data []byte) error {
+	if current, err := os.ReadFile(path); err == nil && bytes.Equal(current, data) {
+		return nil
+	}
+	return WriteFileAtomic(path, data)
 }

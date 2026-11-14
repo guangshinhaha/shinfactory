@@ -28,6 +28,12 @@ func TestIdleLoopDoesNotTriggerItsOwnCycles(t *testing.T) {
 	go func() { done <- tc.loop.Run(ctx) }()
 	t.Cleanup(func() {
 		cancel()
+		// Shutdown waits for live sessions; let the fake ones end.
+		tc.runtime.mu.Lock()
+		for _, sess := range tc.runtime.sessions {
+			sess.complete("failed")
+		}
+		tc.runtime.mu.Unlock()
 		select {
 		case <-done:
 		case <-time.After(5 * time.Second):

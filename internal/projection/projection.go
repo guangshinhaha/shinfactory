@@ -78,7 +78,7 @@ func WriteProjectionFiles(dir string, bundle ProjectionBundle) error {
 	if err != nil {
 		return fmt.Errorf("encode orders projection: %w", err)
 	}
-	if err := filex.WriteFileAtomic(ordersPath, append(ordersData, '\n')); err != nil {
+	if err := filex.WriteFileAtomicIfChanged(ordersPath, append(ordersData, '\n')); err != nil {
 		return fmt.Errorf("write projected orders file: %w", err)
 	}
 
