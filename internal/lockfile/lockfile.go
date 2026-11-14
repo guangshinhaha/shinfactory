@@ -86,3 +86,33 @@ func readPID(f *os.File) int {
 	pid, _ := strconv.Atoi(s)
 	return pid
 }
+
+// HolderState is what the lock file says about the loop that wrote it.
+type HolderState int
+
+const (
+	// HolderUnknown means there is no lock file or it names no pid.
+	HolderUnknown HolderState = iota
+	// HolderAlive means the pid in the lock file is a running process.
+	HolderAlive
+	// HolderDead means the pid in the lock file is gone: the loop is not running.
+	HolderDead
+)
+
+// Holder reads the pid in the lock file at path and checks whether it is alive.
+// It never takes the lock, so it is safe to call while a loop runs.
+func Holder(path string) HolderState {
+	f, err := os.Open(path)
+	if err != nil {
+		return HolderUnknown
+	}
+	defer f.Close()
+	pid := readPID(f)
+	if pid <= 0 {
+		return HolderUnknown
+	}
+	if pidAlive(pid) {
+		return HolderAlive
+	}
+	return HolderDead
+}
