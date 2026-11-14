@@ -3,7 +3,6 @@ package loop
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -44,22 +43,26 @@ func (g ghLander) BranchPRClosed(ctx context.Context, dir, branch string) ([]str
 // branchHoldsNewWork reports whether the local branch has a tip that is not
 // inside the history of any closed PR head: commits the closed order never had.
 // A retry of a rebuilt order's first stage lands here before its own PR exists,
-// and must not wipe that order's work. A branch ref that is missing, or a git
-// error, reads as no new work only for a missing ref; an error keeps the branch.
+// and must not wipe that order's work. A closed head missing from this clone
+// (pushed from elsewhere) is fetched first; a head that still cannot be checked
+// is skipped, and the branch is kept only when no head contains its tip.
 func branchHoldsNewWork(projectDir, branch string, closedHeads []string) bool {
-	tip, err := exec.Command("git", "-C", projectDir, "rev-parse", "--verify", "-q", "refs/heads/"+branch).Output()
+	tipOut, err := exec.Command("git", "-C", projectDir, "rev-parse", "--verify", "-q", "refs/heads/"+branch).Output()
 	if err != nil {
 		return false // no local branch: nothing to lose
 	}
+	tip := strings.TrimSpace(string(tipOut))
 	for _, head := range closedHeads {
-		cmd := exec.Command("git", "-C", projectDir, "merge-base", "--is-ancestor", strings.TrimSpace(string(tip)), head)
-		runErr := cmd.Run()
-		if runErr == nil {
-			return false // the tip is the closed order's own history
+		head = strings.TrimSpace(head)
+		if head == "" {
+			continue
 		}
-		var ee *exec.ExitError
-		if !errors.As(runErr, &ee) || ee.ExitCode() != 1 {
-			return true // cannot tell (head not fetched?): keep the branch
+		if exec.Command("git", "-C", projectDir, "cat-file", "-e", head+"^{commit}").Run() != nil {
+			// Best effort: a failed fetch leaves the head unverifiable.
+			_ = exec.Command("git", "-C", projectDir, "fetch", "-q", "origin", head).Run()
+		}
+		if exec.Command("git", "-C", projectDir, "merge-base", "--is-ancestor", tip, head).Run() == nil {
+			return false // the tip is the closed order's own history
 		}
 	}
 	return true

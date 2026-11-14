@@ -3,6 +3,7 @@ package loop
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -196,5 +197,64 @@ func TestPrepareOrderBranchKeepsNewWorkOnRetryWhileOldPRIsClosed(t *testing.T) {
 	}
 	if got := gitIn(t, dir, "rev-parse", "HEAD"); got != newHead {
 		t.Fatalf("retry discarded the rebuilt order's work: head %s, want %s", got, newHead)
+	}
+}
+
+// The closed PR's head was pushed from another clone, so this clone never saw
+// it. The check fetches it, finds the stale tip inside it, and rebuilds from
+// current main (#186).
+func TestPrepareOrderBranchFetchesAClosedHeadMissingFromTheClone(t *testing.T) {
+	fetchBase = fetchLandingBase
+	t.Cleanup(func() { fetchBase = func(string, string) (string, error) { return "origin/main", nil } })
+
+	remote := t.TempDir()
+	gitIn(t, remote, "init", "--bare", "-b", "main")
+	project := t.TempDir()
+	gitIn(t, project, "init", "-b", "main")
+	gitIn(t, project, "remote", "add", "origin", remote)
+	writeFile(t, filepath.Join(project, "a.txt"), "a\n")
+	gitIn(t, project, "add", ".")
+	gitIn(t, project, "commit", "-m", "base")
+	gitIn(t, project, "push", "origin", "main")
+	wt := &worktree.App{Root: project}
+	cfg := config.DefaultConfig()
+	cfg.Landing.Mode = config.LandingModePR
+	ln := &fakeLander{}
+	l := New(project, "noodle", cfg, Dependencies{Worktree: wt, Lander: ln})
+	l.config.Landing.Mode = config.LandingModePR
+
+	const branch = "131-0-task"
+	if _, err := l.ensureWorktree(branch); err != nil {
+		t.Fatal(err)
+	}
+	dir := l.worktreePath(branch)
+	writeFile(t, filepath.Join(dir, "old.txt"), "old\n")
+	gitIn(t, dir, "add", ".")
+	gitIn(t, dir, "commit", "-m", "old order work")
+	gitIn(t, dir, "push", "origin", branch)
+
+	// Someone else pushes one more commit to the PR branch before it closes.
+	other := t.TempDir()
+	gitIn(t, other, "clone", "-b", branch, remote, ".")
+	writeFile(t, filepath.Join(other, "more.txt"), "more\n")
+	gitIn(t, other, "add", ".")
+	gitIn(t, other, "commit", "-m", "pushed from elsewhere")
+	gitIn(t, other, "push", "origin", branch)
+	elsewhere := gitIn(t, other, "rev-parse", "HEAD")
+	if exec.Command("git", "-C", project, "cat-file", "-e", elsewhere+"^{commit}").Run() == nil {
+		t.Fatal("setup: the clone already has the closed head")
+	}
+	ln.closedPR = true
+	ln.closedHeads = []string{"1111111111111111111111111111111111111111", elsewhere}
+
+	if err := l.prepareOrderBranch(context.Background(), branch); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := l.ensureWorktree(branch); err != nil {
+		t.Fatal(err)
+	}
+	mainHead := gitIn(t, project, "rev-parse", "origin/main")
+	if got := gitIn(t, l.worktreePath(branch), "rev-parse", "HEAD"); got != mainHead {
+		t.Fatalf("rebuilt branch head = %s, want current main %s", got, mainHead)
 	}
 }
