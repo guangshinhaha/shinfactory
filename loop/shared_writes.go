@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path"
+	"regexp"
 	"slices"
 	"strings"
 )
@@ -136,6 +137,41 @@ func (l *Loop) flagParkedHold(waiter string, h writeHold) {
 	}
 	if err := l.flagActionNeeded(line); err != nil {
 		l.logger.Warn("could not flag a parked shared-file hold", "order", waiter, "held_by", h.orderID, "error", err)
+	}
+}
+
+// parkedHoldLine matches the lines flagParkedHold writes; group 1 is the
+// parked order.
+var parkedHoldLine = regexp.MustCompile(`^order \S+ waits for .+, held by order (\S+), which is parked in pending review: `)
+
+// pruneParkedHoldFlags removes the action_needed lines of holds that ended: the
+// holder is no longer parked, so nobody needs to approve, reject or skip it.
+func (l *Loop) pruneParkedHoldFlags() {
+	orders, err := l.currentOrders()
+	if err != nil {
+		return
+	}
+	kept := make([]string, 0, len(orders.ActionNeeded))
+	for _, line := range orders.ActionNeeded {
+		if m := parkedHoldLine.FindStringSubmatch(line); m != nil {
+			if _, parked := l.cooks.pendingReview[m[1]]; !parked {
+				continue
+			}
+		}
+		kept = append(kept, line)
+	}
+	if len(kept) == len(orders.ActionNeeded) {
+		return
+	}
+	err = l.mutateOrdersState(func(o *OrdersFile) (bool, error) {
+		o.ActionNeeded = kept
+		return true, nil
+	})
+	if err == nil {
+		err = l.persistCanonicalCheckpoint()
+	}
+	if err != nil {
+		l.logger.Warn("could not clear ended parked-hold flags", "error", err)
 	}
 }
 

@@ -169,3 +169,24 @@ func TestStageBlockedByAParkedOrderFlagsActionNeededOnce(t *testing.T) {
 		t.Fatalf("action_needed = %q, want one line naming parked order a", orders.ActionNeeded)
 	}
 }
+
+// The line asks a person to approve, reject or skip the parked order; once it
+// leaves pending review the ask is stale.
+func TestParkedHoldFlagIsRemovedWhenTheHoldEnds(t *testing.T) {
+	h := newGateHarness(t, "none", "execute")
+	cand := []dispatchCandidate{{OrderID: "b", Stage: writesStage("brain/index.md")}}
+	h.l.cooks.pendingReview["a"] = &pendingReviewCook{cookIdentity: cookIdentity{orderID: "a", stage: writesStage("brain/index.md")}}
+	h.l.withoutWriteClashes(cand)
+	h.l.pruneParkedHoldFlags()
+	orders, _ := h.l.currentOrders()
+	if len(orders.ActionNeeded) != 1 {
+		t.Fatalf("action_needed = %q, want the line kept while order a is parked", orders.ActionNeeded)
+	}
+
+	delete(h.l.cooks.pendingReview, "a") // approved, rejected or skipped
+	h.l.pruneParkedHoldFlags()
+	orders, _ = h.l.currentOrders()
+	if len(orders.ActionNeeded) != 0 {
+		t.Fatalf("action_needed = %q, want the parked-hold line removed", orders.ActionNeeded)
+	}
+}

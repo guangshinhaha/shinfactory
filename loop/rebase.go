@@ -162,9 +162,7 @@ func (l *Loop) onShipConflict(ctx context.Context, cook *cookHandle, pr PullRequ
 		return false, err
 	}
 	// reopenStages checkpoints the canonical state, so the parked entry must
-	// be gone first. The reducer drops it; if the reopen fails, park the order
-	// again so it is not lost.
-	prevPending, hadPending := l.canonical.PendingReviews[cook.orderID]
+	// be gone first. The reducer drops it.
 	if parked {
 		err = l.emitEventChecked(ingest.EventStageReviewApproved, map[string]any{
 			"order_id":    cook.orderID,
@@ -176,10 +174,11 @@ func (l *Loop) onShipConflict(ctx context.Context, cook *cookHandle, pr PullRequ
 		err = l.reopenStages(cook.orderID, idx, cook.stageIndex, order.Round)
 	}
 	if err != nil {
-		if parked && hadPending {
-			if perr := l.parkPendingReview(cook, prevPending.Reason); perr != nil {
-				err = errors.Join(err, perr)
-			}
+		if parked {
+			// The branch now holds rebased commits nobody reviewed, so the
+			// order must not park again: an approve would merge them. A
+			// person decides.
+			return true, errors.Join(err, l.stopUnreviewedRebase(ctx, cook, err))
 		}
 		return true, err
 	}
@@ -202,6 +201,23 @@ func (l *Loop) probeConflicts(ctx context.Context, cook *cookHandle, base string
 		l.logger.Warn("could not list conflicting files", "order", cook.orderID, "error", err)
 	}
 	return files
+}
+
+// stopUnreviewedRebase ends a parked order whose rebased head could not be sent
+// back to review: the stage fails and the issue goes to a person.
+func (l *Loop) stopUnreviewedRebase(ctx context.Context, cook *cookHandle, cause error) error {
+	msg := "the branch was rebased onto the base branch but review could not run again on the new head: " + cause.Error()
+	l.logger.Warn("rebased head not reviewed, stopping order", "order", cook.orderID, "error", cause)
+	// The approve step dropped the parked entry from canonical state; drop it
+	// from the in-memory view too, even if later writes fail.
+	if err := l.loadPendingReview(); err != nil {
+		cause = errors.Join(cause, err)
+	}
+	flagErr := l.flagActionNeeded(cook.orderID + ": " + msg)
+	l.stopForPerson(ctx, cook.orderID,
+		"The branch was rebased after a merge conflict, but the factory could not send it back to review, so it was not merged. Check the branch, then put ready back. Cause:",
+		msg)
+	return errors.Join(flagErr, l.failStage(ctx, cook, msg))
 }
 
 // stopConflicted ends an order whose conflict the factory cannot clear: the
