@@ -301,6 +301,12 @@ func normalizeParsedValues(config *Config, metadata toml.MetaData, diagnostics *
 		config.Spend.MaxCostUSD = defaultMaxOrderCostUSD
 	}
 
+	// An unset max_rounds takes the default; an explicit 0 or negative value
+	// stays so Validate can reject it.
+	if !metadata.IsDefined("review", "max_rounds") {
+		config.Review.MaxRounds = defaultReviewMaxRounds
+	}
+
 	if config.Backlog.SyncIntervalSeconds < 0 {
 		appendNormalizedValueDiagnostic(diagnostics, "backlog.sync_interval_seconds",
 			fmt.Sprintf("sync_interval_seconds=%d is invalid; using the default %s", config.Backlog.SyncIntervalSeconds, defaultBacklogSyncInterval),

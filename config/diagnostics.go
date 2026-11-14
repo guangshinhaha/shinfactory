@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -69,6 +70,42 @@ func Validate(config Config) ValidationResult {
 				Severity:  DiagnosticSeverityFatal,
 				Fix:       "Point the role at routing.defaults.provider, or unset routing.sensitive.",
 				Code:      DiagnosticCodeSensitiveProvider,
+			})
+		}
+	}
+
+	if config.Review.MaxRounds <= 0 {
+		result.Diagnostics = append(result.Diagnostics, ConfigDiagnostic{
+			FieldPath: "review.max_rounds",
+			Message:   fmt.Sprintf("max_rounds=%d is invalid; it counts review rounds and must be 1 or more", config.Review.MaxRounds),
+			Severity:  DiagnosticSeverityFatal,
+			Fix:       "Set review.max_rounds to 1 (no automatic rework) or higher in .noodle.toml.",
+			Code:      DiagnosticCodeReviewRoundsInvalid,
+		})
+	}
+	tierNames := make([]string, 0, len(config.Review.Tiers))
+	for name := range config.Review.Tiers {
+		tierNames = append(tierNames, name)
+	}
+	sort.Strings(tierNames)
+	for _, name := range tierNames {
+		field := "review.tiers." + name
+		switch {
+		case !slices.Contains(reviewTiers, name):
+			result.Diagnostics = append(result.Diagnostics, ConfigDiagnostic{
+				FieldPath: field,
+				Message:   fmt.Sprintf("unknown tier %q (valid: %s)", name, strings.Join(reviewTiers, ", ")),
+				Severity:  DiagnosticSeverityFatal,
+				Fix:       "Name one of the tiers in [review.tiers] in .noodle.toml.",
+				Code:      DiagnosticCodeReviewRoundsInvalid,
+			})
+		case config.Review.Tiers[name] <= 0:
+			result.Diagnostics = append(result.Diagnostics, ConfigDiagnostic{
+				FieldPath: field,
+				Message:   fmt.Sprintf("%s=%d is invalid; it counts review rounds and must be 1 or more", name, config.Review.Tiers[name]),
+				Severity:  DiagnosticSeverityFatal,
+				Fix:       "Set the tier's rounds to 1 (no automatic rework) or higher in .noodle.toml.",
+				Code:      DiagnosticCodeReviewRoundsInvalid,
 			})
 		}
 	}

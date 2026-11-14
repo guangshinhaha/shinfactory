@@ -17,7 +17,7 @@ import (
 // the same ID, so the ledger lives beside orders.json, keyed by order ID.
 type orderSpend struct {
 	// Round is the fix round Attempts counts in. A quality reject sends the
-	// order back for a new round (capped by maxFixRounds), which starts the
+	// order back for a new round (capped by the [review] round limit), which starts the
 	// attempt count over so the loop does not eat the failure-retry cap.
 	Round int `json:"round"`
 	// Attempts counts launches per stage task key within Round.

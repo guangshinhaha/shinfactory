@@ -107,6 +107,23 @@ The cost cap does not apply where the runtime reports no cost: the Orca runtime 
 
 The cost check runs between stages, so one stage can finish past the ceiling before the order stops. There is no cap across orders.
 
+### `[review]`
+
+Sets how many review/verify rounds an order gets before the loop sends it to a person. The count is per order and includes the first round: a rejection from review, verify or a failed quality/verify stage ends a round. While rounds remain, the order goes back to execute on the same branch with the rejection attached. When the last round fails, the order stops and the issue comment says "2 of 2 review rounds failed" (the numbers are rounds run and the limit) with each rejection's reason.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `max_rounds` | int | `2` | Rounds per order; `1` means no automatic rework, so the first rejection goes to a person. `0` or a negative value is a fatal config error |
+| `tiers` | table | none | Per-tier override of `max_rounds`, keyed by order tier (`none`, `low`, `medium`, `high`). An order with no tier uses `medium`. Values follow the same rule as `max_rounds` |
+
+```toml
+[review]
+max_rounds = 2
+
+[review.tiers]
+high = 3
+```
+
 ## `[backlog]`
 
 Spaces the loop's backlog syncs, each a GitHub API call that shares one user's rate limit across every loop. A loop with no work syncs every 5 minutes. A loop with work syncs at most once per interval and reuses the last result in between. `enqueue` and `requeue` sync on the next cycle regardless.

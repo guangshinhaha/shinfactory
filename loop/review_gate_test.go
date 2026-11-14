@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -229,7 +230,7 @@ func TestSecondRejectionStopsTheOrderAndFlagsAPerson(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(orders.ActionNeeded) != 1 || !strings.Contains(orders.ActionNeeded[0], "rejected 2 times") {
+	if len(orders.ActionNeeded) != 1 || !strings.Contains(orders.ActionNeeded[0], "2 of 2 review rounds failed") {
 		t.Fatalf("action_needed = %v, want one line flagging the stopped order", orders.ActionNeeded)
 	}
 }
@@ -640,5 +641,55 @@ func TestMediumTierPostsNoVerdict(t *testing.T) {
 	h.next(t)
 	if len(h.ln.verdicts) != 0 {
 		t.Fatalf("medium tier posted %q, want nothing", h.ln.verdicts)
+	}
+}
+
+// rejectUntilStopped drives an order through rejected review rounds and
+// returns how many rejections it took to stop.
+func rejectUntilStopped(t *testing.T, h *gateHarness) int {
+	t.Helper()
+	h.next(t) // execute
+	for round := 0; round < 10; round++ {
+		h.review(t, round, "\n- still broken")
+		h.next(t) // quality rejects
+		if h.order(t).Status == OrderStatusFailed {
+			return round + 1
+		}
+		h.finishRework(t)
+	}
+	t.Fatal("order never stopped")
+	return 0
+}
+
+func TestMaxRoundsSendsBackAfterExactlyThatManyRejections(t *testing.T) {
+	for _, rounds := range []int{1, 2, 3} {
+		t.Run(fmt.Sprint(rounds), func(t *testing.T) {
+			h := newGateHarness(t, "medium", "execute", "quality")
+			h.l.config.Review.MaxRounds = rounds
+			if got := rejectUntilStopped(t, h); got != rounds {
+				t.Fatalf("stopped after %d rejections, want %d", got, rounds)
+			}
+			orders, err := readOrders(h.l.deps.OrdersFile)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := fmt.Sprintf("%d of %d review rounds failed", rounds, rounds)
+			if len(orders.ActionNeeded) != 1 || !strings.Contains(orders.ActionNeeded[0], want) ||
+				!strings.Contains(orders.ActionNeeded[0], "still broken") {
+				t.Fatalf("action_needed = %v, want %q and the rejection reason", orders.ActionNeeded, want)
+			}
+		})
+	}
+}
+
+func TestTierOverrideWinsOverMaxRounds(t *testing.T) {
+	h := newGateHarness(t, "high", "execute", "quality", "verify")
+	h.l.config.Review.MaxRounds = 2
+	h.l.config.Review.Tiers = map[string]int{"high": 1}
+	h.next(t) // execute
+	h.review(t, 0, "\n- broken")
+	h.next(t)
+	if got := h.order(t).Status; got != OrderStatusFailed {
+		t.Fatalf("status = %q, want failed after one rejection under high=1", got)
 	}
 }
