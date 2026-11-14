@@ -96,6 +96,7 @@ export interface ControlAck {
 }
 
 export interface ConfigDefaults {
+  repo: string;
   provider: string;
   model: string;
   mode: string;

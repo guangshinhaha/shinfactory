@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"net"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -282,12 +283,22 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := map[string]any{
+		"repo":       s.repoName(),
 		"provider":   s.config.Routing.Defaults.Provider,
 		"model":      s.config.Routing.Defaults.Model,
 		"mode":       s.config.Mode,
 		"task_types": names,
 	}
 	writeJSON(w, http.StatusOK, resp)
+}
+
+// repoName is the directory name of the project that owns the runtime dir.
+func (s *Server) repoName() string {
+	abs, err := filepath.Abs(s.runtimeDir)
+	if err != nil {
+		return ""
+	}
+	return filepath.Base(filepath.Dir(abs))
 }
 
 func (s *Server) handleReviewDiff(w http.ResponseWriter, r *http.Request) {
