@@ -10,6 +10,7 @@ import (
 
 	"github.com/guangshinhaha/shinfactory/adapter"
 	"github.com/guangshinhaha/shinfactory/internal/orderx"
+	"github.com/guangshinhaha/shinfactory/internal/state"
 )
 
 func actionNeeded(t *testing.T, h *gateHarness) string {
@@ -199,8 +200,9 @@ func TestStopConflictedStillStopsThePersonWhenTheFlagWriteFails(t *testing.T) {
 	}
 }
 
-func TestFailedReopenOfAParkedOrderRestoresItsPendingReviewAndStages(t *testing.T) {
-	h := newGateHarness(t, "medium", "execute", "quality")
+// parkedForReview runs a medium order to a parked review and returns its cook.
+func parkedForReview(t *testing.T, h *gateHarness) *cookHandle {
+	t.Helper()
 	h.next(t)
 	h.review(t, 0, "none")
 	h.ln.pending = 5
@@ -209,19 +211,73 @@ func TestFailedReopenOfAParkedOrderRestoresItsPendingReviewAndStages(t *testing.
 	if !ok {
 		t.Fatal("order did not park")
 	}
-	cook := &cookHandle{cookIdentity: pending.cookIdentity}
-	before := h.l.canonical.Orders["42"].Stages[0].Status
-	readOnlyRuntimeDir(t, h)
+	return &cookHandle{cookIdentity: pending.cookIdentity}
+}
+
+// A reopen that fails after the approve step left the branch rebased onto
+// commits nobody reviewed. The order must not park again there: it goes to a
+// person, and no later approve can merge those commits.
+func TestFailedReopenOfAParkedOrderHandsItToAPersonInsteadOfParkingUnreviewed(t *testing.T) {
+	h := newGateHarness(t, "medium", "execute", "quality")
+	cook := parkedForReview(t, h)
+	// Fail the reopen's orders write, not the approve's checkpoint before it.
+	ordersPath := h.l.deps.OrdersFile
+	if err := os.Remove(ordersPath); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(ordersPath, "x"), 0o755); err != nil {
+		t.Fatal(err)
+	}
 
 	stopped, err := h.l.onShipConflict(t.Context(), cook, PullRequest{URL: "u"}, true)
 	if !stopped || err == nil {
 		t.Fatalf("stopped=%v err=%v, want a stop with the reopen error", stopped, err)
 	}
-	if _, ok := h.l.canonical.PendingReviews["42"]; !ok {
-		t.Fatal("parked entry lost after the failed reopen")
+	if _, ok := h.l.canonical.PendingReviews["42"]; ok {
+		t.Fatal("order parked again on a rebased head nobody reviewed")
 	}
-	if got := h.l.canonical.Orders["42"].Stages[0].Status; got != before {
-		t.Fatalf("stage 0 status = %s after the failed reopen, want %s", got, before)
+	if _, ok := h.l.cooks.pendingReview["42"]; ok {
+		t.Fatal("pending review entry left for the rebased head")
+	}
+	if got := h.l.canonical.Orders["42"].Stages[0].Status; got != state.StageCompleted {
+		t.Fatalf("stage 0 status = %s, want completed (the build is not redone)", got)
+	}
+	if got := h.l.canonical.Orders["42"].Stages[1].Status; got == state.StagePending {
+		t.Fatal("review stage left pending: the reopen was not rolled back")
+	}
+	if len(h.ar.stopCalls) != 1 || h.ar.stopCalls[0] != "42" {
+		t.Fatalf("stop calls = %v, want the person told once about order 42", h.ar.stopCalls)
+	}
+	// A later merge retry has nothing to merge, so nothing unreviewed lands.
+	if err := h.l.controlMerge("42"); err == nil {
+		t.Fatal("merge succeeded for an order with no pending review")
+	}
+	if len(h.ln.merged) != 0 {
+		t.Fatalf("merges = %d, want 0: unreviewed commits landed", len(h.ln.merged))
+	}
+}
+
+func TestRequeueGivesAnOrderAtItsRebaseLimitAnotherRebase(t *testing.T) {
+	h := newGateHarness(t, "none", "execute")
+	h.ln.conflicts = 2
+	h.ln.rebaseErr = errors.New("boom")
+	h.next(t)
+	// The stage failed. Put the order at its rebase limit, as a failure that
+	// bypasses the hand-off to a person leaves it.
+	if err := h.l.bumpRebased("42"); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.l.controlRequeue("42"); err != nil {
+		t.Fatal(err)
+	}
+	if n := h.l.rebaseCount("42"); n != 0 {
+		t.Fatalf("rebase count = %d after requeue, want 0 (a fresh start)", n)
+	}
+	h.ln.rebaseErr = nil
+	rebases := h.ln.rebases
+	h.next(t)
+	if h.ln.rebases != rebases+1 {
+		t.Fatalf("rebases = %d, want %d: the requeued order could not rebase again", h.ln.rebases, rebases+1)
 	}
 }
 

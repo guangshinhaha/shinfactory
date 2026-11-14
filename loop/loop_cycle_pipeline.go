@@ -450,6 +450,7 @@ func (l *Loop) planCycleSpawns(orders OrdersFile, brief mise.Brief, capacity int
 		blockedOrders[targetID] = "checking"
 	}
 
+	l.pruneParkedHoldFlags()
 	plan := dispatch.PlanDispatches(l.canonical, capacity, blockedOrders)
 	if len(plan.Candidates) == 0 {
 		return nil, nil
