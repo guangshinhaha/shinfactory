@@ -109,6 +109,8 @@ Set `runtime` only when this order needs a specific one, and then state why in t
 
 Write valid JSON to `.noodle/orders-next.json` matching `shinfactory schema orders`.
 
+**Confirm the result.** The loop deletes `orders-next.json` within seconds of promoting it, so a missing file is not a failure. Read `.noodle/orders-next.result.json` (written before the proposal is deleted) and report what it says: `status` `promoted` (check `amend_rejected`, orders whose stage was in flight, and `unbuildable`, orders dropped for naming no ready issue) or `rejected` with its `reason`. Never report "did not persist" while no result file exists; if neither file is there after a few seconds, report the outcome as pending, not failed.
+
 See [references/examples.md](references/examples.md) for order JSON examples and `extra_prompt` field usage.
 
 ## Principles

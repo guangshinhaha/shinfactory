@@ -2,14 +2,17 @@ package loop
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/guangshinhaha/shinfactory/adapter"
 	"github.com/guangshinhaha/shinfactory/internal/dispatch"
+	"github.com/guangshinhaha/shinfactory/internal/filex"
 	"github.com/guangshinhaha/shinfactory/mise"
 )
 
@@ -113,6 +116,13 @@ func (l *Loop) handlePromotionResult(result mergeResult, err error) error {
 		l.handlePromotionError(err)
 		return nil
 	}
+	// Written before the proposal is deleted, so a worker that sees the proposal
+	// gone always finds the outcome beside it.
+	l.writePromotionResult(promotionResultFile{
+		Status:        "promoted",
+		AmendRejected: amendRejections(result.AmendRejected),
+		Unbuildable:   result.Unbuildable,
+	})
 	if err := os.Remove(l.deps.OrdersNextFile); err != nil && !os.IsNotExist(err) {
 		l.handlePromotionError(fmt.Errorf("remove orders-next.json: %w", err))
 		return nil
@@ -212,6 +222,47 @@ func (l *Loop) cancelSupersededCook(orderID string, cook *cookHandle, resume boo
 	return nil
 }
 
+// promotionResultFile is what the loop leaves in .noodle/orders-next.result.json
+// after it consumes orders-next.json. The loop deletes the proposal within
+// seconds, so without this the schedule worker cannot tell a promotion from a
+// write that never landed (#214).
+type promotionResultFile struct {
+	// Status is "promoted" or "rejected" (the whole proposal was refused).
+	Status string `json:"status"`
+	// Reason says why a rejected proposal was refused.
+	Reason string `json:"reason,omitempty"`
+	// AmendRejected lists active orders whose amendment was dropped.
+	AmendRejected []amendRejection `json:"amend_rejected,omitempty"`
+	// Unbuildable lists proposed order IDs dropped for naming no ready issue.
+	Unbuildable []string  `json:"unbuildable,omitempty"`
+	At          time.Time `json:"at"`
+}
+
+type amendRejection struct {
+	Order  string `json:"order"`
+	Reason string `json:"reason"`
+}
+
+func amendRejections(ids []string) []amendRejection {
+	out := make([]amendRejection, 0, len(ids))
+	for _, id := range ids {
+		out = append(out, amendRejection{Order: id, Reason: "stage in flight; amend after it finishes"})
+	}
+	return out
+}
+
+func (l *Loop) writePromotionResult(result promotionResultFile) {
+	result.At = l.deps.Now().UTC()
+	data, err := json.MarshalIndent(result, "", "  ")
+	if err == nil {
+		path := filepath.Join(filepath.Dir(l.deps.OrdersNextFile), "orders-next.result.json")
+		err = filex.WriteFileAtomic(path, append(data, '\n'))
+	}
+	if err != nil {
+		l.logger.Warn("write orders-next result failed", "error", err)
+	}
+}
+
 // handlePromotionError classifies and emits events for a failed orders-next
 // promotion. Always marks schedulePromoted so the schedule order can complete.
 func (l *Loop) handlePromotionError(err error) {
@@ -237,6 +288,7 @@ func (l *Loop) handlePromotionError(err error) {
 		payload.Failure = &failureMetadata
 	}
 	l.logger.Warn("orders-next promotion failed", "error", err)
+	l.writePromotionResult(promotionResultFile{Status: "rejected", Reason: err.Error()})
 	l.lastPromotionError = err.Error()
 	_ = l.events.Emit(LoopEventPromotionFailed, payload)
 	// Mark promoted so the schedule order can complete and a new
