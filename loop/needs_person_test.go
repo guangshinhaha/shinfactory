@@ -173,7 +173,7 @@ func TestStopForPersonWhenAttemptsRunOut(t *testing.T) {
 	env.reject(t, max, "Rejected: ./greet still prints nothing.")
 	log := ghLog(t, env.log)
 	if strings.Count(log, "issue comment 7") != 1 ||
-		!strings.Contains(log, "Reason: Rejected: ./greet still prints nothing.") {
+		!strings.Contains(log, "Reason: Rejected: ./greet still prints nothing.") || strings.Contains(log, "or the Done when") {
 		t.Fatalf("want one comment after the last attempt naming the reason:\n%s", log)
 	}
 	if !strings.Contains(log, "issue edit 7 --remove-label ready --add-label needs-shin") {
@@ -209,8 +209,43 @@ func TestStopForPersonOnAnUnresolvableMergeConflict(t *testing.T) {
 	}
 
 	log := ghLog(t, logPath)
-	if strings.Count(log, "issue comment 7") != 1 || !strings.Contains(log, "A merge conflict the factory cannot resolve") {
-		t.Fatalf("want one comment on issue 7 naming the conflict:\n%s", log)
+	if strings.Count(log, "issue comment 7") != 1 || !strings.Contains(log, "A merge conflict the factory cannot resolve") || strings.Contains(log, "Done when") {
+		t.Fatalf("want one comment on issue 7 naming the conflict, not the Done when:\n%s", log)
+	}
+	if !strings.Contains(log, "issue edit 7 --remove-label ready --add-label needs-shin") {
+		t.Fatalf("issue 7 not labelled needs-shin:\n%s", log)
+	}
+}
+
+// Stop 5: a ship or merge failure that is not a conflict. The comment carries
+// that failure, not the Done when (#131).
+func TestStopForPersonOnAShipFailureNamesTheFailure(t *testing.T) {
+	logPath := stubStopGH(t)
+	orders := OrdersFile{Orders: []Order{{
+		ID: "7", Title: "ship", Status: OrderStatusActive,
+		Stages: []Stage{{TaskKey: "execute", Skill: "execute", Provider: "claude", Model: "claude-opus-4-6", Status: StageStatusPending}},
+	}}}
+	env := newIntegrationEnv(t, orders, func(ic *integrationCfg) {
+		ic.cfg.Mode = "auto"
+		ic.mergeErr = errors.New("merge refused: verdict-check pending")
+	})
+	env.loop.deps.Adapter = githubStopRunner(t, env.projectDir)
+	seedCanonicalFromOrders(env.loop, orders)
+
+	if err := env.loop.Cycle(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	env.completeSessions("completed")
+	if err := env.loop.Cycle(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	log := ghLog(t, logPath)
+	if strings.Count(log, "issue comment 7") != 1 || !strings.Contains(log, "merge failed: ") || !strings.Contains(log, "merge refused: verdict-check pending") {
+		t.Fatalf("want one comment on issue 7 naming the merge failure:\n%s", log)
+	}
+	if strings.Contains(log, "Done when") {
+		t.Fatalf("a ship failure must not blame the Done when:\n%s", log)
 	}
 	if !strings.Contains(log, "issue edit 7 --remove-label ready --add-label needs-shin") {
 		t.Fatalf("issue 7 not labelled needs-shin:\n%s", log)
@@ -271,7 +306,7 @@ func spendCapEnv(t *testing.T, tweak func(*config.SpendConfig)) (*integrationEnv
 func assertSpendStop(t *testing.T, env *integrationEnv, logPath, wantReason string) {
 	t.Helper()
 	log := ghLog(t, logPath)
-	if strings.Count(log, "issue comment 7") != 1 || !strings.Contains(log, wantReason) || !strings.Contains(log, "Spending cap reached") {
+	if strings.Count(log, "issue comment 7") != 1 || !strings.Contains(log, wantReason) || !strings.Contains(log, "Spending cap reached") || strings.Contains(log, "Done when") {
 		t.Fatalf("want one comment on issue 7 saying %q:\n%s", wantReason, log)
 	}
 	if !strings.Contains(log, "issue edit 7 --remove-label ready --add-label needs-shin") {
