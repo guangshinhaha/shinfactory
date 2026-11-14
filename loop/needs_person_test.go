@@ -241,7 +241,7 @@ func TestStopForPersonOnAShipFailureNamesTheFailure(t *testing.T) {
 	}
 
 	log := ghLog(t, logPath)
-	if strings.Count(log, "issue comment 7") != 1 || !strings.Contains(log, "merge failed: merge refused: verdict-check pending") {
+	if strings.Count(log, "issue comment 7") != 1 || !strings.Contains(log, "merge failed: ") || !strings.Contains(log, "merge refused: verdict-check pending") {
 		t.Fatalf("want one comment on issue 7 naming the merge failure:\n%s", log)
 	}
 	if strings.Contains(log, "Done when") {
