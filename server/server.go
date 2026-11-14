@@ -5,7 +5,6 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"github.com/guangshinhaha/shinfactory/internal/loopreg"
 	"io/fs"
 	"net"
 	"net/http"
@@ -13,6 +12,7 @@ import (
 	"time"
 
 	"github.com/guangshinhaha/shinfactory/config"
+	"github.com/guangshinhaha/shinfactory/internal/loopreg"
 	"github.com/guangshinhaha/shinfactory/internal/snapshot"
 	"github.com/guangshinhaha/shinfactory/internal/stringx"
 	"github.com/guangshinhaha/shinfactory/loop"
