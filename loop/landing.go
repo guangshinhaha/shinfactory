@@ -54,6 +54,10 @@ type Lander interface {
 	// ConflictingFiles lists the files a rebase onto the remote base branch
 	// would conflict in, without changing the branch.
 	ConflictingFiles(ctx context.Context, dir, base string) ([]string, error)
+	// BranchPRClosed returns the head commits of branch's pull requests when
+	// all are closed or merged and at least one exists: the order that owned
+	// the branch is over. It returns nothing while any is open or none exists.
+	BranchPRClosed(ctx context.Context, dir, branch string) ([]string, error)
 }
 
 // ErrChecksPending means the PR cannot merge yet because checks are still
@@ -316,7 +320,11 @@ func (p prState) checksPending() string {
 
 // pendingError is ErrChecksPending with what the PR waits on, so a parked
 // order can tell a human why.
-type pendingError struct{ url, detail string }
+type pendingError struct {
+	url, detail string
+	// noVerdict: the wait is a red verdict-check and no verdict exists at the head.
+	noVerdict bool
+}
 
 func (e pendingError) Error() string {
 	return ErrChecksPending.Error() + " on " + e.url + ": " + e.detail
@@ -370,10 +378,19 @@ func (g ghLander) MarkReadyAndMerge(ctx context.Context, dir string, pr PullRequ
 		}
 	}
 	if detail := st.checksPending(); detail != "" {
-		return pendingError{pr.URL, detail}
+		pe := pendingError{url: pr.URL, detail: detail}
+		// Only at the head this worktree holds: GitHub can still show the
+		// previous head right after a push, and its verdicts say nothing then.
+		if strings.HasPrefix(detail, redCheckPrefix) && st.verdictCheckRed() && st.HeadRefOid == head {
+			// A failed read just leaves the wait as it was.
+			if bodies, cerr := g.commentBodies(ctx, dir, pr); cerr == nil && !hasVerdictFor(head, bodies) {
+				pe.noVerdict = true
+			}
+		}
+		return pe
 	}
 	if st.HeadRefOid != head {
-		return pendingError{pr.URL, fmt.Sprintf("GitHub shows head %.12s, not the pushed %.12s", st.HeadRefOid, head)}
+		return pendingError{url: pr.URL, detail: fmt.Sprintf("GitHub shows head %.12s, not the pushed %.12s", st.HeadRefOid, head)}
 	}
 	// After the head check: GitHub's mergeability of an older head says
 	// nothing about the commit this worktree holds.
@@ -390,10 +407,10 @@ func (g ghLander) MarkReadyAndMerge(ctx context.Context, dir string, pr PullRequ
 	// The merge ran, so a failed read must not fail the stage: the next
 	// attempt sees MERGED and finishes.
 	if st, err = g.view(ctx, dir, pr); err != nil {
-		return pendingError{pr.URL, "merge ran but its status could not be read: " + err.Error()}
+		return pendingError{url: pr.URL, detail: "merge ran but its status could not be read: " + err.Error()}
 	}
 	if st.State != "MERGED" {
-		return pendingError{pr.URL, "merge is queued, not merged"}
+		return pendingError{url: pr.URL, detail: "merge is queued, not merged"}
 	}
 	return nil
 }
@@ -593,6 +610,9 @@ func (l *Loop) completeWithPR(ctx context.Context, cook *cookHandle, hasCommits 
 		}
 		if err != nil {
 			if errors.Is(err, ErrChecksPending) {
+				if l.tryVerifyRerun(cook, err) {
+					return nil
+				}
 				// Gantry's checks run on the final push. Wait for them: the
 				// order stays parked and each cycle retries the merge.
 				l.lastChecksPoll = l.deps.Now()
@@ -756,6 +776,11 @@ func (l *Loop) retryAwaitingChecks(ctx context.Context) error {
 		case errors.Is(err, ErrChecksPending):
 			// Show what it waits on now, not on the first poll.
 			if !errors.As(err, &pe) {
+				break
+			}
+			// A PR a human approved parks again if its stage reruns, and the
+			// human approves only once; it waits as before.
+			if !strings.HasPrefix(pending.reason, approvedAwaitingChecksPrefix) && l.tryVerifyRerun(cook, err) {
 				break
 			}
 			if stuck := l.noteCheckWait(cook.orderID, pe.detail, now); stuck {

@@ -357,6 +357,83 @@ func (l *Loop) reviewGate(ctx context.Context, cook *cookHandle) (bool, error) {
 	return false, nil
 }
 
+// verifyRerunFile records the head verify was already rerun for in a round, so
+// one missing verdict reruns verify once and ship is never retried on it.
+const verifyRerunFile = "verify-rerun"
+
+// rerunVerifyForMissingVerdict handles a ship that found verdict-check red
+// because the head has no verdict (the comment was lost, say in an outage).
+// Waiting or retrying ship cannot fix that; the verify stage has to run again
+// at this head (#186). It reopens verify (and anything after it) once per head
+// and reports true. A FAIL from the rerun takes the normal rework path. When
+// the rerun was already spent for this head it reports false and the usual red
+// check wait, then stop, applies.
+func (l *Loop) tryVerifyRerun(cook *cookHandle, shipErr error) bool {
+	rerun, err := l.rerunVerifyForMissingVerdict(cook, shipErr)
+	if err != nil {
+		// Not worth losing the wait: the order parks as it did before.
+		l.logger.Warn("verify rerun for a missing verdict failed", "order", cook.orderID, "error", err)
+		return false
+	}
+	return rerun
+}
+
+func (l *Loop) rerunVerifyForMissingVerdict(cook *cookHandle, shipErr error) (bool, error) {
+	var pe pendingError
+	if !l.config.Landing.PR() || !errors.As(shipErr, &pe) || !pe.noVerdict {
+		return false, nil
+	}
+	order, ok := l.orderByID(cook.orderID)
+	if !ok {
+		return false, nil
+	}
+	if _, needVerify := gateNeeds(order.Tier); !needVerify {
+		return false, nil
+	}
+	verifyIdx := -1
+	for i, s := range order.Stages {
+		if gateStageKey(s) == gateVerifyKey {
+			verifyIdx = i
+		}
+	}
+	if verifyIdx < 0 || verifyIdx > cook.stageIndex {
+		return false, nil
+	}
+	head, err := headSHA(cook.worktreePath)
+	if err != nil {
+		return false, err
+	}
+	dir := l.gateDir(order.ID, order.Round)
+	marker := filepath.Join(dir, verifyRerunFile)
+	if done, err := os.ReadFile(marker); err == nil && strings.TrimSpace(string(done)) == head {
+		return false, nil
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return false, fmt.Errorf("record verify rerun: %w", err)
+	}
+	// The earlier post is not on the PR; a rerun must be allowed to post again.
+	if err := os.Remove(filepath.Join(dir, verdictPostedFile)); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return false, fmt.Errorf("clear posted-verdict record: %w", err)
+	}
+	delete(l.canonical.PendingReviews, cook.orderID)
+	delete(l.checkWaitSince, cook.orderID)
+	delete(l.checkWaitKind, cook.orderID)
+	if err := l.reopenStages(cook.orderID, verifyIdx, cook.stageIndex, order.Round); err != nil {
+		return false, err
+	}
+	if err := l.syncPendingReviewProjection(); err != nil {
+		return false, err
+	}
+	// Last: a failure above leaves the rerun unspent for the next attempt.
+	if err := os.WriteFile(marker, []byte(head), 0o644); err != nil {
+		return false, fmt.Errorf("record verify rerun: %w", err)
+	}
+	l.logger.Warn("no verdict at the PR head; rerunning verify",
+		"order", cook.orderID, "stage", verifyIdx, "head", head, "waiting_on", pe.detail)
+	l.forwardToScheduler(cook, "verify_rerun", "no verifier verdict at head "+head+" while verdict-check is red", nil)
+	return true, nil
+}
+
 // sendBack returns the order to its last execute stage on the same branch,
 // with the rejection in its next prompt, or stops it once maxFixRounds rework
 // rounds are used up. The stop comment carries every rejection of the order.
