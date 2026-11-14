@@ -346,3 +346,29 @@ func TestConflictedOrderIsNotReplannedWhileItsStopIsUnsent(t *testing.T) {
 		t.Fatalf("order ran after its stop landed: rebases=%d new sessions=%d", h.ln.rebases, len(h.rt.sessions)-sessions)
 	}
 }
+
+// A kill can leave a failed order with a parked PR. Startup archives the order;
+// the parked entry must go with it, or the next maintenance pass cannot find the
+// order and ends start.
+func TestStartupDropsPendingReviewOfArchivedFailedOrder(t *testing.T) {
+	h := newGateHarness(t, "medium", "execute", "quality")
+	parkedForReview(t, h)
+	if err := h.l.mutateOrdersState(func(orders *OrdersFile) (bool, error) {
+		orders.Orders[0].Status = OrderStatusFailed
+		orders.Orders[0].Stages[1].Status = StageStatusFailed
+		return true, nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := h.l.reconcile(t.Context()); err != nil {
+		t.Fatalf("reconcile: %v", err)
+	}
+	h.l.lastChecksPoll = time.Time{}
+	if err := h.l.retryAwaitingChecks(t.Context()); err != nil {
+		t.Fatalf("maintenance after startup archive: %v", err)
+	}
+	if _, ok := h.l.cooks.pendingReview["42"]; ok {
+		t.Fatal("pending review entry left for an archived order")
+	}
+}
