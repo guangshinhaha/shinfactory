@@ -13,6 +13,7 @@ Change slots (`set-max-concurrency`) and mode (`mode`) from the Ready page befor
 Controls are controlled by the snapshot value, so a failed ack leaves the old value; no local optimistic state beyond a pending flag.
 
 ## Behaviour
+- `controlMode` sets `l.config.Mode` in memory only (`loop/control_orders.go:13`); it is not persisted, so a loop restart reverts it. Say so in the mode copy or persist it; do not claim it survives a restart.
 - Switching to `auto` asks for confirmation (merges happen without review); other modes do not.
 - Stepper rejects values below 1; the loop already validates invalid values, surface its error.
 
