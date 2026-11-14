@@ -28,6 +28,12 @@ const (
 // is skipped. A failed stop is logged: the order is already failed and
 // inert, and the next stop reports again.
 func (l *Loop) stopForPerson(ctx context.Context, orderID, summary, detail string) {
+	l.runStop(ctx, orderID, summary, detail, false)
+}
+
+// runStop is stopForPerson; retry marks the settler re-running an unpaid debt, so the
+// adapter can tell a stop that already landed from a fresh failure (#213).
+func (l *Loop) runStop(ctx context.Context, orderID, summary, detail string, retry bool) {
 	// A person now owns the order; when they put ready back it starts with
 	// its one rebase again.
 	l.clearRebased(orderID)
@@ -39,8 +45,12 @@ func (l *Loop) stopForPerson(ctx context.Context, orderID, summary, detail strin
 	}
 	ctx, cancel := context.WithTimeout(ctx, stopTimeout)
 	defer cancel()
+	args := []string{orderID}
+	if retry {
+		args = append(args, "retry")
+	}
 	_, err := l.deps.Adapter.Run(ctx, "backlog", "stop", adapter.RunOptions{
-		Args:  []string{orderID},
+		Args:  args,
 		Stdin: []byte(message),
 	})
 	// The issue left the ready list: a cached backlog would still offer it to
