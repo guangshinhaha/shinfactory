@@ -24,6 +24,7 @@ type Report struct {
 	Mode        string      `json:"mode"`
 	Concurrency int         `json:"concurrency"`
 	LoopState   string      `json:"loop_state"`
+	StaleFor    string      `json:"stale_for,omitempty"` // how long since the loop last wrote state, when loop_state is stale
 	Running     []Order     `json:"running"`
 	Queued      []Order     `json:"queued"`
 	Parked      []Order     `json:"parked"`
@@ -164,6 +165,11 @@ func Read(runtimeDir string) (Report, error) {
 		default:
 			rep.Queued = append(rep.Queued, order)
 		}
+	}
+	state, staleFor := ResolveLoopState(runtimeDir, rep.LoopState, len(rep.Running) > 0, time.Now())
+	rep.LoopState = state
+	if staleFor > 0 {
+		rep.StaleFor = staleFor.String()
 	}
 	// A person who put the order back has retried it; the old stop no longer applies.
 	for _, it := range stopped {
