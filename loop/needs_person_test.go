@@ -32,6 +32,7 @@ case "$1 $2" in
   "issue view") if [ -f "` + dir + `/labelled" ]; then echo needs-shin; fi; echo ready ;;
   "issue edit") case "$*" in *--add-label*) touch "` + dir + `/labelled" ;; esac ;;
 esac
+if [ "$1" = "api" ] && [ -f "` + dir + `/events" ]; then cat "` + dir + `/events"; fi
 `
 	if err := os.WriteFile(filepath.Join(dir, "gh"), []byte(stub), 0o755); err != nil {
 		t.Fatal(err)
@@ -427,5 +428,29 @@ func TestControlRequeueClearsTheOrdersSpend(t *testing.T) {
 	}
 	if n := h.l.orderSpendOf("42").totalAttempts(); n != 0 {
 		t.Fatalf("attempts after requeue = %d, want 0", n)
+	}
+}
+
+// A stop debt left by an earlier run (the stop landed, the process died before
+// paying) is retried at startup. A person has since put ready back next to
+// needs-shin; the retry must leave the issue alone (#213).
+func TestStopDebtRetryLeavesAnIssueAPersonRestored(t *testing.T) {
+	env := newStopEnv(t)
+	ghDir := filepath.Dir(env.log)
+	// The issue carries both labels: stopped earlier, then ready put back.
+	if err := os.WriteFile(filepath.Join(ghDir, "labelled"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// GitHub's events show needs-shin labelled after the debt was recorded.
+	if err := os.WriteFile(filepath.Join(ghDir, "events"), []byte("2999-01-01T00:00:00Z\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	env.loop.recordStopDebt("7", "The order failed.", "usage limit")
+	env.loop.settleStopDebts(context.Background())
+	if log := ghLog(t, env.log); strings.Contains(log, "issue comment") || strings.Contains(log, "issue edit") {
+		t.Fatalf("debt retry touched an issue a person restored:\n%s", log)
+	}
+	if debts := env.loop.readStopDebts(); len(debts) != 0 {
+		t.Fatalf("debts = %v, want the stale debt dropped", debts)
 	}
 }

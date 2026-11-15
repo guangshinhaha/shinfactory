@@ -8,17 +8,29 @@
 # back up means a person re-readied the issue and it failed again: stop it again (#175). A crash between the comment and the label
 # costs one duplicate comment, never a silent stop.
 #
+# A second argument, an RFC3339 UTC time, marks a retried stop whose debt outlived the process
+# that owed it. If needs-shin was labelled at or after that time, the earlier stop landed and
+# only the payment was lost: whatever the labels say now (ready back, with or without
+# needs-shin) is a person's doing, so leave the issue alone (#213). Without such an event the
+# stop never landed (gh was down): stop the issue. A failed events call fails the script, so the
+# debt stays owed.
+#
 # Env: NOODLE_GH_STOP_LABEL renames needs-shin; NOODLE_GH_LABEL renames ready (as in backlog-sync).
 set -eu
 
 id=${1:-}
 [ -n "$id" ] || { echo "id required" >&2; exit 1; }
+since=${2:-}
 label="${NOODLE_GH_STOP_LABEL:-needs-shin}"
 
 message=$(cat)
 [ -n "$message" ] || { echo "message required" >&2; exit 1; }
 
 labels=$(gh issue view "$id" --json labels --jq '.labels[].name')
+if [ -n "$since" ]; then
+  landed=$(gh api --paginate "repos/{owner}/{repo}/issues/$id/events" --jq ".[] | select(.event == \"labeled\" and .label.name == \"$label\" and .created_at >= \"$since\") | .created_at")
+  [ -z "$landed" ] || exit 0
+fi
 if printf '%s\n' "$labels" | grep -Fxq -- "$label" && ! printf '%s\n' "$labels" | grep -Fxq -- "${NOODLE_GH_LABEL:-ready}"; then exit 0; fi
 
 gh label create "$label" --color D93F0B --description "shinfactory stopped and needs a person's decision" --force >/dev/null
