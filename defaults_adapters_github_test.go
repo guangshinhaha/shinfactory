@@ -48,6 +48,7 @@ if [ "$1 $2" = "issue edit" ]; then
     shift
   done
 fi
+if [ "$1" = "api" ] && [ -f "`+filepath.Join(dir, "events.txt")+`" ]; then cat "`+filepath.Join(dir, "events.txt")+`"; fi
 case "$1 $*" in api*--input*) cat > "` + filepath.Join(dir, "api-input.json") + `"; echo 42 ;; esac
 `
 	if err := os.WriteFile(filepath.Join(dir, "gh"), []byte(stub), 0o755); err != nil {
@@ -382,34 +383,39 @@ func TestGitHubBacklogStopStopsAgainWhenReadyIsBackNextToNeedsShin(t *testing.T)
 	}
 }
 
-// A retried stop (an unpaid debt from an earlier run) finding ready next to needs-shin means
-// the stop landed and a person has since put ready back: it must leave the issue alone (#213).
+// A retried stop finding needs-shin labelled since the debt means the stop landed and only
+// the payment was lost; a person has since put ready back (with or without clearing
+// needs-shin). It must leave the issue alone (#213).
 func TestGitHubBacklogStopRetryLeavesAnIssueAPersonRestored(t *testing.T) {
-	env, logPath := fakeGH(t, `[
-  {"number": 7, "title": "Back", "url": "u7", "labels": [{"name": "ready"}, {"name": "needs-shin"}], "body": "x"}
-]`)
-	runGitHubAdapter(t, env, "backlog-stop", "Failed.", "7", "retry")
-	log := readLog(t, logPath)
-	if strings.Contains(log, "issue comment") || strings.Contains(log, "issue edit") {
-		t.Fatalf("retried stop touched an issue a person restored:\n%s", log)
-	}
-	if got := backlogIDs(t, env); got != "7" {
-		t.Fatalf("backlog = %q, want 7 still ready", got)
+	for name, labels := range map[string]string{
+		"ready next to needs-shin": `[{"name": "ready"}, {"name": "needs-shin"}]`,
+		"bare ready":               `[{"name": "ready"}]`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			env, logPath := fakeGH(t, `[{"number": 7, "title": "Back", "url": "u7", "labels": `+labels+`, "body": "x"}]`)
+			if err := os.WriteFile(filepath.Join(filepath.Dir(logPath), "events.txt"), []byte("2026-11-11T09:00:30Z\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			runGitHubAdapter(t, env, "backlog-stop", "Failed.", "7", "2026-11-11T08:59:00Z")
+			log := readLog(t, logPath)
+			if strings.Contains(log, "issue comment") || strings.Contains(log, "issue edit") {
+				t.Fatalf("retried stop touched an issue a person restored:\n%s", log)
+			}
+			if got := backlogIDs(t, env); got != "7" {
+				t.Fatalf("backlog = %q, want 7 still ready", got)
+			}
+		})
 	}
 }
 
-// A retried stop finding only ready means a person restored it (clearing needs-shin too): leave it (#213).
-func TestGitHubBacklogStopRetryLeavesAReadyIssue(t *testing.T) {
-	env, logPath := fakeGH(t, `[
-  {"number": 7, "title": "Back", "url": "u7", "labels": [{"name": "ready"}], "body": "x"}
-]`)
-	runGitHubAdapter(t, env, "backlog-stop", "Failed.", "7", "retry")
+// A retried stop with no needs-shin event since the debt means the first stop never landed
+// (gh was down): the issue is still ready and must be stopped.
+func TestGitHubBacklogStopRetryStopsAnIssueTheFirstStopNeverReached(t *testing.T) {
+	env, logPath := fakeGH(t, `[{"number": 7, "title": "Back", "url": "u7", "labels": [{"name": "ready"}], "body": "x"}]`)
+	runGitHubAdapter(t, env, "backlog-stop", "Failed.", "7", "2026-11-11T08:59:00Z")
 	log := readLog(t, logPath)
-	if strings.Contains(log, "issue comment") || strings.Contains(log, "issue edit") {
-		t.Fatalf("retried stop touched a ready issue:\n%s", log)
-	}
-	if got := backlogIDs(t, env); got != "7" {
-		t.Fatalf("backlog = %q, want 7 still ready", got)
+	if !strings.Contains(log, "issue comment 7") || !strings.Contains(log, "issue edit 7 --remove-label ready --add-label needs-shin") {
+		t.Fatalf("retried stop did not stop the issue:\n%s", log)
 	}
 }
 

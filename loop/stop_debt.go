@@ -127,6 +127,6 @@ func (l *Loop) settleStopDebts(ctx context.Context) {
 			l.payStopDebt(orderID) // launched again (requeued): the failure is no longer current
 			continue
 		}
-		l.runStop(ctx, orderID, debt.Summary, debt.Detail, true)
+		l.runStop(ctx, orderID, debt.Summary, debt.Detail, debt.At)
 	}
 }

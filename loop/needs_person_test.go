@@ -31,6 +31,7 @@ case "$1 $2" in
   "issue view") if [ -f "` + dir + `/labelled" ]; then echo needs-shin; fi; echo ready ;;
   "issue edit") case "$*" in *--add-label*) touch "` + dir + `/labelled" ;; esac ;;
 esac
+if [ "$1" = "api" ] && [ -f "` + dir + `/events" ]; then cat "` + dir + `/events"; fi
 `
 	if err := os.WriteFile(filepath.Join(dir, "gh"), []byte(stub), 0o755); err != nil {
 		t.Fatal(err)
@@ -437,6 +438,10 @@ func TestStopDebtRetryLeavesAnIssueAPersonRestored(t *testing.T) {
 	ghDir := filepath.Dir(env.log)
 	// The issue carries both labels: stopped earlier, then ready put back.
 	if err := os.WriteFile(filepath.Join(ghDir, "labelled"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// GitHub's events show needs-shin labelled after the debt was recorded.
+	if err := os.WriteFile(filepath.Join(ghDir, "events"), []byte("2999-01-01T00:00:00Z\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	env.loop.recordStopDebt("7", "The order failed.", "usage limit")

@@ -28,12 +28,13 @@ const (
 // is skipped. A failed stop is logged: the order is already failed and
 // inert, and the next stop reports again.
 func (l *Loop) stopForPerson(ctx context.Context, orderID, summary, detail string) {
-	l.runStop(ctx, orderID, summary, detail, false)
+	l.runStop(ctx, orderID, summary, detail, time.Time{})
 }
 
-// runStop is stopForPerson; retry marks the settler re-running an unpaid debt, so the
-// adapter can tell a stop that already landed from a fresh failure (#213).
-func (l *Loop) runStop(ctx context.Context, orderID, summary, detail string, retry bool) {
+// runStop is stopForPerson; a non-zero owedSince marks the settler re-running a debt
+// recorded then, so the adapter can tell a stop that already landed from a fresh
+// failure (#213).
+func (l *Loop) runStop(ctx context.Context, orderID, summary, detail string, owedSince time.Time) {
 	// A person now owns the order; when they put ready back it starts with
 	// its one rebase again.
 	l.clearRebased(orderID)
@@ -46,8 +47,9 @@ func (l *Loop) runStop(ctx context.Context, orderID, summary, detail string, ret
 	ctx, cancel := context.WithTimeout(ctx, stopTimeout)
 	defer cancel()
 	args := []string{orderID}
-	if retry {
-		args = append(args, "retry")
+	if !owedSince.IsZero() {
+		// A minute of margin for clock skew between this machine and GitHub.
+		args = append(args, owedSince.Add(-time.Minute).UTC().Format("2006-01-02T15:04:05Z"))
 	}
 	_, err := l.deps.Adapter.Run(ctx, "backlog", "stop", adapter.RunOptions{
 		Args:  args,
