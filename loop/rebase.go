@@ -238,6 +238,16 @@ func (l *Loop) stopConflicted(ctx context.Context, cook *cookHandle, files []str
 	// A failed flag write must not skip the stop (failStage clears the count): the order
 	// would stay claimed with nobody told. Report both errors.
 	flagErr := l.flagActionNeeded(cook.orderID + ": " + msg)
+	// A parked entry left behind makes the parked-PR retry find the conflict
+	// again every cycle, with the rebase count cleared by the stop below.
+	if _, parked := l.cooks.pendingReview[cook.orderID]; parked {
+		flagErr = errors.Join(flagErr, l.emitEventChecked(ingest.EventStageReviewApproved, map[string]any{
+			"order_id":    cook.orderID,
+			"stage_index": cook.stageIndex,
+			"reason":      "merge conflict stopped the order",
+		}))
+		flagErr = errors.Join(flagErr, l.syncPendingReviewProjection())
+	}
 	l.stopForPerson(ctx, cook.orderID,
 		"A merge conflict the factory cannot resolve. Resolve it by hand or reshape the issue, then put ready back. Conflict:",
 		msg)

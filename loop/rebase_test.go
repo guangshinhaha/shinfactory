@@ -346,3 +346,43 @@ func TestConflictedOrderIsNotReplannedWhileItsStopIsUnsent(t *testing.T) {
 		t.Fatalf("order ran after its stop landed: rebases=%d new sessions=%d", h.ln.rebases, len(h.rt.sessions)-sessions)
 	}
 }
+
+// #197: a PR parked on mergeability GitHub had not computed, then reported
+// CONFLICTING, was stopped again every cycle because the parked entry stayed.
+func TestConflictedOrderParkedOnUnknownMergeabilityIsStoppedOnce(t *testing.T) {
+	h := newGateHarness(t, "medium", "execute", "quality")
+	h.next(t)
+	h.review(t, 0, "none")
+	h.ln.pending = 1 // mergeability UNKNOWN: the stage parks
+	h.next(t)
+	pending, ok := h.l.cooks.pendingReview["42"]
+	if !ok || !strings.HasPrefix(pending.reason, awaitingChecksPrefix) {
+		t.Fatalf("pending review = %+v (parked=%v), want parked waiting for checks", pending, ok)
+	}
+
+	// GitHub now reports CONFLICTING, and the rebase conflicts too.
+	h.ln.conflicts = 1000
+	h.ln.rebaseErr = &RebaseConflictError{Files: []string{"tally/vowels.go"}}
+	for i := 0; i < 11; i++ {
+		h.l.lastChecksPoll = time.Time{}
+		if err := h.l.Cycle(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if got := countLoopEvents(t, h, "order.failed"); got != 1 {
+		t.Fatalf("order.failed events = %d, want 1", got)
+	}
+	if got := countLoopEvents(t, h, "merge.conflict"); got != 1 {
+		t.Fatalf("merge.conflict events = %d, want 1", got)
+	}
+	if len(h.ar.stopCalls) != 1 {
+		t.Fatalf("stop calls = %v, want 1", h.ar.stopCalls)
+	}
+	if len(h.ln.merged) != 0 {
+		t.Fatalf("merges = %d, want 0", len(h.ln.merged))
+	}
+	if _, ok := h.l.cooks.pendingReview["42"]; ok {
+		t.Fatal("pending review entry left after the stop landed")
+	}
+}
