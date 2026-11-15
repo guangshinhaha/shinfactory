@@ -155,6 +155,10 @@ func readSessionSummary(runtimeDir string) (active int, loopState string, _ erro
 	if loopState == "" {
 		loopState = "running"
 	}
+	loopState, staleFor := linestatus.ResolveLoopState(runtimeDir, loopState, active > 0, time.Now())
+	if staleFor > 0 {
+		loopState += " (no state write for " + staleFor.String() + ")"
+	}
 	return active, loopState, nil
 }
 

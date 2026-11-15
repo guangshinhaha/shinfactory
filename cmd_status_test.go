@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -182,5 +183,39 @@ func TestRunStatusJSONKeepsRecordedStopsWithoutStoppedScript(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), `"order": "7"`) {
 		t.Fatalf("recorded stop dropped:\n%s", out.String())
+	}
+}
+
+func TestRunStatusReportsDeadLoopAsStopped(t *testing.T) {
+	projectDir := t.TempDir()
+	runtimeDir := filepath.Join(projectDir, ".noodle")
+	if err := os.MkdirAll(runtimeDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(runtimeDir, "status.json"),
+		[]byte(`{"active":["order-1"],"loop_state":"running"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dead := exec.Command(os.Args[0], "-test.run=^$")
+	if err := dead.Run(); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(runtimeDir, "noodle.lock"),
+		[]byte(strconv.Itoa(dead.ProcessState.Pid())+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	originalDir, _ := os.Getwd()
+	if err := os.Chdir(projectDir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(originalDir) })
+
+	output := captureStdout(t, func() {
+		if err := runStatus(&App{}); err != nil {
+			t.Fatalf("runStatus: %v", err)
+		}
+	})
+	if !strings.Contains(output, "loop=stopped") {
+		t.Fatalf("output = %q, want loop=stopped", output)
 	}
 }
