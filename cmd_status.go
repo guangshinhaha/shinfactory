@@ -23,6 +23,7 @@ type statusSummary struct {
 	ActiveCooks int
 	OrdersDepth int
 	LoopState   string
+	Stuck       []string
 }
 
 func newStatusCmd(app *App) *cobra.Command {
@@ -121,12 +122,21 @@ func runStatus(app *App) error {
 
 	fmt.Fprintf(
 		os.Stdout,
-		"active cooks=%d | orders=%d | loop=%s\n",
+		"active cooks=%d | orders=%d | loop=%s%s\n",
 		summary.ActiveCooks,
 		summary.OrdersDepth,
 		summary.LoopState,
+		stuckSuffix(summary.Stuck),
 	)
 	return nil
+}
+
+// stuckSuffix names the orders whose session shows no events, or "" when none.
+func stuckSuffix(stuck []string) string {
+	if len(stuck) == 0 {
+		return ""
+	}
+	return " | stuck=" + strings.Join(stuck, ",")
 }
 
 func readStatusSummary(runtimeDir string) (statusSummary, error) {
@@ -138,10 +148,15 @@ func readStatusSummary(runtimeDir string) (statusSummary, error) {
 	if err != nil {
 		return statusSummary{}, err
 	}
+	status, err := statusfile.Read(filepath.Join(runtimeDir, "status.json"))
+	if err != nil {
+		return statusSummary{}, err
+	}
 	return statusSummary{
 		ActiveCooks: active,
 		OrdersDepth: ordersDepth,
 		LoopState:   loopState,
+		Stuck:       status.Stuck,
 	}, nil
 }
 

@@ -109,6 +109,12 @@ The cost cap does not apply where the runtime reports no cost: the Orca runtime 
 
 The cost check runs between stages, so one stage can finish past the ceiling before the order stops. There is no cap across orders.
 
+## `[monitor]`
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `stuck_after_minutes` | int | `20` | A running session with no event or log output for this long is listed as `stuck=` in `shinfactory status` and logged once as a warning; `0` turns it off |
+
 ### `[review]`
 
 Sets how many review/verify rounds an order gets before the loop sends it to a person. The count is per order and includes the first round: a rejection from review, verify or a failed quality/verify stage ends a round. While rounds remain, the order goes back to execute on the same branch with the rejection attached. When the last round fails, the order stops and the issue comment says "2 of 2 review rounds failed" (the numbers are rounds run and the limit) with each rejection's reason.

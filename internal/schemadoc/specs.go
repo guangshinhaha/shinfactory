@@ -127,6 +127,7 @@ var schemaTargets = []targetSpec{
 			"mode":            {Type: "string (auto|supervised|manual)", Description: "current run mode governing schedule, dispatch, and merge gates"},
 			"max_concurrency": {Type: "number", Description: "current max concurrency (may differ from config if overridden at runtime)"},
 			"warnings[]":      {Description: "operational warning message"},
+			"stuck[]":         {Description: "order IDs whose running session showed no event for longer than [monitor] stuck_after_minutes"},
 		},
 	},
 }

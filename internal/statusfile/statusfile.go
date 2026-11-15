@@ -16,6 +16,9 @@ type Status struct {
 	Mode           string   `json:"mode,omitempty"`
 	MaxConcurrency int      `json:"max_concurrency,omitempty"`
 	Warnings       []string `json:"warnings,omitempty"`
+	// Stuck lists the orders whose running session showed no event for longer
+	// than [monitor] stuck_after_minutes.
+	Stuck []string `json:"stuck,omitempty"`
 }
 
 // Read parses status.json at path. Returns zero-value Status if the file

@@ -599,3 +599,39 @@ func backlogFingerprint(backlog []adapter.BacklogItem) string {
 	}
 	return b.String()
 }
+
+// retryFailedScheduleOrder requeues a failed schedule order. A failed order is
+// inert and still counts as "a schedule order exists", so without this nothing
+// would schedule again until a person ran `control requeue schedule` (#205).
+// Retries are spaced scheduleRetryBackoff apart so a scheduler that dies at
+// once cannot spin, and none start once the loop is shutting down (a requeued
+// scheduler would be a live session that shutdown waits on).
+func (l *Loop) retryFailedScheduleOrder(ctx context.Context) error {
+	if ctx.Err() != nil {
+		return nil
+	}
+	orders, err := l.currentOrders()
+	if err != nil {
+		return err
+	}
+	failed := false
+	for _, order := range orders.Orders {
+		if isScheduleOrder(order) && order.Status == OrderStatusFailed {
+			failed = true
+			break
+		}
+	}
+	if !failed || l.hasActiveScheduleCook() {
+		return nil
+	}
+	now := l.deps.Now()
+	if now.Before(l.scheduleRetryAt) {
+		return nil
+	}
+	if err := l.controlRequeue(scheduleOrderID); err != nil {
+		return fmt.Errorf("requeueing failed schedule order: %w", err)
+	}
+	l.scheduleRetryAt = now.Add(scheduleRetryBackoff)
+	l.logger.Warn("schedule order had failed, requeued it", "next_retry_not_before", l.scheduleRetryAt.Format(time.RFC3339))
+	return nil
+}

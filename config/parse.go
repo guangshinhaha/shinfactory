@@ -82,6 +82,10 @@ func applyDefaultsFromMetadata(config *Config, metadata toml.MetaData, diagnosti
 		config.Concurrency.MaxConcurrency = defaultMaxConcurrency
 	}
 
+	if !metadata.IsDefined("monitor", "stuck_after_minutes") {
+		config.Monitor.StuckAfterMinutes = defaultStuckAfterMinutes
+	}
+
 	if !metadata.IsDefined("spend", "max_attempts") {
 		config.Spend.MaxAttempts = defaultMaxStageAttempts
 	}
@@ -286,6 +290,13 @@ func normalizeParsedValues(config *Config, metadata toml.MetaData, diagnostics *
 			)
 		}
 		config.Concurrency.MaxConcurrency = defaultMaxConcurrency
+	}
+
+	if config.Monitor.StuckAfterMinutes < 0 {
+		appendNormalizedValueDiagnostic(diagnostics, "monitor.stuck_after_minutes",
+			fmt.Sprintf("stuck_after_minutes=%d is invalid; using %d", config.Monitor.StuckAfterMinutes, defaultStuckAfterMinutes),
+		)
+		config.Monitor.StuckAfterMinutes = defaultStuckAfterMinutes
 	}
 
 	if config.Spend.MaxAttempts < 0 {

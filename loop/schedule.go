@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/guangshinhaha/shinfactory/dispatcher"
 	"github.com/guangshinhaha/shinfactory/internal/ingest"
@@ -407,3 +408,6 @@ func ordersSchemaPrompt() string {
 	}
 	return prompt
 }
+
+// scheduleRetryBackoff spaces out automatic retries of a failed schedule order.
+const scheduleRetryBackoff = 5 * time.Minute

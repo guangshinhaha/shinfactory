@@ -29,6 +29,7 @@ func (l *Loop) stampStatus() error {
 		Mode:           mode,
 		MaxConcurrency: l.config.Concurrency.MaxConcurrency,
 		Warnings:       l.lastMiseWarnings,
+		Stuck:          l.stuckOrders,
 	}
 
 	// Skip write if nothing changed.
@@ -36,7 +37,8 @@ func (l *Loop) stampStatus() error {
 		l.lastStatus.LoopState == status.LoopState &&
 		l.lastStatus.Mode == status.Mode &&
 		l.lastStatus.MaxConcurrency == status.MaxConcurrency &&
-		slices.Equal(l.lastStatus.Warnings, status.Warnings) {
+		slices.Equal(l.lastStatus.Warnings, status.Warnings) &&
+		slices.Equal(l.lastStatus.Stuck, status.Stuck) {
 		l.publishState()
 		return nil
 	}

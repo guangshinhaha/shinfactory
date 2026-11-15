@@ -28,7 +28,18 @@ type Config struct {
 	Backlog     BacklogConfig            `toml:"backlog"`
 	Review      ReviewConfig             `toml:"review"`
 	Gate        GateConfig               `toml:"gate"`
+	Monitor     MonitorConfig            `toml:"monitor"`
 }
+
+// MonitorConfig tunes what the loop reports about running sessions.
+type MonitorConfig struct {
+	// StuckAfterMinutes is how long a running session may show no event or log
+	// output before `status` reports it as stuck and the loop logs a warning.
+	// Zero turns the report off; a negative value is invalid.
+	StuckAfterMinutes int `toml:"stuck_after_minutes"`
+}
+
+const defaultStuckAfterMinutes = 20
 
 // GateConfig tunes the evidence gate that checks a bug fix before its execute
 // stage is accepted.
@@ -337,7 +348,8 @@ func DefaultConfig() Config {
 		Skills: SkillsConfig{
 			Paths: defaultSkillPaths(),
 		},
-		Mode: defaultMode,
+		Mode:    defaultMode,
+		Monitor: MonitorConfig{StuckAfterMinutes: defaultStuckAfterMinutes},
 		Concurrency: ConcurrencyConfig{
 			MaxConcurrency: 2,
 		},
