@@ -357,7 +357,8 @@ func (l *Loop) controlStop(name string) error {
 }
 
 // controlStopKill is the fallback for non-steerable sessions: kill the process
-// and clean up the cook.
+// and fail the stage. The stop is a person's decision to abandon the cook, so
+// the order leaves active (and frees its slot) and goes to them like any failure.
 func (l *Loop) controlStopKill(cook *cookHandle) error {
 	if err := cook.session.ForceKill(); err != nil {
 		return fmt.Errorf("force kill session %q failed: %w", cook.session.ID(), err)
@@ -368,8 +369,7 @@ func (l *Loop) controlStopKill(cook *cookHandle) error {
 		CompletedAt: l.deps.Now(),
 	})
 	delete(l.cooks.activeCooksByOrder, cook.orderID)
-	l.cleanupCookWorktree(cook)
-	return nil
+	return l.failStage(context.Background(), cook, "stopped by control stop")
 }
 
 func (l *Loop) writeLastAppliedSeq() error {
