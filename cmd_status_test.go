@@ -184,3 +184,35 @@ func TestRunStatusJSONKeepsRecordedStopsWithoutStoppedScript(t *testing.T) {
 		t.Fatalf("recorded stop dropped:\n%s", out.String())
 	}
 }
+
+func TestRunStatusReportsStuckOrders(t *testing.T) {
+	projectDir := t.TempDir()
+	runtimeDir := filepath.Join(projectDir, ".noodle")
+	if err := os.MkdirAll(runtimeDir, 0o755); err != nil {
+		t.Fatalf("mkdir runtime: %v", err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(runtimeDir, "status.json"),
+		[]byte(`{"active":["38"],"loop_state":"running","stuck":["38"]}`),
+		0o644,
+	); err != nil {
+		t.Fatalf("write status: %v", err)
+	}
+	originalDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	if err := os.Chdir(projectDir); err != nil {
+		t.Fatalf("chdir project dir: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(originalDir) })
+
+	output := captureStdout(t, func() {
+		if err := runStatus(&App{}); err != nil {
+			t.Fatalf("runStatus: %v", err)
+		}
+	})
+	if !strings.Contains(output, "stuck=38") {
+		t.Fatalf("expected stuck orders in status, got: %q", output)
+	}
+}
