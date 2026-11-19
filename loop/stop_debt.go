@@ -63,7 +63,7 @@ func failureStopText(reason string) (summary, detail string) {
 	if detail, ok := strings.CutPrefix(reason, unbuildablePrefix); ok {
 		return "The issue has no observable Done when, or something only a person can settle blocks it.", detail
 	}
-	return "The order failed and the factory will not retry it. Fix the cause or the Done when, then put ready back. Reason:", reason
+	return "The order failed and the factory will not retry it. Fix the cause, then put ready back. Reason:", reason
 }
 
 // isScheduleOrderID reports whether id names the scheduler's own order, which
