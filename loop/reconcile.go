@@ -74,6 +74,14 @@ func (l *Loop) reconcile(ctx context.Context) error {
 			err,
 		)
 	}
+	// Archiving removed these orders, so their parked entries have no order left.
+	if err := l.reconcilePendingReview(); err != nil {
+		return l.classifySystemHard(
+			"reconcile.pending_review_prune",
+			"reconcile pending review prune failed",
+			err,
+		)
+	}
 
 	if len(l.cooks.adoptedSessions) > 0 {
 		tickets := monitor.NewEventTicketMaterializer(l.runtimeDir)
