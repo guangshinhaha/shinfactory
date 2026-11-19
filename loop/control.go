@@ -100,6 +100,11 @@ func (l *Loop) processControlCommands() error {
 		}
 		return fmt.Errorf("read control file: %w", err)
 	}
+	if len(data) == 0 {
+		// Truncating an empty queue is a write the runtime watcher reports as
+		// a control command, which starts the next cycle with no wait (#188).
+		return nil
+	}
 
 	acks := l.processControlLines(data)
 	if len(acks) > 0 {
